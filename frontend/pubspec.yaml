@@ -1,0 +1,65 @@
+name: plately_v2
+description: Plately V2 — AI-powered high-protein meal generator for students.
+publish_to: 'none'
+version: 1.0.0+1
+
+environment:
+  sdk: '>=3.0.0 <4.0.0'
+
+dependencies:
+  flutter:
+    sdk: flutter
+
+  # HTTP
+  http: ^1.2.1
+
+  # Image picking
+  image_picker: ^1.1.2
+
+  # Local storage
+  shared_preferences: ^2.3.2
+
+  # Cached network images
+  cached_network_image: ^3.3.1
+
+  # ── UI UPGRADE PACKAGES ──────────────────────────────────────
+  # Chainable animations: .animate().fadeIn().slideY().shimmer()
+  flutter_animate: ^4.5.0
+
+  # 1450+ clean Lucide line icons — replaces Material icons + emojis
+  lucide_icons_flutter: ^3.1.13
+
+  # Skeleton shimmer loading effect
+  shimmer: ^3.0.0
+
+  # Frosted glass panels
+  glassmorphism: ^2.0.0
+
+  cupertino_icons: ^1.0.8
+
+dev_dependencies:
+  flutter_test:
+    sdk: flutter
+  flutter_lints: ^4.0.0
+
+flutter:
+  uses-material-design: true
+
+  assets:
+    - assets/images/
+
+  fonts:
+    - family: Nunito
+      fonts:
+        - asset: assets/fonts/Nunito-Regular.ttf
+        - asset: assets/fonts/Nunito-Bold.ttf
+          weight: 700
+        - asset: assets/fonts/Nunito-ExtraBold.ttf
+          weight: 800
+    - family: DM Sans
+      fonts:
+        - asset: assets/fonts/DMSans-Regular.ttf
+        - asset: assets/fonts/DMSans-Medium.ttf
+          weight: 500
+        - asset: assets/fonts/DMSans-Bold.ttf
+          weight: 700

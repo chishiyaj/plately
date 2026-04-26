@@ -1,0 +1,36 @@
+# Flutter/Dart
+.dart_tool/
+.flutter-plugins
+.flutter-plugins-dependencies
+.packages
+.pub-cache/
+.pub/
+build/
+*.iml
+
+# Android
+frontend/android/local.properties
+frontend/android/.gradle/
+frontend/android/captures/
+frontend/android/key.properties
+*.keystore
+*.jks
+
+# IDE
+.idea/
+.vscode/
+*.suo
+*.ntvs*
+*.njsproj
+*.sln
+*.sw?
+
+# Backend
+backend/__pycache__/
+backend/*.pyc
+backend/.env
+backend/db/plately.db
+
+# OS
+.DS_Store
+Thumbs.db
