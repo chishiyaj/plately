@@ -1,7 +1,8 @@
-﻿import 'package:flutter/material.dart';
+import 'package:flutter/material.dart';
 import 'package:flutter_animate/flutter_animate.dart';
 import 'package:lucide_icons_flutter/lucide_icons.dart';
 import '../theme/app_theme.dart';
+import '../models/recipe.dart';
 import '../widgets/bottom_nav.dart';
 import '../widgets/tap_scale.dart';
 import '../widgets/ai_tip_card.dart';
@@ -12,8 +13,8 @@ import 'profile_screen.dart';
 import 'recipe_results_screen.dart';
 
 class RecipeDetailScreen extends StatefulWidget {
-  final String title;
-  const RecipeDetailScreen({required this.title, super.key});
+  final Recipe recipe;
+  const RecipeDetailScreen({required this.recipe, super.key});
   @override
   State<RecipeDetailScreen> createState() => _RecipeDetailScreenState();
 }
@@ -25,25 +26,13 @@ class _RecipeDetailScreenState extends State<RecipeDetailScreen> with TickerProv
   late final Animation<double> _heroFade;
   final Set<int> _checked = {};
 
-  static const _ingredients = [
-    {'name': 'Chicken breast',   'amount': '200g'},
-    {'name': 'Mixed vegetables', 'amount': '1.5 cups'},
-    {'name': 'Soy sauce',        'amount': '2 tbsp'},
-    {'name': 'Garlic',           'amount': '3 cloves'},
-    {'name': 'Ginger',           'amount': '1 tsp'},
-    {'name': 'Sesame oil',       'amount': '1 tbsp'},
-    {'name': 'Cornstarch',       'amount': '1 tbsp'},
-  ];
+  Recipe get r => widget.recipe;
 
-  static const _steps = [
-    'Slice chicken breast into thin strips. Season generously with salt and pepper.',
-    'Mix soy sauce, sesame oil, and cornstarch in a small bowl. Set aside.',
-    'Heat a wok or large pan over high heat. Add oil until shimmering.',
-    'Add chicken and cook for 3â€“4 minutes until golden. Remove and set aside.',
-    'In the same pan, stir-fry vegetables for 2â€“3 minutes until tender-crisp.',
-    'Return chicken to pan. Pour sauce over everything and toss to coat.',
-    'Serve hot over rice and garnish with sesame seeds.',
-  ];
+  List<String> get _steps => r.instructions
+      .split('\n')
+      .map((s) => s.replaceFirst(RegExp(r'^\d+\.\s*'), '').trim())
+      .where((s) => s.isNotEmpty)
+      .toList();
 
   @override
   void initState() {
@@ -61,7 +50,7 @@ class _RecipeDetailScreenState extends State<RecipeDetailScreen> with TickerProv
     switch (index) {
       case 0: screen = const HomeScreen();      break;
       case 1: screen = const FavoritesScreen(); break;
-      case 2: screen = RecipeResultsScreen(ingredients: const ['chicken', 'eggs', 'rice']); break;
+      case 2: screen = const RecipeResultsScreen(ingredients: []); break;
       case 3: screen = const AiChatScreen();    break;
       case 4: screen = const ProfileScreen();   break;
       default: return;
@@ -83,7 +72,10 @@ class _RecipeDetailScreenState extends State<RecipeDetailScreen> with TickerProv
               duration: 280.ms,
               transitionBuilder: (child, anim) => FadeTransition(
                 opacity: anim,
-                child: SlideTransition(position: Tween(begin: const Offset(0.04, 0), end: Offset.zero).animate(anim), child: child),
+                child: SlideTransition(
+                  position: Tween(begin: const Offset(0.04, 0), end: Offset.zero).animate(anim),
+                  child: child,
+                ),
               ),
               child: SingleChildScrollView(
                 key: ValueKey(_showIngredients),
@@ -94,7 +86,7 @@ class _RecipeDetailScreenState extends State<RecipeDetailScreen> with TickerProv
                     const SizedBox(height: 16),
                     _buildNutrition(),
                     const SizedBox(height: 14),
-                    const AiTipCard(tip: 'Velvet the chicken by marinating in cornstarch + egg white for 15 min before cooking â€” it stays incredibly tender at high heat.'),
+                    AiTipCard(tip: _aiTip()),
                     const SizedBox(height: 18),
                     _buildActionBtn(),
                   ],
@@ -106,6 +98,13 @@ class _RecipeDetailScreenState extends State<RecipeDetailScreen> with TickerProv
       ),
       bottomNavigationBar: PlatelyBottomNav(currentIndex: 2, onTap: _onNavTap, onScanTap: () => _onNavTap(2)),
     );
+  }
+
+  String _aiTip() {
+    if (r.tags.contains('Asian'))    return 'For best stir-fry results, use high heat and keep ingredients moving — this gives that restaurant-style wok hei flavour.';
+    if (r.tags.contains('Italian'))  return 'Salt your pasta water generously — it should taste like the sea. This is the only chance to season the pasta itself.';
+    if (r.tags.contains('High-Protein')) return 'Let protein rest 2–3 min after cooking — it stays juicier and retains more nutrients.';
+    return 'Prep all ingredients before you start cooking — it makes the whole process faster and less stressful.';
   }
 
   Widget _buildHero(BuildContext context) {
@@ -139,18 +138,17 @@ class _RecipeDetailScreenState extends State<RecipeDetailScreen> with TickerProv
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                Text(widget.title, style: const TextStyle(color: Colors.white, fontSize: 22, fontFamily: 'DM Sans', fontWeight: FontWeight.w800)),
+                Text(r.name, style: const TextStyle(color: Colors.white, fontSize: 22, fontFamily: 'DM Sans', fontWeight: FontWeight.w800)),
                 const SizedBox(height: 8),
-                const Wrap(spacing: 8, children: [
-                  _MetaBadge(icon: LucideIcons.clock3,          label: '20 min'),
-                  _MetaBadge(icon: LucideIcons.flame,           label: '420 cal'),
-                  _MetaBadge(icon: LucideIcons.dumbbell,        label: '38g protein', highlight: true),
-                  _MetaBadge(icon: LucideIcons.signalHigh,      label: 'Easy'),
+                Wrap(spacing: 8, children: [
+                  _MetaBadge(icon: LucideIcons.clock3,     label: r.cookTime),
+                  _MetaBadge(icon: LucideIcons.flame,      label: '${r.calories} cal'),
+                  _MetaBadge(icon: LucideIcons.dumbbell,   label: '${r.protein}g protein', highlight: true),
+                  _MetaBadge(icon: LucideIcons.signalHigh, label: r.difficulty),
                 ]),
               ],
             ),
           ),
-          // Back
           Positioned(
             top: 48, left: 16,
             child: TapScale(
@@ -162,7 +160,6 @@ class _RecipeDetailScreenState extends State<RecipeDetailScreen> with TickerProv
               ),
             ),
           ),
-          // Favourite
           Positioned(
             top: 48, right: 16,
             child: TapScale(
@@ -173,7 +170,7 @@ class _RecipeDetailScreenState extends State<RecipeDetailScreen> with TickerProv
                   color: _isFavorited ? AppTheme.red.withValues(alpha: 0.9) : Colors.black45,
                   borderRadius: BorderRadius.circular(12),
                 ),
-                child: Icon(_isFavorited ? LucideIcons.heartCrack : LucideIcons.heart, color: Colors.white, size: 18),
+                child: Icon(_isFavorited ? LucideIcons.heartOff : LucideIcons.heart, color: Colors.white, size: 18),
               ),
             ),
           ),
@@ -187,27 +184,31 @@ class _RecipeDetailScreenState extends State<RecipeDetailScreen> with TickerProv
       margin: const EdgeInsets.fromLTRB(20, 14, 20, 0),
       height: 44,
       decoration: BoxDecoration(color: AppTheme.lightGray.withValues(alpha: 0.5), borderRadius: BorderRadius.circular(14)),
-      child: Row(
-        children: [
-          _Tab(label: 'Ingredients', selected: _showIngredients,  onTap: () => setState(() => _showIngredients = true)),
-          _Tab(label: 'Steps',       selected: !_showIngredients, onTap: () => setState(() => _showIngredients = false)),
-        ],
-      ),
+      child: Row(children: [
+        _Tab(label: 'Ingredients', selected: _showIngredients,  onTap: () => setState(() => _showIngredients = true)),
+        _Tab(label: 'Steps',       selected: !_showIngredients, onTap: () => setState(() => _showIngredients = false)),
+      ]),
     );
   }
 
   Widget _buildIngredients() {
+    final ings = r.ingredients;
+    if (ings.isEmpty) {
+      return const Padding(
+        padding: EdgeInsets.symmetric(vertical: 32),
+        child: Center(child: Text('No ingredient details', style: TextStyle(fontFamily: 'DM Sans', color: AppTheme.mutedText))),
+      );
+    }
     return Column(
-      children: List.generate(_ingredients.length, (i) {
-        final ing = _ingredients[i];
+      children: List.generate(ings.length, (i) {
+        final ing = ings[i];
         return TapScale(
           onTap: () => setState(() => _checked.contains(i) ? _checked.remove(i) : _checked.add(i)),
           child: Container(
             margin: const EdgeInsets.only(bottom: 8),
             padding: const EdgeInsets.all(14),
             decoration: BoxDecoration(
-              color: Colors.white,
-              borderRadius: BorderRadius.circular(14),
+              color: Colors.white, borderRadius: BorderRadius.circular(14),
               boxShadow: const [BoxShadow(color: Color(0x06000000), blurRadius: 8, offset: Offset(0, 2))],
             ),
             child: Row(
@@ -223,12 +224,12 @@ class _RecipeDetailScreenState extends State<RecipeDetailScreen> with TickerProv
                   child: _checked.contains(i) ? const Icon(LucideIcons.check, color: Colors.white, size: 13) : null,
                 ),
                 const SizedBox(width: 12),
-                Expanded(child: Text(ing['name']!, style: TextStyle(
+                Expanded(child: Text(ing.name, style: TextStyle(
                   color: _checked.contains(i) ? AppTheme.mutedText : AppTheme.darkText,
                   fontSize: 14, fontFamily: 'DM Sans', fontWeight: FontWeight.w500,
                   decoration: _checked.contains(i) ? TextDecoration.lineThrough : null,
                 ))),
-                Text(ing['amount']!, style: const TextStyle(color: AppTheme.mutedText, fontSize: 13, fontFamily: 'DM Sans', fontWeight: FontWeight.w500)),
+                Text(ing.amount, style: const TextStyle(color: AppTheme.mutedText, fontSize: 13, fontFamily: 'DM Sans', fontWeight: FontWeight.w500)),
               ],
             ),
           ).animate(delay: (i * 40).ms).fadeIn(duration: 300.ms).slideX(begin: 0.04),
@@ -238,8 +239,9 @@ class _RecipeDetailScreenState extends State<RecipeDetailScreen> with TickerProv
   }
 
   Widget _buildSteps() {
+    final steps = _steps;
     return Column(
-      children: List.generate(_steps.length, (i) {
+      children: List.generate(steps.length, (i) {
         return Container(
           margin: const EdgeInsets.only(bottom: 12),
           padding: const EdgeInsets.all(16),
@@ -256,7 +258,7 @@ class _RecipeDetailScreenState extends State<RecipeDetailScreen> with TickerProv
                 child: Center(child: Text('${i + 1}', style: const TextStyle(color: Colors.white, fontSize: 12, fontFamily: 'DM Sans', fontWeight: FontWeight.w700))),
               ),
               const SizedBox(width: 12),
-              Expanded(child: Text(_steps[i], style: const TextStyle(color: AppTheme.darkText, fontSize: 14, fontFamily: 'DM Sans', height: 1.5))),
+              Expanded(child: Text(steps[i], style: const TextStyle(color: AppTheme.darkText, fontSize: 14, fontFamily: 'DM Sans', height: 1.5))),
             ],
           ),
         ).animate(delay: (i * 50).ms).fadeIn(duration: 300.ms).slideX(begin: 0.04);
@@ -279,13 +281,13 @@ class _RecipeDetailScreenState extends State<RecipeDetailScreen> with TickerProv
             Text('1 serving', style: TextStyle(color: AppTheme.mutedText, fontSize: 12, fontFamily: 'DM Sans')),
           ]),
           const SizedBox(height: 16),
-          const Row(
+          Row(
             mainAxisAlignment: MainAxisAlignment.spaceAround,
             children: [
-              _NutriBadge(label: 'Calories', value: '420', unit: 'kcal', color: AppTheme.orange),
-              _NutriBadge(label: 'Protein',  value: '38',  unit: 'g',    color: AppTheme.green),
-              _NutriBadge(label: 'Carbs',    value: '32',  unit: 'g',    color: AppTheme.typeBlue),
-              _NutriBadge(label: 'Fat',      value: '12',  unit: 'g',    color: AppTheme.askPurple),
+              _NutriBadge(label: 'Calories', value: '${r.calories}', unit: 'kcal', color: AppTheme.orange),
+              _NutriBadge(label: 'Protein',  value: '${r.protein}',  unit: 'g',    color: AppTheme.green),
+              _NutriBadge(label: 'Carbs',    value: '${r.carbs}',    unit: 'g',    color: AppTheme.typeBlue),
+              _NutriBadge(label: 'Fat',      value: '${r.fat}',      unit: 'g',    color: AppTheme.askPurple),
             ],
           ),
         ],
@@ -308,13 +310,16 @@ class _RecipeDetailScreenState extends State<RecipeDetailScreen> with TickerProv
           children: [
             Icon(_showIngredients ? LucideIcons.chefHat : LucideIcons.circleCheck, color: Colors.white, size: 20),
             const SizedBox(width: 10),
-            Text(_showIngredients ? "Let's Cook" : 'Finish Cooking', style: const TextStyle(color: Colors.white, fontSize: 16, fontFamily: 'DM Sans', fontWeight: FontWeight.w700)),
+            Text(_showIngredients ? "Let's Cook" : 'Finish Cooking',
+                style: const TextStyle(color: Colors.white, fontSize: 16, fontFamily: 'DM Sans', fontWeight: FontWeight.w700)),
           ],
         ),
       ),
     );
   }
 }
+
+// ── Shared sub-widgets ─────────────────────────────────────────────────────
 
 class _Tab extends StatelessWidget {
   final String label;
@@ -323,28 +328,24 @@ class _Tab extends StatelessWidget {
   const _Tab({required this.label, required this.selected, required this.onTap});
 
   @override
-  Widget build(BuildContext context) {
-    return Expanded(
-      child: TapScale(
-        onTap: onTap,
-        child: AnimatedContainer(
-          duration: 200.ms,
-          margin: const EdgeInsets.all(4),
-          decoration: BoxDecoration(
-            color: selected ? Colors.white : Colors.transparent,
-            borderRadius: BorderRadius.circular(10),
-            boxShadow: selected ? const [BoxShadow(color: Color(0x12000000), blurRadius: 6)] : [],
-          ),
-          child: Center(
-            child: Text(label, style: TextStyle(
-              color: selected ? AppTheme.primaryDark : AppTheme.mutedText,
-              fontSize: 13, fontFamily: 'DM Sans', fontWeight: selected ? FontWeight.w700 : FontWeight.w500,
-            )),
-          ),
+  Widget build(BuildContext context) => Expanded(
+    child: TapScale(
+      onTap: onTap,
+      child: AnimatedContainer(
+        duration: 200.ms,
+        margin: const EdgeInsets.all(4),
+        decoration: BoxDecoration(
+          color: selected ? Colors.white : Colors.transparent,
+          borderRadius: BorderRadius.circular(10),
+          boxShadow: selected ? const [BoxShadow(color: Color(0x12000000), blurRadius: 6)] : [],
         ),
+        child: Center(child: Text(label, style: TextStyle(
+          color: selected ? AppTheme.primaryDark : AppTheme.mutedText,
+          fontSize: 13, fontFamily: 'DM Sans', fontWeight: selected ? FontWeight.w700 : FontWeight.w500,
+        ))),
       ),
-    );
-  }
+    ),
+  );
 }
 
 class _MetaBadge extends StatelessWidget {
@@ -354,23 +355,21 @@ class _MetaBadge extends StatelessWidget {
   const _MetaBadge({required this.icon, required this.label, this.highlight = false});
 
   @override
-  Widget build(BuildContext context) {
-    return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
-      decoration: BoxDecoration(
-        color: highlight ? AppTheme.green : Colors.black38,
-        borderRadius: BorderRadius.circular(8),
-      ),
-      child: Row(
-        mainAxisSize: MainAxisSize.min,
-        children: [
-          Icon(icon, size: 11, color: highlight ? AppTheme.primaryDark : Colors.white),
-          const SizedBox(width: 4),
-          Text(label, style: TextStyle(color: highlight ? AppTheme.primaryDark : Colors.white, fontSize: 11, fontFamily: 'DM Sans', fontWeight: FontWeight.w700)),
-        ],
-      ),
-    );
-  }
+  Widget build(BuildContext context) => Container(
+    padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+    decoration: BoxDecoration(
+      color: highlight ? AppTheme.green : Colors.black38,
+      borderRadius: BorderRadius.circular(8),
+    ),
+    child: Row(mainAxisSize: MainAxisSize.min, children: [
+      Icon(icon, size: 11, color: highlight ? AppTheme.primaryDark : Colors.white),
+      const SizedBox(width: 4),
+      Text(label, style: TextStyle(
+        color: highlight ? AppTheme.primaryDark : Colors.white,
+        fontSize: 11, fontFamily: 'DM Sans', fontWeight: FontWeight.w700,
+      )),
+    ]),
+  );
 }
 
 class _NutriBadge extends StatelessWidget {
@@ -379,19 +378,14 @@ class _NutriBadge extends StatelessWidget {
   const _NutriBadge({required this.label, required this.value, required this.unit, required this.color});
 
   @override
-  Widget build(BuildContext context) {
-    return Column(
-      children: [
-        Container(
-          width: 58, height: 58,
-          decoration: BoxDecoration(color: color.withValues(alpha: 0.12), shape: BoxShape.circle),
-          child: Center(child: Text(value, style: TextStyle(color: color, fontSize: 18, fontFamily: 'DM Sans', fontWeight: FontWeight.w800))),
-        ),
-        const SizedBox(height: 5),
-        Text(unit, style: const TextStyle(color: AppTheme.mutedText, fontSize: 11, fontFamily: 'DM Sans')),
-        Text(label, style: const TextStyle(color: AppTheme.darkText, fontSize: 12, fontFamily: 'DM Sans', fontWeight: FontWeight.w600)),
-      ],
-    );
-  }
+  Widget build(BuildContext context) => Column(children: [
+    Container(
+      width: 58, height: 58,
+      decoration: BoxDecoration(color: color.withValues(alpha: 0.12), shape: BoxShape.circle),
+      child: Center(child: Text(value, style: TextStyle(color: color, fontSize: 18, fontFamily: 'DM Sans', fontWeight: FontWeight.w800))),
+    ),
+    const SizedBox(height: 5),
+    Text(unit, style: const TextStyle(color: AppTheme.mutedText, fontSize: 11, fontFamily: 'DM Sans')),
+    Text(label, style: const TextStyle(color: AppTheme.darkText, fontSize: 12, fontFamily: 'DM Sans', fontWeight: FontWeight.w600)),
+  ]);
 }
-

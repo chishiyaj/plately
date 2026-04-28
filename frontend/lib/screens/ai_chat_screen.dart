@@ -3,7 +3,7 @@ import 'package:lucide_icons_flutter/lucide_icons.dart';
 import 'package:flutter_animate/flutter_animate.dart';
 import '../theme/app_theme.dart';
 import '../models/chat_message.dart';
-import '../widgets/bottom_nav.dart';
+import '../services/api_service.dart';
 import '../widgets/tap_scale.dart';
 
 class AiChatScreen extends StatefulWidget {
@@ -32,8 +32,7 @@ class _AiChatScreenState extends State<AiChatScreen> {
     'Meal prep for the week',
   ];
 
-  static const _mockReply =
-      "Great question! I'd suggest a high-protein chicken and vegetable stir fry — quick (20 min), packed with 38g protein, and only about P150 per serving. Want the full recipe?";
+
 
   @override
   void dispose() {
@@ -42,23 +41,21 @@ class _AiChatScreenState extends State<AiChatScreen> {
     super.dispose();
   }
 
-  void _send([String? text]) {
+  Future<void> _send([String? text]) async {
     final msg = (text ?? _inputCtrl.text).trim();
-    if (msg.isEmpty) return;
     setState(() {
       _messages.add(ChatMessage(text: msg, isUser: true, timestamp: DateTime.now()));
       _loading = true;
     });
     _inputCtrl.clear();
     _scrollToBottom();
-    Future.delayed(const Duration(milliseconds: 1400), () {
-      if (!mounted) return;
-      setState(() {
-        _messages.add(ChatMessage(text: _mockReply, isUser: false, timestamp: DateTime.now()));
-        _loading = false;
-      });
-      _scrollToBottom();
+    final reply = await ApiService.sendChat(msg);
+    if (!mounted) return;
+    setState(() {
+      _messages.add(ChatMessage(text: reply, isUser: false, timestamp: DateTime.now()));
+      _loading = false;
     });
+    _scrollToBottom();
   }
 
   void _scrollToBottom() {
@@ -94,7 +91,7 @@ class _AiChatScreenState extends State<AiChatScreen> {
           ],
         ),
       ),
-      bottomNavigationBar: PlatelyBottomNav(currentIndex: 3, onTap: (_) {}, onScanTap: () {}),
+      bottomNavigationBar: null, // MainShell owns the nav
     );
   }
 
@@ -104,18 +101,6 @@ class _AiChatScreenState extends State<AiChatScreen> {
       padding: const EdgeInsets.fromLTRB(20, 14, 24, 14),
       child: Row(
         children: [
-          TapScale(
-            onTap: () => Navigator.pop(context),
-            child: Container(
-              width: 42, height: 42,
-              decoration: BoxDecoration(
-                  color: AppTheme.creamBg,
-                  borderRadius: BorderRadius.circular(12),
-                  border: Border.all(color: AppTheme.borderGray)),
-              child: const Icon(LucideIcons.arrowLeft, color: AppTheme.primaryDark, size: 18),
-            ),
-          ),
-          const SizedBox(width: 12),
           Container(
             width: 42, height: 42,
             decoration: const BoxDecoration(gradient: AppTheme.tealGradient, shape: BoxShape.circle),

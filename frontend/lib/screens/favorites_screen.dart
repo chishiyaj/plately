@@ -3,9 +3,8 @@ import 'package:lucide_icons_flutter/lucide_icons.dart';
 import 'package:flutter_animate/flutter_animate.dart';
 import '../theme/app_theme.dart';
 import '../widgets/recipe_card.dart';
-import '../widgets/bottom_nav.dart';
 import '../widgets/tap_scale.dart';
-import 'recipe_detail_screen.dart';
+import 'recipe_results_screen.dart';
 
 class FavoritesScreen extends StatefulWidget {
   const FavoritesScreen({super.key});
@@ -55,7 +54,7 @@ class _FavoritesScreenState extends State<FavoritesScreen> {
           ],
         ),
       ),
-      bottomNavigationBar: PlatelyBottomNav(currentIndex: 1, onTap: (_) {}, onScanTap: () {}),
+      // No bottomNavigationBar — MainShell owns it
     );
   }
 
@@ -64,29 +63,15 @@ class _FavoritesScreenState extends State<FavoritesScreen> {
       padding: const EdgeInsets.fromLTRB(24, 16, 24, 16),
       child: Row(
         children: [
-          TapScale(
-            onTap: () => Navigator.pop(context),
-            child: Container(
-              width: 42, height: 42,
-              decoration: BoxDecoration(
-                color: Colors.white,
-                borderRadius: BorderRadius.circular(12),
-                border: Border.all(color: AppTheme.borderGray),
-                boxShadow: const [BoxShadow(color: Color(0x08000000), blurRadius: 6, offset: Offset(0, 2))],
-              ),
-              child: const Icon(LucideIcons.arrowLeft, color: AppTheme.primaryDark, size: 18),
-            ),
-          ),
-          const SizedBox(width: 14),
           Expanded(
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
                 const Text('Favorites',
-                    style: TextStyle(color: AppTheme.darkText, fontSize: 20,
+                    style: TextStyle(color: AppTheme.darkText, fontSize: 24,
                         fontFamily: 'DM Sans', fontWeight: FontWeight.w800)),
                 Text('${_favorites.length} saved recipes',
-                    style: const TextStyle(color: AppTheme.mutedText, fontSize: 12, fontFamily: 'DM Sans')),
+                    style: const TextStyle(color: AppTheme.mutedText, fontSize: 13, fontFamily: 'DM Sans')),
               ],
             ),
           ),
@@ -210,7 +195,7 @@ class _FavoritesScreenState extends State<FavoritesScreen> {
           title: r['title']!, time: r['time']!, calories: r['cal']!,
           protein: r['protein']!, difficulty: r['diff']!, index: i,
           onTap: () => Navigator.push(context,
-              AppTheme.slideUp(RecipeDetailScreen(title: r['title']!))),
+              AppTheme.slideUp(RecipeResultsScreen(ingredients: [r['title']!.split(' ').first.toLowerCase()]))),
         ).animate().fadeIn(delay: (i * 60).ms, duration: 300.ms)
             .slideY(begin: 0.1, end: 0, delay: (i * 60).ms, duration: 300.ms);
       },

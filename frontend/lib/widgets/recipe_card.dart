@@ -7,11 +7,13 @@ class RecipeCard extends StatelessWidget {
   final String title, time, calories, protein, difficulty;
   final int index;
   final VoidCallback onTap;
+  final List<Color>? cardGradientColors;
+  final Color? cardFgColor;
 
   const RecipeCard({
     required this.title, required this.time, required this.calories,
     required this.protein, required this.difficulty, required this.index,
-    required this.onTap, super.key,
+    required this.onTap, this.cardGradientColors, this.cardFgColor, super.key,
   });
 
   @override
@@ -37,14 +39,14 @@ class RecipeCard extends StatelessWidget {
                   children: [
                     Container(
                       width: double.infinity,
-                      decoration: const BoxDecoration(
+                      decoration: BoxDecoration(
                         gradient: LinearGradient(
                           begin: Alignment.topLeft, end: Alignment.bottomRight,
-                          colors: [Color(0xFFD8EDD4), Color(0xFFC5DFC0)],
+                          colors: cardGradientColors ?? const [Color(0xFFD8EDD4), Color(0xFFC5DFC0)],
                         ),
                       ),
-                      child: const Center(
-                        child: Icon(LucideIcons.chefHat, size: 44, color: Color(0xFF4A8A46)),
+                      child: Center(
+                        child: Icon(LucideIcons.chefHat, size: 44, color: cardFgColor ?? const Color(0xFF4A8A46)),
                       ),
                     ),
                     // Difficulty badge

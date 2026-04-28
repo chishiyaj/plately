@@ -3,7 +3,9 @@ import 'package:flutter_animate/flutter_animate.dart';
 import 'package:lucide_icons_flutter/lucide_icons.dart';
 import '../theme/app_theme.dart';
 import '../widgets/tap_scale.dart';
-import 'home_screen.dart';
+import '../widgets/google_g_logo.dart';
+import '../widgets/plately_logo.dart';
+import '../main_shell.dart';
 import 'login_screen.dart';
 
 class SignupScreen extends StatefulWidget {
@@ -28,12 +30,12 @@ class _SignupScreenState extends State<SignupScreen> {
     setState(() => _loading = true);
     Future.delayed(900.ms, () {
       if (!mounted) return;
-      Navigator.pushReplacement(context, AppTheme.fadeScale(const HomeScreen()));
+      Navigator.pushReplacement(context, AppTheme.fadeScale(const MainShell()));
     });
   }
 
   void _googleSignup() =>
-      Navigator.pushReplacement(context, AppTheme.fadeScale(const HomeScreen()));
+      Navigator.pushReplacement(context, AppTheme.fadeScale(const MainShell()));
 
   @override
   Widget build(BuildContext context) {
@@ -46,12 +48,11 @@ class _SignupScreenState extends State<SignupScreen> {
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
               const SizedBox(height: 48),
-              Container(
-                width: 52, height: 52,
-                decoration: BoxDecoration(gradient: AppTheme.tealGradient, borderRadius: BorderRadius.circular(16)),
-                child: const Icon(LucideIcons.utensils, color: Colors.white, size: 24),
-              )
-              .animate().fadeIn(duration: 400.ms).scale(begin: const Offset(0.8, 0.8), curve: Curves.easeOutBack),
+              const PlatelyLogo(
+                theme: PlatelyLogoTheme.onLight,
+                iconSize: 44,
+                wordmarkSize: 22,
+              ).animate().fadeIn(duration: 400.ms).scale(begin: const Offset(0.85, 0.85), curve: Curves.easeOutBack),
               const SizedBox(height: 24),
               const Text('Create\naccount', style: TextStyle(color: AppTheme.darkText, fontSize: 36, fontFamily: 'DM Sans', fontWeight: FontWeight.w800, height: 1.1))
               .animate().fadeIn(duration: 400.ms, delay: 80.ms).slideY(begin: 0.08),
@@ -92,18 +93,16 @@ class _SignupScreenState extends State<SignupScreen> {
                       child: _agreed ? const Icon(LucideIcons.check, color: Colors.white, size: 13) : null,
                     ),
                     const SizedBox(width: 10),
-                    const Expanded(
-                      child: Text.rich(
-                        TextSpan(
-                          text: 'I agree to the ',
-                          style: TextStyle(color: AppTheme.mutedText, fontSize: 13, fontFamily: 'DM Sans'),
-                          children: [
-                            TextSpan(text: 'Terms of Service', style: TextStyle(color: AppTheme.primaryDark, fontWeight: FontWeight.w600)),
-                            TextSpan(text: ' and '),
-                            TextSpan(text: 'Privacy Policy', style: TextStyle(color: AppTheme.primaryDark, fontWeight: FontWeight.w600)),
-                          ],
-                        ),
-                      ),
+                  const Expanded(
+                      child: Text.rich(TextSpan(
+                        text: 'I agree to the ',
+                        style: TextStyle(color: AppTheme.mutedText, fontSize: 13, fontFamily: 'DM Sans'),
+                        children: [
+                          TextSpan(text: 'Terms of Service', style: TextStyle(color: AppTheme.primaryDark, fontWeight: FontWeight.w600)),
+                          TextSpan(text: ' and '),
+                          TextSpan(text: 'Privacy Policy', style: TextStyle(color: AppTheme.primaryDark, fontWeight: FontWeight.w600)),
+                        ],
+                      )),
                     ),
                   ],
                 ),
@@ -155,7 +154,7 @@ class _SignupScreenState extends State<SignupScreen> {
                   child: const Row(
                     mainAxisAlignment: MainAxisAlignment.center,
                     children: [
-                      Text('G', style: TextStyle(fontSize: 18, fontFamily: 'DM Sans', fontWeight: FontWeight.w800, color: Color(0xFF4285F4))),
+                      GoogleGLogo(),
                       SizedBox(width: 10),
                       Text('Continue with Google', style: TextStyle(color: AppTheme.darkText, fontSize: 15, fontFamily: 'DM Sans', fontWeight: FontWeight.w600)),
                     ],

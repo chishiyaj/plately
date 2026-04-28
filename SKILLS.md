@@ -8,7 +8,7 @@
 
 Claude has a finite context window. Every wasted token = less code we get.
 
-RuleDetail**Complete files only**No `// ...rest stays the same`. Always full file.**One-line summary**Before any code block: one sentence max.**No re-explaining [MEMORY.md](http://MEMORY.md**)Stack, design, screens are documented. Skip.**No multi-message Q&A**Ask all questions at once in one block.**Batch writes**Write multiple related files in sequence, no chatter between.**Reference don't repeat**Say "see AppTheme.primaryDark" not the hex value.**Max response format**Summary line → code → 3 bullets → "Next:"**Skip boilerplate comments**No `// Flutter SDK`, `// material.dart` type comments.**Short var names in local scope**`res`, `ctx`, `fn` etc. fine inside functions.**Compress mock data**3 items in a list = fine for demo. Not 10.
+RuleDetail**Complete files only**No `// ...rest stays the same`. Always full file.**One-line summary**Before any code block: one sentence max.\*\*No re-explaining [MEMORY.md](http://MEMORY.md**)Stack, design, screens are documented. Skip.**No multi-message Q&A**Ask all questions at once in one block.**Batch writes**Write multiple related files in sequence, no chatter between.**Reference don't repeat**Say "see AppTheme.primaryDark" not the hex value.**Max response format**Summary line → code → 3 bullets → "Next:"**Skip boilerplate comments**No `// Flutter SDK`, `// material.dart` type comments.**Short var names in local scope**`res`, `ctx`, `fn` etc. fine inside functions.**Compress mock data**3 items in a list = fine for demo. Not 10.
 
 ---
 

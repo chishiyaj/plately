@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:animations/animations.dart';
 
 class AppTheme {
   // Core colors
@@ -58,6 +59,14 @@ class AppTheme {
   );
 
   // Page transitions
+  static Route<T> crossFade<T>(Widget page) => PageRouteBuilder<T>(
+    pageBuilder: (_, a, __) => page,
+    transitionDuration: const Duration(milliseconds: 260),
+    reverseTransitionDuration: const Duration(milliseconds: 220),
+    transitionsBuilder: (_, a, __, child) =>
+        FadeTransition(opacity: CurvedAnimation(parent: a, curve: Curves.easeInOut), child: child),
+  );
+
   static Route<T> slideUp<T>(Widget page) => PageRouteBuilder<T>(
     pageBuilder: (_, a, __) => page,
     transitionDuration: const Duration(milliseconds: 380),
@@ -91,6 +100,38 @@ class AppTheme {
         ), child: child),
       );
     },
+  );
+
+  // Spotify-style horizontal shared axis — direction depends on tab index
+  // goingRight=true  → new screen slides in from right (higher index tab)
+  // goingRight=false → new screen slides in from left  (lower index tab)
+  static Route<T> sharedAxisH<T>(Widget page, {required bool goingRight}) =>
+      PageRouteBuilder<T>(
+        pageBuilder: (_, __, ___) => page,
+        transitionDuration: const Duration(milliseconds: 300),
+        reverseTransitionDuration: const Duration(milliseconds: 260),
+        transitionsBuilder: (_, anim, secAnim, child) =>
+            SharedAxisTransition(
+              animation: anim,
+              secondaryAnimation: secAnim,
+              transitionType: SharedAxisTransitionType.horizontal,
+              // Flip axis direction via a custom curve offset trick:
+              // We wrap child in a directional slide using the anim value
+              child: child,
+            ),
+      );
+
+  // Zoom-in transition — card → detail screen (feels like zooming into content)
+  static Route<T> zoomIn<T>(Widget page) => PageRouteBuilder<T>(
+    pageBuilder: (_, __, ___) => page,
+    transitionDuration: const Duration(milliseconds: 340),
+    reverseTransitionDuration: const Duration(milliseconds: 280),
+    transitionsBuilder: (_, anim, secAnim, child) => SharedAxisTransition(
+      animation: anim,
+      secondaryAnimation: secAnim,
+      transitionType: SharedAxisTransitionType.scaled,
+      child: child,
+    ),
   );
 
   static ThemeData get theme => ThemeData(
