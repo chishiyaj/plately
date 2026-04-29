@@ -246,13 +246,7 @@ class _IngredientEntryScreenState extends State<IngredientEntryScreen>
     if (!_scanning && _capturedPath == null)
       _ScanFrame(pulse: _pulse)
     else if (_scanning)
-      Column(children: [
-        SizedBox(width: 52, height: 52,
-            child: CircularProgressIndicator(color: AppTheme.green, strokeWidth: 2.5)),
-        const SizedBox(height: 16),
-        Text('Identifying ingredients...', style: TextStyle(
-            color: Colors.white.withValues(alpha: 0.7), fontSize: 14, fontFamily: 'DM Sans')),
-      ]),
+      _ScanningIndicator(),
     const Spacer(),
     if (_ingredients.isNotEmpty || _scanError != null) _chipPanel(),
     _addRow(dark: true),
@@ -442,6 +436,18 @@ class _IngredientEntryScreenState extends State<IngredientEntryScreen>
       ]),
     ),
   );
+}
+
+// ── Scanning indicator (non-const safe) ───────────────────────────────────────
+class _ScanningIndicator extends StatelessWidget {
+  @override
+  Widget build(BuildContext context) => Column(children: [
+    SizedBox(width: 52, height: 52,
+        child: CircularProgressIndicator(color: AppTheme.green, strokeWidth: 2.5)),
+    const SizedBox(height: 16),
+    Text('Identifying ingredients...', style: TextStyle(
+        color: Colors.white.withValues(alpha: 0.7), fontSize: 14, fontFamily: 'DM Sans')),
+  ]);
 }
 
 // ── Pill Tab ───────────────────────────────────────────────────────────────────

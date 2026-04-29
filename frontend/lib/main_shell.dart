@@ -81,7 +81,8 @@ class _MainShellState extends State<MainShell> {
   Widget build(BuildContext context) {
     return Scaffold(
       backgroundColor: AppTheme.creamBg,
-      extendBody: true,
+      resizeToAvoidBottomInset: false,
+      extendBody: true, // needed so other tabs' content scrolls behind the floating pill nav
       body: PageTransitionSwitcher(
         duration: const Duration(milliseconds: 300),
         reverse: _current < _previous,
@@ -112,23 +113,21 @@ class _ShellNav extends StatelessWidget {
   const _ShellNav({required this.currentNavIndex, required this.onTap});
 
   static const _items = [
-    (icon: LucideIcons.house,         label: 'Home',    index: 0),
-    (icon: LucideIcons.heart,         label: 'Saved',   index: 1),
-    (icon: LucideIcons.scanLine,      label: 'Scan',    index: 2),
-    (icon: LucideIcons.chefHat,       label: 'AI',      index: 3),
-    (icon: LucideIcons.circleUser,    label: 'Profile', index: 4),
+    (icon: LucideIcons.house,      label: 'Home',    index: 0),
+    (icon: LucideIcons.heart,      label: 'Saved',   index: 1),
+    (icon: LucideIcons.scanLine,   label: 'Scan',    index: 2),
+    (icon: LucideIcons.chefHat,    label: 'AI',      index: 3),
+    (icon: LucideIcons.circleUser, label: 'Profile', index: 4),
   ];
 
   @override
   Widget build(BuildContext context) {
     return Padding(
       padding: const EdgeInsets.fromLTRB(20, 0, 20, 20),
-      // Outer Stack is unclipped — FAB floats above the pill freely
       child: Stack(
         clipBehavior: Clip.none,
         alignment: Alignment.topCenter,
         children: [
-          // ── The pill nav bar ─────────────────────────────────────────────
           SizedBox(
             height: 76,
             child: ClipRRect(
@@ -144,10 +143,7 @@ class _ShellNav extends StatelessWidget {
                   ),
                   child: Row(
                     children: _items.map((item) {
-                      if (item.index == 2) {
-                        // Blank space for FAB — same flex as other items
-                        return const Expanded(child: SizedBox());
-                      }
+                      if (item.index == 2) return const Expanded(child: SizedBox());
                       return _NavItem(
                         icon: item.icon, label: item.label,
                         index: item.index, current: currentNavIndex,
@@ -159,7 +155,6 @@ class _ShellNav extends StatelessWidget {
               ),
             ),
           ),
-          // ── FAB: floats above pill — top: -18 gives clean half-overlap
           Positioned(
             top: -10,
             child: _ScanFab(onTap: () => onTap(2)),

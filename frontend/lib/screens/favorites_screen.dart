@@ -2,9 +2,11 @@ import 'package:flutter/material.dart';
 import 'package:lucide_icons_flutter/lucide_icons.dart';
 import 'package:flutter_animate/flutter_animate.dart';
 import '../theme/app_theme.dart';
+import '../models/recipe.dart';
 import '../widgets/recipe_card.dart';
 import '../widgets/tap_scale.dart';
-import 'recipe_results_screen.dart';
+import '../services/api_service.dart';
+import 'recipe_detail_screen.dart';
 
 class FavoritesScreen extends StatefulWidget {
   const FavoritesScreen({super.key});
@@ -16,17 +18,22 @@ class _FavoritesScreenState extends State<FavoritesScreen> {
   String _filter = 'All';
   final _searchCtrl = TextEditingController();
   String _query = '';
+  List<Recipe> _favorites = [];
+  bool _loading = true;
 
-  final _filters = const ['All', 'Breakfast', 'Lunch', 'Dinner', 'Asian', 'Italian', 'Vegan'];
+  final _filters = const ['All', 'Asian', 'Italian', 'Vegetarian', 'High-Protein', 'Low-Cal'];
 
-  final _favorites = const [
-    {'title': 'Chicken Stir Fry', 'time': '20 min', 'cal': '420 cal', 'protein': '38g protein', 'diff': 'Easy'},
-    {'title': 'Egg Fried Rice',   'time': '15 min', 'cal': '380 cal', 'protein': '22g protein', 'diff': 'Easy'},
-    {'title': 'Tuna Pasta',       'time': '18 min', 'cal': '490 cal', 'protein': '34g protein', 'diff': 'Medium'},
-    {'title': 'Greek Salad',      'time': '10 min', 'cal': '280 cal', 'protein': '14g protein', 'diff': 'Easy'},
-    {'title': 'Beef Bowl',        'time': '25 min', 'cal': '550 cal', 'protein': '45g protein', 'diff': 'Medium'},
-    {'title': 'Omelette',         'time': '8 min',  'cal': '240 cal', 'protein': '18g protein', 'diff': 'Easy'},
-  ];
+  @override
+  void initState() {
+    super.initState();
+    _loadFavorites();
+  }
+
+  Future<void> _loadFavorites() async {
+    setState(() => _loading = true);
+    final favs = await ApiService.getFavorites();
+    if (mounted) setState(() { _favorites = favs; _loading = false; });
+  }
 
   @override
   void dispose() {
@@ -34,8 +41,14 @@ class _FavoritesScreenState extends State<FavoritesScreen> {
     super.dispose();
   }
 
-  List<Map<String, String>> get _filtered =>
-      _favorites.where((r) => r['title']!.toLowerCase().contains(_query.toLowerCase())).toList();
+  List<Recipe> get _filtered {
+    var list = _favorites.where((r) =>
+        r.name.toLowerCase().contains(_query.toLowerCase())).toList();
+    if (_filter != 'All') {
+      list = list.where((r) => r.tags.contains(_filter)).toList();
+    }
+    return list;
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -50,11 +63,10 @@ class _FavoritesScreenState extends State<FavoritesScreen> {
             const SizedBox(height: 12),
             _buildFilters(),
             const SizedBox(height: 4),
-            Expanded(child: _buildGrid()),
+            Expanded(child: _loading ? _buildShimmer() : _buildGrid()),
           ],
         ),
       ),
-      // No bottomNavigationBar — MainShell owns it
     );
   }
 
@@ -70,20 +82,20 @@ class _FavoritesScreenState extends State<FavoritesScreen> {
                 const Text('Favorites',
                     style: TextStyle(color: AppTheme.darkText, fontSize: 24,
                         fontFamily: 'DM Sans', fontWeight: FontWeight.w800)),
-                Text('${_favorites.length} saved recipes',
+                Text(_loading ? 'Loading...' : '${_favorites.length} saved recipes',
                     style: const TextStyle(color: AppTheme.mutedText, fontSize: 13, fontFamily: 'DM Sans')),
               ],
             ),
           ),
           TapScale(
-            onTap: () {},
+            onTap: _loadFavorites,
             child: Container(
               width: 42, height: 42,
               decoration: BoxDecoration(
                 color: Colors.white, borderRadius: BorderRadius.circular(12),
                 border: Border.all(color: AppTheme.borderGray),
               ),
-              child: const Icon(LucideIcons.arrowUpDown, color: AppTheme.primaryDark, size: 18),
+              child: const Icon(LucideIcons.refreshCw, color: AppTheme.primaryDark, size: 18),
             ),
           ),
         ],
@@ -157,8 +169,50 @@ class _FavoritesScreenState extends State<FavoritesScreen> {
     );
   }
 
+  Widget _buildShimmer() {
+    return GridView.builder(
+      padding: const EdgeInsets.fromLTRB(24, 14, 24, 24),
+      gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
+        crossAxisCount: 2, crossAxisSpacing: 14, mainAxisSpacing: 14, childAspectRatio: 0.72,
+      ),
+      itemCount: 6,
+      itemBuilder: (_, __) => Container(
+        decoration: BoxDecoration(
+          color: AppTheme.lightGray.withValues(alpha: 0.5),
+          borderRadius: BorderRadius.circular(18),
+        ),
+      ).animate(onPlay: (c) => c.repeat(reverse: true))
+       .shimmer(duration: 1200.ms, color: Colors.white.withValues(alpha: 0.6)),
+    );
+  }
+
   Widget _buildGrid() {
     final items = _filtered;
+
+    if (_favorites.isEmpty) {
+      return Center(
+        child: Column(
+          mainAxisAlignment: MainAxisAlignment.center,
+          children: [
+            Container(
+              width: 80, height: 80,
+              decoration: BoxDecoration(
+                  color: AppTheme.borderGray.withValues(alpha: 0.5),
+                  shape: BoxShape.circle),
+              child: const Icon(LucideIcons.heart, size: 36, color: AppTheme.mutedText),
+            ),
+            const SizedBox(height: 16),
+            const Text('No favorites yet',
+                style: TextStyle(color: AppTheme.darkText, fontSize: 16,
+                    fontFamily: 'DM Sans', fontWeight: FontWeight.w600)),
+            const SizedBox(height: 6),
+            const Text('Tap the heart on any recipe to save it',
+                style: TextStyle(color: AppTheme.mutedText, fontSize: 13, fontFamily: 'DM Sans')),
+          ],
+        ).animate().fadeIn(duration: 300.ms),
+      );
+    }
+
     if (items.isEmpty) {
       return Center(
         child: Column(
@@ -176,10 +230,10 @@ class _FavoritesScreenState extends State<FavoritesScreen> {
                 style: TextStyle(color: AppTheme.darkText, fontSize: 16,
                     fontFamily: 'DM Sans', fontWeight: FontWeight.w600)),
             const SizedBox(height: 6),
-            const Text('Try a different search',
+            const Text('Try a different search or filter',
                 style: TextStyle(color: AppTheme.mutedText, fontSize: 13, fontFamily: 'DM Sans')),
           ],
-        ).animate().fadeIn(duration: 300.ms).scale(begin: const Offset(0.95, 0.95), end: const Offset(1, 1)),
+        ).animate().fadeIn(duration: 300.ms),
       );
     }
 
@@ -192,10 +246,12 @@ class _FavoritesScreenState extends State<FavoritesScreen> {
       itemBuilder: (_, i) {
         final r = items[i];
         return RecipeCard(
-          title: r['title']!, time: r['time']!, calories: r['cal']!,
-          protein: r['protein']!, difficulty: r['diff']!, index: i,
+          title: r.name, time: r.cookTime,
+          calories: '${r.calories} cal',
+          protein: '${r.protein}g protein',
+          difficulty: r.difficulty, index: i,
           onTap: () => Navigator.push(context,
-              AppTheme.slideUp(RecipeResultsScreen(ingredients: [r['title']!.split(' ').first.toLowerCase()]))),
+              AppTheme.slideUp(RecipeDetailScreen(recipe: r))).then((_) => _loadFavorites()),
         ).animate().fadeIn(delay: (i * 60).ms, duration: 300.ms)
             .slideY(begin: 0.1, end: 0, delay: (i * 60).ms, duration: 300.ms);
       },

@@ -1,6 +1,6 @@
 # 🍽️ PLATELY V2 — TEAM GUIDE
+> **UPDATED — Full Assessment Pass 3**
 > Read YOUR section only. Follow it step by step.
-> Updated after full code assessment.
 
 ---
 
@@ -34,13 +34,6 @@ git config --global user.email "your-github-email@gmail.com"
 git config --global user.name "YourName"
 ```
 
-### STEP 4 — Find your local path
-```
-cd plately
-pwd
-```
-Copy the result. You need it for Claude.
-
 ---
 
 ## 🧠 EVERY CLAUDE SESSION — ALL MEMBERS
@@ -50,13 +43,10 @@ Paste this at the very top of EVERY new Claude chat before anything else:
 ```
 NOTE: I am [Your Name], [Your Role] for Plately V2.
 My local project path is: [your path here, e.g. C:\Users\marco\plately]
-I am NOT marc. Do not reference marcd paths.
 
 [Paste full MEMORY.md contents here]
 [Paste full SKILLS.md contents here]
 ```
-
-MEMORY.md and SKILLS.md are in the root of the plately folder.
 
 ---
 
@@ -68,8 +58,6 @@ Marco → push → tell Landon
 Landon → push → tell Adrian
 Adrian → test → push → done
 ```
-
-Only ONE person codes at a time.
 
 ### Before EVERY session:
 ```
@@ -84,314 +72,154 @@ git commit -m "yourname - what you did
 
 - Built: what you added
 - Changed: what you modified
-- Bug encountered: describe it
-- Fix applied: how you fixed it
 - Notes: what next member needs to know"
 git push
 ```
 
-### See what previous member did:
-```
-git log -1
-```
+---
+
+## 📊 TRUE PROJECT STATUS (as of Pass 3)
+
+### ✅ FULLY DONE — Backend
+- Flask app, CORS, blueprints registered
+- POST /api/recipes — ingredient matching → recipes
+- GET  /api/recipe/<id> — full detail + ingredients
+- POST /api/scan — Vision API or mock fallback
+- POST /api/chat — OpenRouter Mistral-7B or mock fallback
+- POST /api/goals — Mifflin-St Jeor TDEE calculator
+- GET/POST /api/favorites — ✅ NEW
+- GET /api/favorites/check/<id> — ✅ NEW
+- DELETE /api/favorites/<id> — ✅ NEW
+- GET/POST /api/history — ✅ NEW
+- GET /api/history/stats — ✅ NEW
+- SQLite: all 6 tables, 6 seeded recipes, 22 ingredients
+
+### ✅ FULLY DONE — Frontend (Marc)
+- All 10 screens: Splash, Login, SignUp, Home, Results, Detail, Favorites, History, AI Chat, Profile
+- MainShell with real bottom nav (IndexedStack, no rebuilds)
+- IngredientEntryScreen (camera scan + type mode, chip input)
+- Home: loads real recipes from API, real history
+- Favorites: loads from API, search + filter working
+- History: loads from API, grouped by date, real stats card
+- Recipe Detail: loads real recipe, ingredients checklist, steps, nutrition
+- ♥ Heart button: loads real favorite state, persists to backend ✅ NEW
+- "Finish Cooking": logs to backend history + increments local count ✅ NEW
+- Profile: Edit profile, goals, log calories — all save to SharedPrefs
+- Profile recipe count: syncs from /api/history/stats ✅ NEW
+- UserPrefsService.incrementRecipeCount() — exists ✅
+
+### ❌ STILL NEEDED
+| What | Who | Priority |
+|------|-----|----------|
+| Real API keys in .env (OpenRouter + Google Vision) | Landon | HIGH |
+| Partial ingredient matching in scan.py | Landon | HIGH |
+| Expand ingredient list in DB (15+ more items) | Landon | MEDIUM |
+| Full QA checklist | Adrian | HIGH |
+| BUGS.md | Adrian | HIGH |
+| README.md | Adrian | MEDIUM |
+| Add 4+ more seeded recipes (Vegetarian, Low-Cal) | Marco | LOW |
 
 ---
 ---
 
-# 👤 MARC — FRONTEND
+# 👤 MARC — FRONTEND ✅ ALL TASKS COMPLETE
 
-## What's already done ✅
-- ALL 10 screens exist and are fully designed (UI complete)
-- Recipe Results screen → already calls ApiService.getRecipes() ✅
-- AI Chat screen → already calls ApiService.sendChat() ✅
-- Ingredient Entry screen → camera + type mode, calls ApiService.scanImage() ✅
-- Recipe Detail screen → heart/favorite button exists (UI only, not saved to backend yet)
-- Home screen → suggested recipes are still HARDCODED (needs API)
-- Favorites screen → showing HARDCODED mock data (needs API)
-- History screen → showing HARDCODED mock data (needs API)
-- Profile screen → stats (recipes cooked, streak, protein avg) are HARDCODED zeros
+## Your tasks are DONE. Here's what was completed:
 
-## Install
-- Flutter: https://docs.flutter.dev/get-started/install
-- Android Studio: https://developer.android.com/studio
+1. ✅ Home screen loads real suggested recipes from /api/recipes
+2. ✅ Favorites screen loads from /api/favorites (real API)
+3. ✅ History screen loads from /api/history (real API, grouped by date)
+4. ✅ Heart button loads initial favorite state + persists toggle to backend
+5. ✅ "Finish Cooking" logs history to /api/history + increments local recipe count
+6. ✅ Profile screen syncs recipe_count from /api/history/stats
 
-## Run the app
+## To run the app:
 ```
 cd plately/frontend
 flutter pub get
 flutter run
 ```
-Emulator or phone must be connected. Backend must also be running.
+Backend must be running (`python app.py` in plately/backend).
+
+## What to do now:
+- Wait for Landon to add the real API keys
+- Test the heart button and "Finish Cooking" flow with backend running
+- If something is broken, tell Adrian and add to BUGS.md
 
 ---
+---
 
-## Your Tasks (in order)
+# 👤 MARCO — BACKEND ✅ ALL ROUTES DONE
 
-### TASK 1 — Home Screen: load real recipes
-File: `frontend/lib/screens/home_screen.dart`
+## What's been completed (by Claude on Marc's machine):
+- GET/POST /api/favorites — done ✅ (`routes/favorites.py`)
+- GET /api/favorites/check/<id> — done ✅
+- DELETE /api/favorites/<id> — done ✅
+- GET/POST /api/history — done ✅ (`routes/history.py`)
+- GET /api/history/stats — done ✅
+- Both blueprints registered in `app.py` ✅
 
-Problem: `_suggested` is a hardcoded list of 4 recipes.
-Fix: Replace with real API call on initState.
+## What you still need to do:
 
-```dart
-// Add to imports
-import '../services/api_service.dart';
-import '../models/recipe.dart';
-
-// Replace _suggested const with:
-List<Recipe> _suggested = [];
-
-// In initState(), after _loadInitials():
-_loadSuggested();
-
-// Add this method:
-Future<void> _loadSuggested() async {
-  final recipes = await ApiService.getRecipes([]);
-  if (mounted) setState(() => _suggested = recipes.take(4).toList());
-}
+### TASK 1 — Pull and test all routes
 ```
-
-Then update `_buildSuggestedRecipes()` to use `_suggested` as `List<Recipe>` instead of the const map list. Each card should pass `r.name`, `r.cookTime`, `'${r.calories} cal'`, `'${r.protein}g protein'`, `r.difficulty`.
-
----
-
-### TASK 2 — Favorites Screen: load from API
-File: `frontend/lib/screens/favorites_screen.dart`
-
-Problem: `_favorites` is a hardcoded const list.
-Fix: Replace with API call. Wait for Marco to finish the favorites routes first.
-
-```dart
-// Replace hardcoded _favorites with:
-List<Recipe> _favorites = [];
-bool _loading = true;
-
-// In initState():
-_loadFavorites();
-
-// Add method:
-Future<void> _loadFavorites() async {
-  final favs = await ApiService.getFavorites();
-  if (mounted) setState(() { _favorites = favs; _loading = false; });
-}
-```
-
-Add `getFavorites()` to `api_service.dart` once Marco pushes the route.
-
----
-
-### TASK 3 — History Screen: load from API
-File: `frontend/lib/screens/history_screen.dart`
-
-Problem: `_grouped` is hardcoded static data.
-Fix: Replace with API call after Marco finishes history routes.
-
-Convert to StatefulWidget, add initState that calls `ApiService.getHistory()`, and render real history grouped by date.
-
----
-
-### TASK 4 — Profile Screen: real stats
-File: `frontend/lib/screens/profile_screen.dart`
-
-Problem: `_recipeCount`, `_streakDays`, `_proteinAvg` are all 0 from UserPrefsService (local only).
-Fix: After history API exists, calculate real recipe count from history length.
-For now: make sure when a user cooks (hits "Finish Cooking" in RecipeDetailScreen), it increments recipe_count in UserPrefsService.
-
-File: `frontend/lib/screens/recipe_detail_screen.dart`
-Find the "Finish Cooking" button tap → add:
-```dart
-await UserPrefsService.incrementRecipeCount();
-```
-Add `incrementRecipeCount()` to UserPrefsService.
-
----
-
-### TASK 5 — Favorites: wire heart button to API
-File: `frontend/lib/screens/recipe_detail_screen.dart`
-
-The `_isFavorited` bool is local state only — not saved anywhere.
-Fix: On heart tap, call `ApiService.toggleFavorite(recipeId)`.
-Add to `api_service.dart`:
-```dart
-static Future<void> toggleFavorite(int recipeId) async {
-  await http.post(
-    Uri.parse('$baseUrl/api/favorites'),
-    headers: {'Content-Type': 'application/json'},
-    body: jsonEncode({'user_id': 'default', 'recipe_id': recipeId}),
-  );
-}
-```
-
----
-
-## Claude prompt to add each session:
-```
-NOTE: I am Marc, Frontend Developer for Plately V2.
-My local project path is: C:\Users\marcd\plately-v2
-I am working on connecting Flutter screens to the Flask backend.
-Currently working on: [state which task]
-Backend is running at http://10.0.2.2:5000 (Android emulator).
-```
-
----
----
-
-# 👤 MARCO — BACKEND
-
-## What's already done ✅
-- Flask app fully set up (app.py, CORS, blueprints)
-- GET/POST /api/recipes → works, returns seeded recipes
-- GET /api/recipe/<id> → works, returns full detail
-- POST /api/chat → works (uses OpenRouter or fallback)
-- POST /api/scan → works (uses Vision API or mock fallback)
-- POST /api/goals → works (Mifflin-St Jeor TDEE calculator)
-- SQLite schema: ingredients, recipes, recipe_ingredients, nutrition, history, favorites
-- 6 seeded recipes with nutrition data
-
-## What's MISSING ❌
-- NO favorites routes (GET/POST/DELETE)
-- NO history routes (GET/POST)
-- These tables exist in the DB but have no API endpoints
-
-## Install
-- Python 3.10+: https://www.python.org/downloads
-- VS Code: https://code.visualstudio.com
-
-## Run the backend
-```
+git checkout dev
+git pull
 cd plately/backend
 pip install -r requirements.txt
 python app.py
 ```
 
-## Test with Postman
-Download: https://www.postman.com/downloads
-
-Confirm existing routes work first:
+Then test in Postman:
 ```
-GET  http://localhost:5000/api/health           → should return {"status":"ok"}
-POST http://localhost:5000/api/recipes          → body: {"ingredients":["chicken"]}
-GET  http://localhost:5000/api/recipe/1         → returns recipe 1 detail
-POST http://localhost:5000/api/goals            → body: {"weight":70,"height":175,"age":20,"sex":"male","goal":"maintain"}
+GET  http://localhost:5000/api/health
+GET  http://localhost:5000/api/favorites?user_id=default         → empty list []
+POST http://localhost:5000/api/favorites  body: {"user_id":"default","recipe_id":1}
+GET  http://localhost:5000/api/favorites?user_id=default         → should have recipe 1
+GET  http://localhost:5000/api/favorites/check/1?user_id=default → {"is_favorite":true}
+DELETE http://localhost:5000/api/favorites/1?user_id=default
+POST http://localhost:5000/api/history body: {"user_id":"default","action_type":"cooked","ingredient_names":"chicken, eggs","recipe_count":1}
+GET  http://localhost:5000/api/history?user_id=default           → should have 1 entry
+GET  http://localhost:5000/api/history/stats?user_id=default     → total_sessions, total_recipes, sessions_this_week
 ```
 
----
-
-## Your Tasks (in order)
-
-### TASK 1 — Add Favorites routes
-Add to `backend/routes/recipes.py`:
+### TASK 2 — Seed 4 more recipes (covers Vegetarian and Low-Cal tags)
+Open `backend/database.py`, inside `_seed()`, add to the `recipes` list:
 
 ```python
-@bp.route('/api/favorites', methods=['POST'])
-def add_favorite():
-    try:
-        data = request.json or {}
-        user_id = data.get('user_id', 'default')
-        recipe_id = data.get('recipe_id')
-        if not recipe_id:
-            return jsonify({"status": "error", "message": "recipe_id required"}), 400
-        execute(
-            "INSERT OR IGNORE INTO favorites (user_id, recipe_id) VALUES (?,?)",
-            (user_id, recipe_id)
-        )
-        return jsonify({"status": "ok", "data": {"saved": True}}), 200
-    except Exception as e:
-        return jsonify({"status": "error", "message": str(e)}), 500
-
-@bp.route('/api/favorites', methods=['GET'])
-def get_favorites():
-    try:
-        user_id = request.args.get('user_id', 'default')
-        rows = query("""
-            SELECT r.*, n.calories, n.protein, n.carbs, n.fat
-            FROM favorites f
-            JOIN recipes r ON r.id = f.recipe_id
-            LEFT JOIN nutrition n ON n.recipe_id = r.id
-            WHERE f.user_id = ?
-            ORDER BY f.id DESC
-        """, (user_id,))
-        return jsonify({"status": "ok", "data": rows}), 200
-    except Exception as e:
-        return jsonify({"status": "error", "message": str(e)}), 500
-
-@bp.route('/api/favorites/<int:recipe_id>', methods=['DELETE'])
-def remove_favorite(recipe_id):
-    try:
-        user_id = request.args.get('user_id', 'default')
-        execute(
-            "DELETE FROM favorites WHERE user_id = ? AND recipe_id = ?",
-            (user_id, recipe_id)
-        )
-        return jsonify({"status": "ok", "data": {"removed": True}}), 200
-    except Exception as e:
-        return jsonify({"status": "error", "message": str(e)}), 500
+{
+    "name": "Tofu Scramble",
+    "cook_time": "12 min",
+    "difficulty": "Easy",
+    "tags": "Vegetarian,Low-Cal,High-Protein",
+    "instructions": "1. Crumble tofu into pan.\n2. Add garlic and onion, sauté 3 min.\n3. Season with soy sauce and pepper.\n4. Add spinach, cook 2 min.\n5. Serve with toast.",
+    "nutrition": (280, 22, 18, 10),
+    "ingredients": [("tofu", "200g"), ("garlic", "2 cloves"), ("onion", "0.5"), ("soy sauce", "1 tbsp"), ("spinach", "1 cup")],
+},
+{
+    "name": "Greek Salad Bowl",
+    "cook_time": "10 min",
+    "difficulty": "Easy",
+    "tags": "Vegetarian,Low-Cal",
+    "instructions": "1. Chop tomatoes, cucumber, onion.\n2. Add olive oil, lemon juice, salt.\n3. Toss gently.\n4. Top with cheese if desired.\n5. Serve immediately.",
+    "nutrition": (240, 12, 22, 11),
+    "ingredients": [("tomato", "2"), ("cucumber", "1"), ("onion", "0.5"), ("olive oil", "2 tbsp"), ("lemon", "0.5"), ("cheese", "40g")],
+},
 ```
 
-### TASK 2 — Add History routes
-Create new file `backend/routes/history.py`:
+Then delete the old database so it re-seeds:
+```
+del plately\backend\db\plately.db
+python app.py
+```
+The DB will be recreated with the new recipes.
 
+### TASK 3 — Add ingredients to DB seed
+Same file, find the `ingredients` list, add:
 ```python
-from flask import Blueprint, request, jsonify
-from database import query, execute
-
-bp = Blueprint('history', __name__)
-
-@bp.route('/api/history', methods=['POST'])
-def add_history():
-    try:
-        data = request.json or {}
-        user_id = data.get('user_id', 'default')
-        action_type = data.get('action_type', 'cooked')
-        ingredient_names = data.get('ingredient_names', '')
-        recipe_count = data.get('recipe_count', 1)
-        execute(
-            "INSERT INTO history (user_id, action_type, ingredient_names, recipe_count) VALUES (?,?,?,?)",
-            (user_id, action_type, ingredient_names, recipe_count)
-        )
-        return jsonify({"status": "ok", "data": {"logged": True}}), 200
-    except Exception as e:
-        return jsonify({"status": "error", "message": str(e)}), 500
-
-@bp.route('/api/history', methods=['GET'])
-def get_history():
-    try:
-        user_id = request.args.get('user_id', 'default')
-        rows = query("""
-            SELECT * FROM history
-            WHERE user_id = ?
-            ORDER BY timestamp DESC
-            LIMIT 50
-        """, (user_id,))
-        return jsonify({"status": "ok", "data": rows}), 200
-    except Exception as e:
-        return jsonify({"status": "error", "message": str(e)}), 500
-```
-
-### TASK 3 — Register history blueprint in app.py
-Open `backend/app.py`, add after the other imports:
-```python
-from routes.history import bp as history_bp
-```
-And after the other register_blueprint lines:
-```python
-app.register_blueprint(history_bp)
-```
-
-### TASK 4 — Seed more recipes (optional but helpful)
-Open `backend/database.py`, add 3-4 more recipes to the `recipes` list inside `_seed()`.
-Make sure to cover tags: Vegetarian, Low-Cal.
-Use same format as existing entries.
-
----
-
-## Claude prompt each session:
-```
-NOTE: I am Marco, Backend Developer for Plately V2.
-My local project path is: C:\Users\[yourname]\plately
-I am building Flask routes and SQLite for Plately V2.
-Currently working on: [favorites / history / seeding]
-The database schema is already set up. Routes go in backend/routes/.
+"tofu", "spinach", "cucumber", "bell pepper", "potato",
+"carrot", "mushroom", "salmon", "bread", "milk", "noodles",
+"pork", "cabbage", "flour", "sugar",
 ```
 
 ---
@@ -400,89 +228,45 @@ The database schema is already set up. Routes go in backend/routes/.
 # 👤 LANDON — AI & DATA
 
 ## What's already done ✅
-- POST /api/chat → fully coded, uses OpenRouter Mistral-7B (falls back to mock if no key)
-- POST /api/scan → fully coded, uses Google Vision API (falls back to mock ingredients if no key)
-- AI Chat screen in Flutter → already calls the backend, shows real replies
-- Ingredient Entry screen → already sends base64 to /api/scan
-- The code works — it just needs REAL API keys to do real things
+- POST /api/chat → coded, uses OpenRouter Mistral-7B (mock fallback if no key)
+- POST /api/scan → coded, uses Google Vision API (mock fallback if no key)
+- AI Chat screen → calls backend, shows real replies
+- Ingredient Entry → sends base64 to /api/scan
 
 ## What's MISSING ❌
-- No actual API keys in .env → everything returns mock/fallback data
-- Scan ingredient matching is too strict (exact match only, Vision returns broad labels)
-- No partial matching (Vision says "chicken meat" but DB only has "chicken")
+- No real API keys → everything returns mock/fallback
+- Scan matching is exact-only (Vision says "chicken meat", DB has "chicken" — no match)
 
-## Install
-- Python 3.10+: https://www.python.org/downloads
-- VS Code: https://code.visualstudio.com
-
-## Run the backend
-```
-cd plately/backend
-pip install -r requirements.txt
-python app.py
-```
-
----
-
-## Your Tasks (in order)
+## Your Tasks
 
 ### TASK 1 — Get API keys (both FREE)
 
 **OpenRouter (AI Chat):**
 1. Go to https://openrouter.ai
-2. Sign up with Google
-3. Dashboard → API Keys → Create Key
-4. Copy the key (starts with sk-or-...)
+2. Sign up → Dashboard → API Keys → Create Key
+3. Copy key (starts with `sk-or-...`)
 
-**Google Cloud Vision (Image Scan):**
+**Google Cloud Vision:**
 1. Go to https://console.cloud.google.com
-2. Create new project → name it "plately"
-3. Search bar → "Cloud Vision API" → Enable
-4. Left menu → APIs & Services → Credentials → Create Credentials → API Key
-5. Copy the key
+2. Create project "plately" → Enable Cloud Vision API
+3. APIs & Services → Credentials → Create API Key
 
-**Put both keys in `backend/.env`:**
+**Put in `backend/.env`:**
 ```
 OPENROUTER_API_KEY=sk-or-your-key-here
 GOOGLE_VISION_API_KEY=your-vision-key-here
 FLASK_ENV=development
 SECRET_KEY=plately-dev-secret
 ```
-⚠️ .env is in .gitignore — it will NOT be pushed to GitHub. That's correct.
+⚠️ .env is gitignored — will NOT push. That's correct.
 
 ---
 
-### TASK 2 — Test AI Chat is working
-Run the backend, then in Postman:
-```
-POST http://localhost:5000/api/chat
-Body (raw JSON): {"message": "what can I cook with chicken and eggs?"}
-```
-Expected: A real reply from Mistral AI, not the fallback mock sentence.
-If you still get the fallback → check that .env is in the backend/ folder and python-dotenv is installed.
-
----
-
-### TASK 3 — Test Image Scan is working
-```
-POST http://localhost:5000/api/scan
-Body: {"image_base64": "..."}
-```
-To get a test base64 image, go to https://base64.guru/converter/encode/image and upload any food photo. Copy the base64 string and paste it in Postman.
-
-Expected: Returns list of detected ingredients that match the DB.
-
----
-
-### TASK 4 — Fix ingredient matching (partial match)
+### TASK 2 — Fix ingredient matching (partial match)
 File: `backend/routes/scan.py`
 
-Current problem: Vision returns labels like "chicken meat", "leafy vegetable", "cooked rice" but the DB only has "chicken", "rice", "mixed vegetables". Exact match fails.
-
-Fix: Add fuzzy/partial matching:
-
+Replace the matching block with:
 ```python
-# Replace the matching logic in scan() with this:
 known = _known_ingredients()
 matched = []
 for label in labels:
@@ -494,202 +278,191 @@ for label in labels:
 
 ---
 
-### TASK 5 — Expand ingredients in DB
-File: `backend/database.py` inside `_seed()`, find the `ingredients` list and add:
+### TASK 3 — Expand ingredients in DB
+File: `backend/database.py` → inside `_seed()`, find the `ingredients` list, extend it:
 ```python
-"potato", "carrot", "mushroom", "spinach", "salmon",
-"tofu", "bread", "milk", "flour", "sugar", "noodles",
-"pork", "cabbage", "cucumber", "bell pepper",
+"tofu", "spinach", "cucumber", "bell pepper", "potato",
+"carrot", "mushroom", "salmon", "bread", "milk", "noodles",
+"pork", "cabbage",
 ```
 
 ---
 
-## Claude prompt each session:
-```
-NOTE: I am Landon, AI & Data Developer for Plately V2.
-My local project path is: C:\Users\[yourname]\plately
-I am working on OpenRouter AI chat and Google Vision scan integration.
-The routes already exist in backend/routes/chat.py and backend/routes/scan.py.
-I need to add API keys and improve ingredient matching.
-Currently working on: [keys / chat test / scan test / matching fix]
-```
+### TASK 4 — Test AI Chat
+Postman: `POST http://localhost:5000/api/chat`
+Body: `{"message": "what can I cook with chicken and eggs?"}`
+Expected: Real Mistral AI reply, not the 1-sentence fallback.
+
+### TASK 5 — Test Image Scan
+Postman: `POST http://localhost:5000/api/scan`
+Body: `{"image_base64": "<base64 string of food photo>"}`
+Get test base64: https://base64.guru/converter/encode/image
+Expected: Returns matching ingredients from DB.
 
 ---
 ---
 
 # 👤 ADRIAN — QA & DOCS
 
-## What you need installed
-- Flutter: https://docs.flutter.dev/get-started/install
-- Python 3.10+: https://www.python.org/downloads
-- Android Studio or VS Code
-
-## Run everything (BOTH terminals must be open)
+## Run everything (both terminals open)
 ```
 Terminal 1:  cd plately/backend && python app.py
 Terminal 2:  cd plately/frontend && flutter run
 ```
 
----
+## Your Tasks
 
-## Your Tasks (in order)
-
-### TASK 1 — Full app test checklist
-Go through every screen. For each item write PASS or FAIL in `docs/BUGS.md`.
+### TASK 1 — Full test checklist (write PASS/FAIL in docs/BUGS.md)
 
 **SPLASH & AUTH**
 ```
-[ ] Splash screen loads without crashing
-[ ] 3-page carousel swipes correctly
-[ ] "Get Started" button goes to Login
-[ ] Login screen opens
-[ ] Sign Up screen opens
-[ ] Back navigation works from Login/SignUp
+[ ] Splash 3-page carousel swipes
+[ ] Get Started → Login
+[ ] Login screen loads
+[ ] Sign Up screen loads
+[ ] Back navigation works
 ```
 
-**MAIN APP**
+**HOME**
 ```
-[ ] Home screen loads with recipe cards (not blank)
-[ ] Greeting text changes based on time of day
-[ ] "Add Ingredients" card opens Ingredient Entry screen
-[ ] Browse button opens Recipe Results (all recipes)
-[ ] Ask AI button opens AI Chat
-[ ] History button opens History screen
-[ ] Profile avatar opens Profile tab
+[ ] Loads with real recipe cards from backend (not blank)
+[ ] Greeting changes by time of day
+[ ] "Add Ingredients" card opens IngredientEntryScreen
+[ ] Browse → RecipeResultsScreen (all recipes)
+[ ] Ask AI → AiChatScreen
+[ ] History → HistoryScreen
+[ ] Avatar → Profile tab
+[ ] Recent Activity shows real entries after cooking
 ```
 
 **INGREDIENT ENTRY**
 ```
-[ ] Camera mode shows live camera view
-[ ] Shutter button takes a photo and scans
+[ ] Camera mode opens live camera
+[ ] Shutter button scans photo → adds detected ingredients
 [ ] Torch button toggles flash
-[ ] Camera flip button works
-[ ] Type mode shows text input
-[ ] Typing an ingredient and pressing arrow adds it as a chip
-[ ] Comma-separated entry works (chicken, rice → 2 chips)
-[ ] Removing a chip (× button) works
-[ ] "Find Recipes" button goes to results
-[ ] "Add ingredients first" error shows if none added
+[ ] Camera flip works
+[ ] Type mode: typing + enter adds chip
+[ ] Comma-separated input works
+[ ] Remove chip (×) works
+[ ] Find Recipes → RecipeResultsScreen
+[ ] Empty state error shows if no ingredients added
 ```
 
 **RECIPE RESULTS**
 ```
-[ ] Recipes load from backend (not blank)
-[ ] Loading shimmer shows while fetching
-[ ] Filter buttons (All, Asian, Italian, etc.) work
-[ ] "X found" count updates when filter changes
-[ ] Tapping a recipe card opens Recipe Detail
-[ ] Error state shows if backend is offline
-[ ] Retry button works after error
+[ ] Recipes load from backend
+[ ] Shimmer shows while loading
+[ ] Filter chips work (All, Asian, Italian, etc.)
+[ ] "X found" count updates with filter
+[ ] Tap card → RecipeDetailScreen
+[ ] Error state if backend offline
+[ ] Retry button works
 ```
 
 **RECIPE DETAIL**
 ```
-[ ] Recipe name, cook time, difficulty show correctly
-[ ] Calories and protein badge show
-[ ] Ingredients tab shows ingredient list with amounts
-[ ] Checking off an ingredient strikes it through
-[ ] Steps tab shows numbered steps
-[ ] Heart/favorite button fills red when tapped, unfills when tapped again (no diagonal line)
-[ ] AI Tip card shows at bottom
-[ ] "Let's Cook" button switches to Steps tab
-[ ] "Finish Cooking" button pops back
+[ ] Recipe name, time, difficulty, calories, protein correct
+[ ] Ingredients tab: checklist works, ticking strikes through
+[ ] Steps tab: numbered steps correct
+[ ] Heart button fills red on tap → state reloads on reopen (persists!)
+[ ] AI tip card shows and is relevant
+[ ] "Let's Cook" switches to Steps tab
+[ ] "Finish Cooking" returns to previous screen
+[ ] "Finish Cooking" adds entry to History screen
 [ ] Nutrition card shows all 4 macros
 ```
 
 **FAVORITES**
 ```
-[ ] Favorites screen loads
-[ ] Search bar filters recipes by name
-[ ] Category filter buttons work
+[ ] Loads from backend (initially empty is fine)
+[ ] After hearting a recipe in Detail, it appears here on reload
+[ ] Search filters by name
+[ ] Category filters work
 [ ] Empty state shows if no favorites
-[ ] Tapping a recipe card navigates correctly
+[ ] Tap recipe card → RecipeDetailScreen
 ```
 
 **HISTORY**
 ```
-[ ] History screen loads
-[ ] Stats card shows (sessions, total, recipes cooked)
-[ ] Grouped entries show (Today / Yesterday / This Week / Older)
-[ ] Tapping an entry opens Recipe Results
+[ ] Loads from backend (initially empty is fine)
+[ ] After "Finish Cooking", entry appears here
+[ ] Stats card: sessions, total, recipes cooked (not all 0)
+[ ] Grouped by Today/Yesterday/This Week/Older
+[ ] Tap entry → RecipeResultsScreen
 ```
 
 **AI CHAT**
 ```
-[ ] Chat screen loads with greeting message
+[ ] Chat loads with greeting bubble
 [ ] Quick prompt chips show on first load
-[ ] Tapping a quick prompt sends it
-[ ] Typing a message and sending works
-[ ] Typing indicator (3 dots) shows while waiting
-[ ] AI reply appears correctly
-[ ] User bubble appears on right, AI bubble on left
+[ ] Tap prompt → sends message
+[ ] Type + send works
+[ ] Typing indicator shows while waiting
+[ ] Real AI reply appears (if Landon added keys)
+[ ] Mock fallback still shows sensible response (if no keys)
 ```
 
 **PROFILE**
 ```
-[ ] Profile screen loads without error
-[ ] Name and email show
-[ ] Stats row (recipes, streak, protein) shows
-[ ] Progress bars for calories and protein show
-[ ] Edit Profile bottom sheet opens
-[ ] Edit Goals bottom sheet opens
-[ ] Log Calories sheet opens
-[ ] Dietary preference toggles work
-[ ] Sign out dialog appears and works
-[ ] Help & Support FAQ items expand/collapse
+[ ] Name and email load correctly
+[ ] Recipe count > 0 after cooking (syncs from backend)
+[ ] Edit Profile bottom sheet opens + saves name/email
+[ ] Edit Goals bottom sheet opens + saves
+[ ] Log Calories opens + saves
+[ ] Dietary prefs toggles work
+[ ] Help FAQ items expand/collapse
+[ ] Sign Out dialog → redirects to Login
 ```
 
 **NAVIGATION**
 ```
-[ ] Bottom nav: Home (index 0) works
-[ ] Bottom nav: Favorites (index 1) works
-[ ] Bottom nav: Scan FAB (center) opens Ingredient Entry
-[ ] Bottom nav: AI Chat (index 3) works
-[ ] Bottom nav: Profile (index 4) works
-[ ] Back button works on all pushed screens
+[ ] Home (nav index 0)
+[ ] Saved (nav index 1)
+[ ] Scan FAB → IngredientEntryScreen
+[ ] AI (nav index 3)
+[ ] Profile (nav index 4)
+[ ] Back button on all pushed screens
+[ ] No navigation crash anywhere
 ```
 
 ---
 
-### TASK 2 — Write BUGS.md
-Create file `docs/BUGS.md`:
-```
+### TASK 2 — Write docs/BUGS.md
+```markdown
 # PLATELY V2 — BUG REPORT
 
-## Bug #1
+## Bug #001
 Screen: [name]
 What happened: [describe]
-Steps to reproduce: [how to trigger]
+Steps to reproduce: [1. 2. 3.]
 Severity: Low / Medium / High / Crash
-Fixed by: [leave blank if not fixed]
+Fixed by: [leave blank]
 
-## Bug #2
+## Bug #002
 ...
 ```
 
 ---
 
-### TASK 3 — Write README.md
-Update the root `README.md`:
-
+### TASK 3 — Update root README.md
 ```markdown
 # Plately V2
 
 A Flutter mobile app that helps students cook affordable, high-protein meals.
-Scan or type ingredients, get AI recipe suggestions, track your cooking history.
+Scan or type ingredients, get AI recipe suggestions, track your history.
 
 ## Tech Stack
 - Frontend: Flutter (Dart) — Android
 - Backend: Python Flask + SQLite
-- AI Chat: OpenRouter (Mistral-7B)
-- Image Scan: Google Cloud Vision API
-- Auth: Firebase (planned)
+- AI: OpenRouter (Mistral-7B)
+- Scan: Google Cloud Vision API
 
-## How to Run
+## Run
 
 ### Backend
 cd backend
 pip install -r requirements.txt
+# Copy .env.example to .env and fill in keys
 python app.py
 
 ### Frontend
@@ -697,41 +470,30 @@ cd frontend
 flutter pub get
 flutter run
 
+## API Endpoints
+GET  /api/health
+POST /api/recipes
+GET  /api/recipe/<id>
+POST /api/scan
+POST /api/chat
+POST /api/goals
+GET/POST /api/favorites
+GET/POST /api/history
+GET  /api/history/stats
+
 ## Team
-- Marc — Frontend (Flutter screens, UI)
-- Marco — Backend (Flask routes, SQLite)
-- Landon — AI & Data (OpenRouter, Vision API)
-- Adrian — QA & Documentation
-
-## Known Issues
-[List from BUGS.md]
+- Marc — Frontend
+- Marco — Backend
+- Landon — AI & Data
+- Adrian — QA & Docs
 ```
 
----
-
-### TASK 4 — Check all commits
-```
-git log --oneline
-```
-Every commit should follow the format. Note any vague commits in BUGS.md under "Process Issues".
-
----
-
-## Claude prompt each session:
-```
-NOTE: I am Adrian, QA & Documentation for Plately V2.
-My local project path is: C:\Users\[yourname]\plately
-I am testing the full app and writing documentation.
-Currently working on: [testing / BUGS.md / README]
-```
-
----
 ---
 
 ## ⚠️ GOLDEN RULES — EVERYONE
 
 1. ✅ `git pull` before coding — every single time
-2. ✅ Paste MEMORY.md + SKILLS.md at the start of every Claude session
+2. ✅ Paste MEMORY.md + SKILLS.md at start of every Claude session
 3. ✅ Add your name/role note at top of Claude paste
 4. ✅ Detailed commit messages always
 5. ✅ Only work on `dev` branch

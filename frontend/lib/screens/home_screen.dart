@@ -8,16 +8,14 @@ import '../widgets/tap_scale.dart';
 import '../widgets/plately_logo.dart';
 import '../widgets/activity_row.dart';
 import '../services/user_prefs_service.dart';
+import '../services/api_service.dart';
+import '../models/recipe.dart';
 import '../main_shell.dart';
 import 'recipe_results_screen.dart';
 import 'history_screen.dart';
 import 'ingredient_entry_screen.dart';
 import 'ai_chat_screen.dart';
-
-// ─── HomeScreen ───────────────────────────────────────────────────────────────
-// Tab child of MainShell (index 0). No back nav, no bottom nav logic.
-// Profile avatar calls MainShell.switchTab(3) — no duplicate push.
-// Recent Activity uses shared ActivityRow widget — same as HistoryScreen.
+import 'recipe_detail_screen.dart';
 
 class HomeScreen extends StatefulWidget {
   const HomeScreen({super.key});
@@ -28,13 +26,10 @@ class HomeScreen extends StatefulWidget {
 class _HomeScreenState extends State<HomeScreen> {
   final _scrollCtrl = ScrollController();
   String _initials = 'M';
-
-  static const _suggested = [
-    {'title': 'Chicken Stir Fry', 'time': '20 min', 'cal': '420 cal', 'protein': '38g protein', 'diff': 'Easy'},
-    {'title': 'Egg Fried Rice',   'time': '15 min', 'cal': '380 cal', 'protein': '22g protein', 'diff': 'Easy'},
-    {'title': 'Tuna Pasta',       'time': '18 min', 'cal': '490 cal', 'protein': '34g protein', 'diff': 'Medium'},
-    {'title': 'Beef Bowl',        'time': '25 min', 'cal': '550 cal', 'protein': '45g protein', 'diff': 'Medium'},
-  ];
+  List<Recipe> _suggested = [];
+  List<Map<String, dynamic>> _recentHistory = [];
+  bool _loadingRecipes = true;
+  bool _loadingHistory = true;
 
   static const _cardGradients = [
     [Color(0xFFD8EDD4), Color(0xFFC0DCB3)],
@@ -54,6 +49,8 @@ class _HomeScreenState extends State<HomeScreen> {
   void initState() {
     super.initState();
     _loadInitials();
+    _loadSuggested();
+    _loadRecentHistory();
   }
 
   Future<void> _loadInitials() async {
@@ -64,6 +61,18 @@ class _HomeScreenState extends State<HomeScreen> {
         ? '${parts[0][0]}${parts[1][0]}'.toUpperCase()
         : parts[0][0].toUpperCase();
     if (mounted) setState(() => _initials = ini);
+  }
+
+  Future<void> _loadSuggested() async {
+    setState(() => _loadingRecipes = true);
+    final recipes = await ApiService.getRecipes([]);
+    if (mounted) setState(() { _suggested = recipes.take(4).toList(); _loadingRecipes = false; });
+  }
+
+  Future<void> _loadRecentHistory() async {
+    setState(() => _loadingHistory = true);
+    final history = await ApiService.getHistory();
+    if (mounted) setState(() { _recentHistory = history.take(2).toList(); _loadingHistory = false; });
   }
 
   @override
@@ -285,6 +294,36 @@ class _HomeScreenState extends State<HomeScreen> {
   );
 
   Widget _buildSuggestedRecipes() {
+    if (_loadingRecipes) {
+      return SizedBox(
+        height: 220,
+        child: ListView.builder(
+          scrollDirection: Axis.horizontal,
+          padding: const EdgeInsets.only(left: 20, top: 14),
+          itemCount: 4,
+          itemBuilder: (_, __) => Padding(
+            padding: const EdgeInsets.only(right: 14),
+            child: Container(
+              width: 155,
+              decoration: BoxDecoration(
+                color: AppTheme.lightGray.withValues(alpha: 0.5),
+                borderRadius: BorderRadius.circular(18),
+              ),
+            ).animate(onPlay: (c) => c.repeat(reverse: true))
+             .shimmer(duration: 1200.ms, color: Colors.white.withValues(alpha: 0.6)),
+          ),
+        ),
+      );
+    }
+
+    if (_suggested.isEmpty) {
+      return const Padding(
+        padding: EdgeInsets.fromLTRB(20, 14, 20, 0),
+        child: Text('No recipes found. Is the backend running?',
+            style: TextStyle(color: AppTheme.mutedText, fontSize: 13, fontFamily: 'DM Sans')),
+      );
+    }
+
     return SizedBox(
       height: 220,
       child: ListView.builder(
@@ -299,14 +338,15 @@ class _HomeScreenState extends State<HomeScreen> {
             child: SizedBox(
               width: 155,
               child: RecipeCard(
-                title: r['title']!, time: r['time']!,
-                calories: r['cal']!, protein: r['protein']!,
-                difficulty: r['diff']!, index: i,
+                title: r.name,
+                time: r.cookTime,
+                calories: '${r.calories} cal',
+                protein: '${r.protein}g protein',
+                difficulty: r.difficulty,
+                index: i,
                 cardGradientColors: colors,
                 cardFgColor: _cardFg[i % _cardFg.length],
-                onTap: () => Navigator.push(context, AppTheme.zoomIn(
-                  RecipeResultsScreen(ingredients: [r['title']!.split(' ').first.toLowerCase()]),
-                )),
+                onTap: () => Navigator.push(context, AppTheme.zoomIn(RecipeDetailScreen(recipe: r))),
               ),
             ),
           );
@@ -315,24 +355,73 @@ class _HomeScreenState extends State<HomeScreen> {
     );
   }
 
-  // Uses shared ActivityRow — same widget as HistoryScreen. Zero duplication.
   Widget _buildActivity() {
+    if (_loadingHistory) {
+      return Padding(
+        padding: const EdgeInsets.fromLTRB(20, 14, 20, 0),
+        child: Column(children: List.generate(2, (_) => Container(
+          margin: const EdgeInsets.only(bottom: 10),
+          height: 64,
+          decoration: BoxDecoration(
+            color: AppTheme.lightGray.withValues(alpha: 0.5),
+            borderRadius: BorderRadius.circular(14),
+          ),
+        ).animate(onPlay: (c) => c.repeat(reverse: true))
+         .shimmer(duration: 1200.ms, color: Colors.white.withValues(alpha: 0.6)))),
+      );
+    }
+
+    if (_recentHistory.isEmpty) {
+      return Padding(
+        padding: const EdgeInsets.fromLTRB(20, 14, 20, 0),
+        child: Container(
+          padding: const EdgeInsets.all(20),
+          decoration: BoxDecoration(
+            color: Colors.white,
+            borderRadius: BorderRadius.circular(16),
+            border: Border.all(color: AppTheme.borderGray),
+          ),
+          child: const Row(children: [
+            Icon(LucideIcons.chefHat, color: AppTheme.mutedText, size: 20),
+            SizedBox(width: 12),
+            Text('No cooking sessions yet. Start cooking!',
+                style: TextStyle(color: AppTheme.mutedText, fontSize: 13, fontFamily: 'DM Sans')),
+          ]),
+        ),
+      );
+    }
+
     return Padding(
       padding: const EdgeInsets.fromLTRB(20, 14, 20, 0),
-      child: Column(children: [
-        ActivityRow(
-          recipeName: 'Chicken Stir Fry',
-          ingredients: 'Chicken, Garlic, Onion',
-          time: 'Today, 2:30 PM',
-          onTap: () => Navigator.push(context, AppTheme.slideUp(const HistoryScreen())),
-        ).animate(delay: 40.ms).fadeIn(duration: 350.ms).slideX(begin: 0.04),
-        ActivityRow(
-          recipeName: 'Cheesy Scrambled Eggs',
-          ingredients: 'Eggs, Tomato, Cheese',
-          time: 'Today, 11:00 AM',
-          onTap: () => Navigator.push(context, AppTheme.slideUp(const HistoryScreen())),
-        ).animate(delay: 100.ms).fadeIn(duration: 350.ms).slideX(begin: 0.04),
-      ]),
+      child: Column(
+        children: _recentHistory.asMap().entries.map((e) {
+          final i = e.key;
+          final h = e.value;
+          final ts = h['timestamp'] as String? ?? '';
+          final timeLabel = _formatTimestamp(ts);
+          return ActivityRow(
+            recipeName: h['ingredient_names'] as String? ?? 'Cooking session',
+            ingredients: h['action_type'] as String? ?? 'cooked',
+            time: timeLabel,
+            onTap: () => Navigator.push(context, AppTheme.slideUp(const HistoryScreen())),
+          ).animate(delay: (i * 60).ms).fadeIn(duration: 350.ms).slideX(begin: 0.04);
+        }).toList(),
+      ),
     );
+  }
+
+  String _formatTimestamp(String ts) {
+    if (ts.isEmpty) return '';
+    try {
+      final dt = DateTime.parse(ts);
+      final now = DateTime.now();
+      final diff = now.difference(dt);
+      if (diff.inMinutes < 60) return '${diff.inMinutes}m ago';
+      if (diff.inHours < 24) return '${diff.inHours}h ago';
+      if (diff.inDays == 1) return 'Yesterday';
+      return '${diff.inDays}d ago';
+    } catch (_) {
+      return ts;
+    }
   }
 }

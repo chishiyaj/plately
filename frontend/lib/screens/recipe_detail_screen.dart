@@ -2,15 +2,11 @@ import 'package:flutter/material.dart';
 import 'package:flutter_animate/flutter_animate.dart';
 import 'package:lucide_icons_flutter/lucide_icons.dart';
 import '../theme/app_theme.dart';
+import '../services/api_service.dart';
+import '../services/user_prefs_service.dart';
 import '../models/recipe.dart';
-import '../widgets/bottom_nav.dart';
 import '../widgets/tap_scale.dart';
 import '../widgets/ai_tip_card.dart';
-import 'home_screen.dart';
-import 'favorites_screen.dart';
-import 'ai_chat_screen.dart';
-import 'profile_screen.dart';
-import 'recipe_results_screen.dart';
 
 class RecipeDetailScreen extends StatefulWidget {
   final Recipe recipe;
@@ -40,23 +36,21 @@ class _RecipeDetailScreenState extends State<RecipeDetailScreen> with TickerProv
     _heroCtrl = AnimationController(vsync: this, duration: const Duration(milliseconds: 500));
     _heroFade = CurvedAnimation(parent: _heroCtrl, curve: Curves.easeOut);
     _heroCtrl.forward();
+    _loadFavoriteState();
+  }
+
+  Future<void> _loadFavoriteState() async {
+    final saved = await ApiService.isFavorite(r.id);
+    if (mounted) setState(() => _isFavorited = saved);
+  }
+
+  Future<void> _toggleFavorite() async {
+    final newState = await ApiService.toggleFavorite(r.id);
+    if (mounted) setState(() => _isFavorited = newState);
   }
 
   @override
   void dispose() { _heroCtrl.dispose(); super.dispose(); }
-
-  void _onNavTap(int index) {
-    Widget screen;
-    switch (index) {
-      case 0: screen = const HomeScreen();      break;
-      case 1: screen = const FavoritesScreen(); break;
-      case 2: screen = const RecipeResultsScreen(ingredients: []); break;
-      case 3: screen = const AiChatScreen();    break;
-      case 4: screen = const ProfileScreen();   break;
-      default: return;
-    }
-    Navigator.pushReplacement(context, AppTheme.slideRight(screen));
-  }
 
   @override
   Widget build(BuildContext context) {
@@ -96,7 +90,7 @@ class _RecipeDetailScreenState extends State<RecipeDetailScreen> with TickerProv
           ),
         ],
       ),
-      bottomNavigationBar: PlatelyBottomNav(currentIndex: 2, onTap: _onNavTap, onScanTap: () => _onNavTap(2)),
+      bottomNavigationBar: null,
     );
   }
 
@@ -163,7 +157,7 @@ class _RecipeDetailScreenState extends State<RecipeDetailScreen> with TickerProv
           Positioned(
             top: 48, right: 16,
             child: TapScale(
-              onTap: () => setState(() => _isFavorited = !_isFavorited),
+              onTap: _toggleFavorite,
               child: Container(
                 width: 38, height: 38,
                 decoration: BoxDecoration(
@@ -297,7 +291,22 @@ class _RecipeDetailScreenState extends State<RecipeDetailScreen> with TickerProv
 
   Widget _buildActionBtn() {
     return TapScale(
-      onTap: () => _showIngredients ? setState(() => _showIngredients = false) : Navigator.pop(context),
+      onTap: () async {
+        if (_showIngredients) {
+          setState(() => _showIngredients = false);
+        } else {
+          // Log this cooking session to backend + increment local count
+          await Future.wait([
+            ApiService.logHistory(
+              ingredientNames: r.ingredients.map((i) => i.name).join(', '),
+              actionType: 'cooked',
+              recipeCount: 1,
+            ),
+            UserPrefsService.incrementRecipeCount(),
+          ]);
+          if (mounted) Navigator.pop(context);
+        }
+      },
       child: Container(
         width: double.infinity, height: 56,
         decoration: BoxDecoration(

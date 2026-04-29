@@ -12,10 +12,12 @@ from dotenv import load_dotenv
 load_dotenv()
 
 from database import init_db
-from routes.scan    import bp as scan_bp
-from routes.recipes import bp as recipes_bp
-from routes.chat    import bp as chat_bp
-from routes.goals   import bp as goals_bp
+from routes.scan      import bp as scan_bp
+from routes.recipes   import bp as recipes_bp
+from routes.chat      import bp as chat_bp
+from routes.goals     import bp as goals_bp
+from routes.favorites import bp as favorites_bp
+from routes.history   import bp as history_bp
 
 
 def create_app() -> Flask:
@@ -30,6 +32,8 @@ def create_app() -> Flask:
     app.register_blueprint(recipes_bp)
     app.register_blueprint(chat_bp)
     app.register_blueprint(goals_bp)
+    app.register_blueprint(favorites_bp)
+    app.register_blueprint(history_bp)
 
     # Health check
     @app.route('/api/health')

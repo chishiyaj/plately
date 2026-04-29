@@ -89,4 +89,125 @@ class ApiService {
       return null;
     }
   }
+
+  // GET /api/favorites — returns saved recipes for user
+  static Future<List<Recipe>> getFavorites({String userId = 'default'}) async {
+    try {
+      final res = await http.get(Uri.parse('$baseUrl/api/favorites?user_id=$userId'));
+      final data = jsonDecode(res.body);
+      if (data['status'] == 'ok') {
+        return (data['data'] as List).map((r) => Recipe.fromJson(r)).toList();
+      }
+      return [];
+    } catch (_) {
+      return [];
+    }
+  }
+
+  // POST /api/favorites — save a recipe as favorite
+  static Future<void> addFavorite(int recipeId, {String userId = 'default'}) async {
+    try {
+      await http.post(
+        Uri.parse('$baseUrl/api/favorites'),
+        headers: {'Content-Type': 'application/json'},
+        body: jsonEncode({'user_id': userId, 'recipe_id': recipeId}),
+      );
+    } catch (_) {}
+  }
+
+  // GET /api/favorites/check/<id> — is recipe saved?
+  static Future<bool> isFavorite(int recipeId, {String userId = 'default'}) async {
+    try {
+      final res = await http.get(Uri.parse('$baseUrl/api/favorites/check/$recipeId?user_id=$userId'));
+      final data = jsonDecode(res.body);
+      if (data['status'] == 'ok') return data['data']['is_favorite'] as bool;
+      return false;
+    } catch (_) {
+      return false;
+    }
+  }
+
+  // POST or DELETE /api/favorites — toggle favorite state, returns new state
+  static Future<bool> toggleFavorite(int recipeId, {String userId = 'default'}) async {
+    final currently = await isFavorite(recipeId, userId: userId);
+    try {
+      if (currently) {
+        await http.delete(Uri.parse('$baseUrl/api/favorites/$recipeId?user_id=$userId'));
+        return false;
+      } else {
+        await http.post(
+          Uri.parse('$baseUrl/api/favorites'),
+          headers: {'Content-Type': 'application/json'},
+          body: jsonEncode({'user_id': userId, 'recipe_id': recipeId}),
+        );
+        return true;
+      }
+    } catch (_) {
+      return currently;
+    }
+  }
+
+  // GET /api/history — returns cooking history for user
+  static Future<List<Map<String, dynamic>>> getHistory({String userId = 'default'}) async {
+    try {
+      final res = await http.get(Uri.parse('$baseUrl/api/history?user_id=$userId'));
+      final data = jsonDecode(res.body);
+      if (data['status'] == 'ok') {
+        return List<Map<String, dynamic>>.from(data['data']);
+      }
+      return [];
+    } catch (_) {
+      return [];
+    }
+  }
+
+  // GET /api/history/stats — aggregated stats
+  static Future<Map<String, int>> getHistoryStats({String userId = 'default'}) async {
+    try {
+      final res = await http.get(Uri.parse('$baseUrl/api/history/stats?user_id=$userId'));
+      final data = jsonDecode(res.body);
+      if (data['status'] == 'ok') {
+        final d = data['data'] as Map<String, dynamic>;
+        return {
+          'total_sessions':     d['total_sessions']     as int? ?? 0,
+          'total_recipes':      d['total_recipes']      as int? ?? 0,
+          'sessions_this_week': d['sessions_this_week'] as int? ?? 0,
+        };
+      }
+      return {};
+    } catch (_) {
+      return {};
+    }
+  }
+  static Future<void> deleteHistory(int id) async {
+    try {
+      await http.delete(Uri.parse('$baseUrl/api/history/$id'));
+    } catch (_) {}
+  }
+
+  static Future<void> clearHistory({String userId = 'default'}) async {
+    try {
+      await http.delete(Uri.parse('$baseUrl/api/history?user_id=$userId'));
+    } catch (_) {}
+  }
+
+  static Future<void> logHistory({
+    required String ingredientNames,
+    String userId = 'default',
+    String actionType = 'cooked',
+    int recipeCount = 1,
+  }) async {
+    try {
+      await http.post(
+        Uri.parse('$baseUrl/api/history'),
+        headers: {'Content-Type': 'application/json'},
+        body: jsonEncode({
+          'user_id': userId,
+          'action_type': actionType,
+          'ingredient_names': ingredientNames,
+          'recipe_count': recipeCount,
+        }),
+      );
+    } catch (_) {}
+  }
 }
