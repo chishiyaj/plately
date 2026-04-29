@@ -170,7 +170,7 @@ class _RecipeDetailScreenState extends State<RecipeDetailScreen> with TickerProv
                   color: _isFavorited ? AppTheme.red.withValues(alpha: 0.9) : Colors.black45,
                   borderRadius: BorderRadius.circular(12),
                 ),
-                child: Icon(_isFavorited ? LucideIcons.heartOff : LucideIcons.heart, color: Colors.white, size: 18),
+                child: Icon(LucideIcons.heart, color: _isFavorited ? Colors.white : Colors.white60, size: 18),
               ),
             ),
           ),
