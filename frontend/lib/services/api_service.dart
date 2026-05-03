@@ -1,37 +1,58 @@
-import 'dart:convert';
+﻿import 'dart:convert';
 import 'package:http/http.dart' as http;
+import 'package:firebase_auth/firebase_auth.dart';
 import '../models/recipe.dart';
 
-// All API calls to Flask backend — change baseUrl for physical device
+// All API calls to Flask backend â€” change baseUrl for physical device
 class ApiService {
-  // Android emulator uses 10.0.2.2, physical device uses LAN IP
-  static const String baseUrl = 'http://10.0.2.2:5000';
+  // â”€â”€â”€ SWITCH THIS FOR DEMO â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+  // Emulator:       'http://10.0.2.2:5000'
+  // Physical phone: 'http://192.168.100.15:5000'  â† use this for demo
+  // â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+  // ── SWITCH FOR DEPLOYMENT ──────────────────────────────────────────────────
+  // Emulator:       'http://10.0.2.2:5000'
+  // Physical phone: 'http://192.168.100.15:5000'
+  // Production:     'https://YOUR-APP.up.railway.app'  <- paste Railway URL
+  // ────────────────────────────────────────────────────────────────────────
+  static const String baseUrl = 'http://192.168.100.15:5000';
 
-  // POST /api/scan — base64 image → ingredient list
-  static Future<List<String>> scanImage(String base64Image) async {
+  /// Returns the current Firebase UID, or 'default' if not signed in.
+  static String get _uid => FirebaseAuth.instance.currentUser?.uid ?? 'default';
+
+  // POST /api/scan â€” base64 image â†’ (ingredients, message)
+  // message is non-null when AI falls back (timeout/parse error).
+  static Future<({List<String> ingredients, String? message})> scanImage(String base64Image) async {
     try {
       final res = await http.post(
         Uri.parse('$baseUrl/api/scan'),
         headers: {'Content-Type': 'application/json'},
         body: jsonEncode({'image_base64': base64Image}),
-      );
+      ).timeout(const Duration(seconds: 30));
       final data = jsonDecode(res.body);
       if (data['status'] == 'ok') {
-        return List<String>.from(data['data']['ingredients']);
+        return (
+          ingredients: List<String>.from(data['data']['ingredients']),
+          message: data['message'] as String?,
+        );
       }
-      return [];
+      return (ingredients: <String>[], message: data['message'] as String? ?? 'Scan failed.');
     } catch (_) {
-      return [];
+      return (ingredients: <String>[], message: 'Connection error. Is the backend running?');
     }
   }
 
-  // POST /api/recipes — ingredient list → recipe list
-  static Future<List<Recipe>> getRecipes(List<String> ingredients) async {
+  // POST /api/recipes â€” ingredient list + user prefs â†’ recipe list
+  static Future<List<Recipe>> getRecipes(
+    List<String> ingredients, {
+    Map<String, dynamic>? prefs,
+  }) async {
     try {
+      final body = <String, dynamic>{'ingredients': ingredients};
+      if (prefs != null && prefs.isNotEmpty) body['prefs'] = prefs;
       final res = await http.post(
         Uri.parse('$baseUrl/api/recipes'),
         headers: {'Content-Type': 'application/json'},
-        body: jsonEncode({'ingredients': ingredients}),
+        body: jsonEncode(body),
       );
       final data = jsonDecode(res.body);
       if (data['status'] == 'ok') {
@@ -43,7 +64,7 @@ class ApiService {
     }
   }
 
-  // GET /api/recipe/:id — single recipe detail
+  // GET /api/recipe/:id â€” single recipe detail
   static Future<Recipe?> getRecipeDetail(int id) async {
     try {
       final res = await http.get(Uri.parse('$baseUrl/api/recipe/$id'));
@@ -55,13 +76,15 @@ class ApiService {
     }
   }
 
-  // POST /api/chat — message → AI reply
-  static Future<String> sendChat(String message) async {
+  // POST /api/chat â€” message â†’ AI reply
+  static Future<String> sendChat(String message, {List<Map<String, String>>? history}) async {
     try {
+      final body = <String, dynamic>{'message': message};
+      if (history != null && history.isNotEmpty) body['history'] = history;
       final res = await http.post(
         Uri.parse('$baseUrl/api/chat'),
         headers: {'Content-Type': 'application/json'},
-        body: jsonEncode({'message': message}),
+        body: jsonEncode(body),
       );
       final data = jsonDecode(res.body);
       if (data['status'] == 'ok') return data['data']['reply'] as String;
@@ -71,7 +94,7 @@ class ApiService {
     }
   }
 
-  // POST /api/goals — weight/height/age/goal → TDEE + targets
+  // POST /api/goals â€” weight/height/age/goal â†’ TDEE + targets
   static Future<Map<String, dynamic>?> setGoals({
     required double weight, required double height,
     required int age, required String goal, required String sex,
@@ -90,10 +113,10 @@ class ApiService {
     }
   }
 
-  // GET /api/favorites — returns saved recipes for user
-  static Future<List<Recipe>> getFavorites({String userId = 'default'}) async {
+  // GET /api/favorites â€” returns saved recipes for user
+  static Future<List<Recipe>> getFavorites() async {
     try {
-      final res = await http.get(Uri.parse('$baseUrl/api/favorites?user_id=$userId'));
+      final res = await http.get(Uri.parse('$baseUrl/api/favorites?user_id=$_uid'));
       final data = jsonDecode(res.body);
       if (data['status'] == 'ok') {
         return (data['data'] as List).map((r) => Recipe.fromJson(r)).toList();
@@ -104,21 +127,21 @@ class ApiService {
     }
   }
 
-  // POST /api/favorites — save a recipe as favorite
-  static Future<void> addFavorite(int recipeId, {String userId = 'default'}) async {
+  // POST /api/favorites â€” save a recipe as favorite
+  static Future<void> addFavorite(int recipeId) async {
     try {
       await http.post(
         Uri.parse('$baseUrl/api/favorites'),
         headers: {'Content-Type': 'application/json'},
-        body: jsonEncode({'user_id': userId, 'recipe_id': recipeId}),
+        body: jsonEncode({'user_id': _uid, 'recipe_id': recipeId}),
       );
     } catch (_) {}
   }
 
-  // GET /api/favorites/check/<id> — is recipe saved?
-  static Future<bool> isFavorite(int recipeId, {String userId = 'default'}) async {
+  // GET /api/favorites/check/<id> â€” is recipe saved?
+  static Future<bool> isFavorite(int recipeId) async {
     try {
-      final res = await http.get(Uri.parse('$baseUrl/api/favorites/check/$recipeId?user_id=$userId'));
+      final res = await http.get(Uri.parse('$baseUrl/api/favorites/check/$recipeId?user_id=$_uid'));
       final data = jsonDecode(res.body);
       if (data['status'] == 'ok') return data['data']['is_favorite'] as bool;
       return false;
@@ -127,18 +150,18 @@ class ApiService {
     }
   }
 
-  // POST or DELETE /api/favorites — toggle favorite state, returns new state
-  static Future<bool> toggleFavorite(int recipeId, {String userId = 'default'}) async {
-    final currently = await isFavorite(recipeId, userId: userId);
+  // POST or DELETE /api/favorites â€” toggle favorite state, returns new state
+  static Future<bool> toggleFavorite(int recipeId) async {
+    final currently = await isFavorite(recipeId);
     try {
       if (currently) {
-        await http.delete(Uri.parse('$baseUrl/api/favorites/$recipeId?user_id=$userId'));
+        await http.delete(Uri.parse('$baseUrl/api/favorites/$recipeId?user_id=$_uid'));
         return false;
       } else {
         await http.post(
           Uri.parse('$baseUrl/api/favorites'),
           headers: {'Content-Type': 'application/json'},
-          body: jsonEncode({'user_id': userId, 'recipe_id': recipeId}),
+          body: jsonEncode({'user_id': _uid, 'recipe_id': recipeId}),
         );
         return true;
       }
@@ -147,10 +170,10 @@ class ApiService {
     }
   }
 
-  // GET /api/history — returns cooking history for user
-  static Future<List<Map<String, dynamic>>> getHistory({String userId = 'default'}) async {
+  // GET /api/history â€” returns cooking history for user
+  static Future<List<Map<String, dynamic>>> getHistory() async {
     try {
-      final res = await http.get(Uri.parse('$baseUrl/api/history?user_id=$userId'));
+      final res = await http.get(Uri.parse('$baseUrl/api/history?user_id=$_uid'));
       final data = jsonDecode(res.body);
       if (data['status'] == 'ok') {
         return List<Map<String, dynamic>>.from(data['data']);
@@ -161,10 +184,10 @@ class ApiService {
     }
   }
 
-  // GET /api/history/stats — aggregated stats
-  static Future<Map<String, int>> getHistoryStats({String userId = 'default'}) async {
+  // GET /api/history/stats â€” aggregated stats
+  static Future<Map<String, int>> getHistoryStats() async {
     try {
-      final res = await http.get(Uri.parse('$baseUrl/api/history/stats?user_id=$userId'));
+      final res = await http.get(Uri.parse('$baseUrl/api/history/stats?user_id=$_uid'));
       final data = jsonDecode(res.body);
       if (data['status'] == 'ok') {
         final d = data['data'] as Map<String, dynamic>;
@@ -179,21 +202,21 @@ class ApiService {
       return {};
     }
   }
+
   static Future<void> deleteHistory(int id) async {
     try {
-      await http.delete(Uri.parse('$baseUrl/api/history/$id'));
+      await http.delete(Uri.parse('$baseUrl/api/history/$id?user_id=$_uid'));
     } catch (_) {}
   }
 
-  static Future<void> clearHistory({String userId = 'default'}) async {
+  static Future<void> clearHistory() async {
     try {
-      await http.delete(Uri.parse('$baseUrl/api/history?user_id=$userId'));
+      await http.delete(Uri.parse('$baseUrl/api/history?user_id=$_uid'));
     } catch (_) {}
   }
 
   static Future<void> logHistory({
     required String ingredientNames,
-    String userId = 'default',
     String actionType = 'cooked',
     int recipeCount = 1,
   }) async {
@@ -202,7 +225,7 @@ class ApiService {
         Uri.parse('$baseUrl/api/history'),
         headers: {'Content-Type': 'application/json'},
         body: jsonEncode({
-          'user_id': userId,
+          'user_id': _uid,
           'action_type': actionType,
           'ingredient_names': ingredientNames,
           'recipe_count': recipeCount,
@@ -211,3 +234,4 @@ class ApiService {
     } catch (_) {}
   }
 }
+

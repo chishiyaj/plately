@@ -6,6 +6,7 @@ import '../theme/app_theme.dart';
 import '../widgets/recipe_card.dart';
 import '../widgets/tap_scale.dart';
 import '../services/api_service.dart';
+import '../services/user_prefs_service.dart';
 import '../models/recipe.dart';
 import 'recipe_detail_screen.dart';
 
@@ -37,7 +38,18 @@ class _RecipeResultsScreenState extends State<RecipeResultsScreen> {
   Future<void> _loadRecipes() async {
     setState(() { _loading = true; _error = null; });
     try {
-      final recipes = await ApiService.getRecipes(widget.ingredients);
+      // Load user prefs to send to AI for personalised recipes
+      final prefs = await UserPrefsService.load();
+      final aiPrefs = {
+        'goal':         prefs['goal']         ?? 'maintain',
+        'cal_goal':     prefs['cal_goal']     ?? 2200,
+        'protein_goal': prefs['protein_goal'] ?? 120,
+        'pref_veg':     prefs['pref_veg']     ?? false,
+        'pref_gluten':  prefs['pref_gluten']  ?? false,
+        'pref_dairy':   prefs['pref_dairy']   ?? false,
+        'pref_hipro':   prefs['pref_hipro']   ?? true,
+      };
+      final recipes = await ApiService.getRecipes(widget.ingredients, prefs: aiPrefs);
       if (mounted) setState(() { _all = recipes; _loading = false; });
     } catch (e) {
       if (mounted) setState(() { _error = e.toString(); _loading = false; });

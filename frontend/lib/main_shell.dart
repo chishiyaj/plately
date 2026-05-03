@@ -21,7 +21,9 @@ class MainShell extends StatefulWidget {
 
   // Static accessor so HomeScreen can switch to Profile tab without a push
   static _MainShellState? _instance;
-  static void switchTab(int shellIndex) => _instance?._switchTab(shellIndex);
+  static void switchTab(int shellIndex) {
+    if (_instance != null && _instance!.mounted) _instance!._switchTab(shellIndex);
+  }
 
   @override
   State<MainShell> createState() => _MainShellState();
@@ -156,7 +158,7 @@ class _ShellNav extends StatelessWidget {
             ),
           ),
           Positioned(
-            top: -10,
+            top: 8,
             child: _ScanFab(onTap: () => onTap(2)),
           ),
         ],

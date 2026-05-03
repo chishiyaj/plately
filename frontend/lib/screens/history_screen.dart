@@ -99,7 +99,7 @@ class _HistoryScreenState extends State<HistoryScreen> {
     backgroundColor: AppTheme.creamBg,
     body: SafeArea(child: Column(children: [
       _header(),
-      Expanded(child: _loading ? _shimmer() : _history.isEmpty ? _empty() : _content()),
+      Expanded(child: _loading ? _shimmer() : _content()),
     ])),
   );
 
@@ -107,10 +107,21 @@ class _HistoryScreenState extends State<HistoryScreen> {
     color: Colors.white,
     padding: const EdgeInsets.fromLTRB(20, 14, 20, 14),
     child: Row(children: [
-      Container(width: 42, height: 42,
-        decoration: BoxDecoration(color: AppTheme.creamBg, borderRadius: BorderRadius.circular(12),
-            border: Border.all(color: AppTheme.borderGray)),
-        child: const Icon(LucideIcons.calendarDays, color: AppTheme.primaryDark, size: 18)),
+      if (Navigator.canPop(context))
+        TapScale(
+          onTap: () => Navigator.pop(context),
+          child: Container(
+            width: 42, height: 42,
+            decoration: BoxDecoration(color: AppTheme.creamBg, borderRadius: BorderRadius.circular(12),
+                border: Border.all(color: AppTheme.borderGray)),
+            child: const Icon(LucideIcons.arrowLeft, color: AppTheme.primaryDark, size: 18),
+          ),
+        )
+      else
+        Container(width: 42, height: 42,
+          decoration: BoxDecoration(color: AppTheme.creamBg, borderRadius: BorderRadius.circular(12),
+              border: Border.all(color: AppTheme.borderGray)),
+          child: const Icon(LucideIcons.calendarDays, color: AppTheme.primaryDark, size: 18)),
       const SizedBox(width: 12),
       const Text('Your Activity', style: TextStyle(color: AppTheme.darkText, fontSize: 18,
           fontFamily: 'DM Sans', fontWeight: FontWeight.w800)),
@@ -159,76 +170,80 @@ class _HistoryScreenState extends State<HistoryScreen> {
     ]),
   );
 
-  Widget _empty() => Center(child: Column(mainAxisSize: MainAxisSize.min, children: [
-    Container(width: 80, height: 80,
-      decoration: BoxDecoration(color: AppTheme.borderGray.withValues(alpha: 0.4), shape: BoxShape.circle),
-      child: const Icon(LucideIcons.chefHat, size: 36, color: AppTheme.mutedText)),
-    const SizedBox(height: 16),
-    const Text('No cooking sessions yet', style: TextStyle(color: AppTheme.darkText,
-        fontSize: 16, fontFamily: 'DM Sans', fontWeight: FontWeight.w600)),
-    const SizedBox(height: 6),
-    const Text('Cook a recipe to see your activity here',
-        style: TextStyle(color: AppTheme.mutedText, fontSize: 13, fontFamily: 'DM Sans')),
-  ]).animate().fadeIn(duration: 300.ms));
-
   Widget _content() {
     final grouped = _grouped;
     return ListView(padding: const EdgeInsets.fromLTRB(20, 16, 20, 100), children: [
-      // Stats card
+      // Stats card — ALWAYS shown, even when history is empty (shows 0s)
       _statsCard().animate().fadeIn(duration: 350.ms).slideY(begin: 0.06),
       const SizedBox(height: 24),
-      // Grouped entries
-      ...grouped.entries.expand((entry) => [
-        // Group label
+      // Empty state below the stats card
+      if (grouped.isEmpty)
         Padding(
-          padding: const EdgeInsets.only(bottom: 10),
-          child: Row(children: [
-            Text(entry.key, style: const TextStyle(color: AppTheme.darkText, fontSize: 13,
-                fontFamily: 'DM Sans', fontWeight: FontWeight.w800)),
-            const SizedBox(width: 10),
-            Expanded(child: Container(height: 1, color: AppTheme.borderGray)),
-            const SizedBox(width: 8),
-            Text('${entry.value.length}', style: const TextStyle(color: AppTheme.mutedText,
-                fontSize: 11, fontFamily: 'DM Sans')),
-          ]),
-        ),
-        // Swipeable rows
-        ...entry.value.map((h) {
-          final id = h['id'] as int? ?? -1;
-          final ingredients = h['ingredient_names'] as String? ?? '';
-          final timeLabel = _fmtTime(h['timestamp'] as String? ?? '', entry.key);
-          final recipeCount = h['recipe_count'] as int? ?? 1;
-          return Dismissible(
-            key: Key('hist_$id'),
-            direction: DismissDirection.endToStart,
-            background: Container(
-              margin: const EdgeInsets.only(bottom: 10),
-              decoration: BoxDecoration(
-                color: AppTheme.red.withValues(alpha: 0.12),
-                borderRadius: BorderRadius.circular(16),
+          padding: const EdgeInsets.only(top: 16),
+          child: Column(children: [
+            Container(width: 64, height: 64,
+              decoration: BoxDecoration(color: AppTheme.borderGray.withValues(alpha: 0.4), shape: BoxShape.circle),
+              child: const Icon(LucideIcons.chefHat, size: 28, color: AppTheme.mutedText)),
+            const SizedBox(height: 14),
+            const Text('No cooking sessions yet', style: TextStyle(color: AppTheme.darkText,
+                fontSize: 15, fontFamily: 'DM Sans', fontWeight: FontWeight.w600)),
+            const SizedBox(height: 6),
+            const Text('Cook a recipe to see your activity here',
+                style: TextStyle(color: AppTheme.mutedText, fontSize: 13, fontFamily: 'DM Sans')),
+          ]).animate().fadeIn(duration: 300.ms),
+        )
+      else
+        ...grouped.entries.expand((entry) => [
+          // Group label
+          Padding(
+            padding: const EdgeInsets.only(bottom: 10),
+            child: Row(children: [
+              Text(entry.key, style: const TextStyle(color: AppTheme.darkText, fontSize: 13,
+                  fontFamily: 'DM Sans', fontWeight: FontWeight.w800)),
+              const SizedBox(width: 10),
+              Expanded(child: Container(height: 1, color: AppTheme.borderGray)),
+              const SizedBox(width: 8),
+              Text('${entry.value.length}', style: const TextStyle(color: AppTheme.mutedText,
+                  fontSize: 11, fontFamily: 'DM Sans')),
+            ]),
+          ),
+          // Swipeable rows
+          ...entry.value.map((h) {
+            final id = h['id'] as int? ?? -1;
+            final ingredients = h['ingredient_names'] as String? ?? '';
+            final timeLabel = _fmtTime(h['timestamp'] as String? ?? '', entry.key);
+            final recipeCount = h['recipe_count'] as int? ?? 1;
+            return Dismissible(
+              key: Key('hist_$id'),
+              direction: DismissDirection.endToStart,
+              background: Container(
+                margin: const EdgeInsets.only(bottom: 10),
+                decoration: BoxDecoration(
+                  color: AppTheme.red.withValues(alpha: 0.12),
+                  borderRadius: BorderRadius.circular(16),
+                ),
+                alignment: Alignment.centerRight,
+                padding: const EdgeInsets.only(right: 20),
+                child: const Icon(LucideIcons.trash2, color: AppTheme.red, size: 20),
               ),
-              alignment: Alignment.centerRight,
-              padding: const EdgeInsets.only(right: 20),
-              child: const Icon(LucideIcons.trash2, color: AppTheme.red, size: 20),
-            ),
-            onDismissed: (_) => _deleteEntry(id),
-            child: _HistoryRow(
-              ingredients: ingredients,
-              time: timeLabel,
-              recipeCount: recipeCount,
-              actionType: h['action_type'] as String? ?? 'cooked',
-              onTap: () {
-                final ings = ingredients.split(',').map((s) => s.trim())
-                    .where((s) => s.isNotEmpty).toList();
-                if (ings.isNotEmpty) {
-                  Navigator.push(context, AppTheme.slideUp(RecipeResultsScreen(ingredients: ings)));
-                }
-              },
-            ).animate().fadeIn(duration: 280.ms).slideX(begin: 0.04),
-          );
-        }),
-        const SizedBox(height: 12),
-      ]),
+              onDismissed: (_) => _deleteEntry(id),
+              child: _HistoryRow(
+                ingredients: ingredients,
+                time: timeLabel,
+                recipeCount: recipeCount,
+                actionType: h['action_type'] as String? ?? 'cooked',
+                onTap: () {
+                  final ings = ingredients.split(',').map((s) => s.trim())
+                      .where((s) => s.isNotEmpty).toList();
+                  if (ings.isNotEmpty) {
+                    Navigator.push(context, AppTheme.slideUp(RecipeResultsScreen(ingredients: ings)));
+                  }
+                },
+              ).animate().fadeIn(duration: 280.ms).slideX(begin: 0.04),
+            );
+          }),
+          const SizedBox(height: 12),
+        ]),
     ]);
   }
 

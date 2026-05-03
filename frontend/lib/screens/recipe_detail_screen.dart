@@ -4,9 +4,12 @@ import 'package:lucide_icons_flutter/lucide_icons.dart';
 import '../theme/app_theme.dart';
 import '../services/api_service.dart';
 import '../services/user_prefs_service.dart';
+import '../services/notification_service.dart';
 import '../models/recipe.dart';
 import '../widgets/tap_scale.dart';
 import '../widgets/ai_tip_card.dart';
+import '../widgets/recipe_card.dart' show recipeImageUrl;
+import 'ai_chat_screen.dart';
 
 class RecipeDetailScreen extends StatefulWidget {
   final Recipe recipe;
@@ -21,6 +24,9 @@ class _RecipeDetailScreenState extends State<RecipeDetailScreen> with TickerProv
   late final AnimationController _heroCtrl;
   late final Animation<double> _heroFade;
   final Set<int> _checked = {};
+  // Serving size scaler — all macros + ingredient amounts multiply by this
+  double _servings = 1.0;
+  static const _servingOptions = [0.5, 1.0, 1.5, 2.0, 3.0];
 
   Recipe get r => widget.recipe;
 
@@ -40,11 +46,23 @@ class _RecipeDetailScreenState extends State<RecipeDetailScreen> with TickerProv
   }
 
   Future<void> _loadFavoriteState() async {
+    if (r.id < 0) return; // AI-generated recipes can't be favorited
     final saved = await ApiService.isFavorite(r.id);
     if (mounted) setState(() => _isFavorited = saved);
   }
 
   Future<void> _toggleFavorite() async {
+    if (r.id < 0) {
+      ScaffoldMessenger.of(context).showSnackBar(SnackBar(
+        content: const Text('Cook this recipe first — AI recipes can be saved after cooking.',
+            style: TextStyle(fontFamily: 'DM Sans')),
+        backgroundColor: AppTheme.primaryDark, behavior: SnackBarBehavior.floating,
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+        margin: const EdgeInsets.fromLTRB(16, 0, 16, 80),
+        duration: const Duration(seconds: 3),
+      ));
+      return;
+    }
     final newState = await ApiService.toggleFavorite(r.id);
     if (mounted) setState(() => _isFavorited = newState);
   }
@@ -57,6 +75,31 @@ class _RecipeDetailScreenState extends State<RecipeDetailScreen> with TickerProv
     return Scaffold(
       backgroundColor: AppTheme.creamBg,
       extendBody: true,
+      floatingActionButton: Padding(
+        padding: const EdgeInsets.only(bottom: 80),
+        child: TapScale(
+          onTap: () => Navigator.push(
+            context,
+            AppTheme.slideUp(AiChatScreen(
+              initialPrompt: 'I\'m cooking ${r.name}. Give me tips and any ingredient substitutions if needed.',
+            )),
+          ),
+          child: Container(
+            padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 11),
+            decoration: BoxDecoration(
+              color: AppTheme.primaryDark,
+              borderRadius: BorderRadius.circular(20),
+              boxShadow: const [BoxShadow(color: Color(0x66043B3C), blurRadius: 14, offset: Offset(0, 5))],
+            ),
+            child: const Row(mainAxisSize: MainAxisSize.min, children: [
+              Icon(LucideIcons.chefHat, color: AppTheme.green, size: 16),
+              SizedBox(width: 7),
+              Text('Ask AI', style: TextStyle(color: Colors.white, fontSize: 13,
+                  fontFamily: 'DM Sans', fontWeight: FontWeight.w700)),
+            ]),
+          ),
+        ).animate(delay: 400.ms).fadeIn(duration: 300.ms).slideY(begin: 0.2),
+      ),
       body: Column(
         children: [
           _buildHero(context),
@@ -74,75 +117,85 @@ class _RecipeDetailScreenState extends State<RecipeDetailScreen> with TickerProv
               child: SingleChildScrollView(
                 key: ValueKey(_showIngredients),
                 padding: const EdgeInsets.fromLTRB(20, 18, 20, 120),
-                child: Column(
-                  children: [
-                    _showIngredients ? _buildIngredients() : _buildSteps(),
-                    const SizedBox(height: 16),
-                    _buildNutrition(),
-                    const SizedBox(height: 14),
-                    AiTipCard(tip: _aiTip()),
-                    const SizedBox(height: 18),
-                    _buildActionBtn(),
-                  ],
-                ),
+                child: Column(children: [
+                  _showIngredients ? _buildIngredients() : _buildSteps(),
+                  const SizedBox(height: 16),
+                  _buildNutrition(),
+                  const SizedBox(height: 14),
+                  AiTipCard(tip: _aiTip()),
+                  const SizedBox(height: 18),
+                  _buildActionBtn(),
+                ]),
               ),
             ),
           ),
         ],
       ),
-      bottomNavigationBar: null,
     );
   }
 
   String _aiTip() {
-    if (r.tags.contains('Asian'))    return 'For best stir-fry results, use high heat and keep ingredients moving — this gives that restaurant-style wok hei flavour.';
-    if (r.tags.contains('Italian'))  return 'Salt your pasta water generously — it should taste like the sea. This is the only chance to season the pasta itself.';
+    if (r.tags.contains('Asian'))       return 'For best stir-fry results, use high heat and keep ingredients moving — this gives that restaurant-style wok hei flavour.';
+    if (r.tags.contains('Italian'))     return 'Salt your pasta water generously — it should taste like the sea. This is the only chance to season the pasta itself.';
     if (r.tags.contains('High-Protein')) return 'Let protein rest 2–3 min after cooking — it stays juicier and retains more nutrients.';
     return 'Prep all ingredients before you start cooking — it makes the whole process faster and less stressful.';
   }
 
   Widget _buildHero(BuildContext context) {
+    final imgUrl = recipeImageUrl(r.name);
     return FadeTransition(
       opacity: _heroFade,
       child: Stack(
         children: [
-          Container(
+          // Real food image
+          SizedBox(
             height: 260, width: double.infinity,
-            decoration: const BoxDecoration(
-              gradient: LinearGradient(
-                begin: Alignment.topLeft, end: Alignment.bottomRight,
-                colors: [Color(0xFFD8EDD4), Color(0xFFC0DCB3)],
+            child: Image.network(
+              imgUrl,
+              fit: BoxFit.cover,
+              loadingBuilder: (_, child, progress) {
+                if (progress == null) return child;
+                return Container(
+                  color: const Color(0xFFD8EDD4),
+                  child: const Center(child: Icon(LucideIcons.utensils, size: 60, color: Color(0x664A8A46))),
+                );
+              },
+              errorBuilder: (_, __, ___) => Container(
+                color: const Color(0xFFD8EDD4),
+                child: const Center(child: Icon(LucideIcons.chefHat, size: 80, color: Color(0xFF4A8A46))),
               ),
             ),
-            child: const Center(child: Icon(LucideIcons.chefHat, size: 80, color: Color(0xFF4A8A46))),
           ),
+          // Gradient scrim
           Positioned(
-            bottom: 0, left: 0, right: 0, height: 130,
+            bottom: 0, left: 0, right: 0, height: 160,
             child: Container(
               decoration: const BoxDecoration(
                 gradient: LinearGradient(
                   begin: Alignment.bottomCenter, end: Alignment.topCenter,
-                  colors: [Color(0xEE000000), Colors.transparent],
+                  colors: [Color(0xF0000000), Colors.transparent],
                 ),
               ),
             ),
           ),
+          // Name + badges
           Positioned(
             bottom: 16, left: 20, right: 20,
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Text(r.name, style: const TextStyle(color: Colors.white, fontSize: 22, fontFamily: 'DM Sans', fontWeight: FontWeight.w800)),
-                const SizedBox(height: 8),
-                Wrap(spacing: 8, children: [
-                  _MetaBadge(icon: LucideIcons.clock3,     label: r.cookTime),
-                  _MetaBadge(icon: LucideIcons.flame,      label: '${r.calories} cal'),
-                  _MetaBadge(icon: LucideIcons.dumbbell,   label: '${r.protein}g protein', highlight: true),
-                  _MetaBadge(icon: LucideIcons.signalHigh, label: r.difficulty),
-                ]),
-              ],
-            ),
+            child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+              Text(r.name, style: const TextStyle(
+                color: Colors.white, fontSize: 22,
+                fontFamily: 'DM Sans', fontWeight: FontWeight.w800,
+              )),
+              const SizedBox(height: 8),
+              Wrap(spacing: 8, children: [
+                _MetaBadge(icon: LucideIcons.clock3,     label: r.cookTime),
+                _MetaBadge(icon: LucideIcons.flame,      label: '${r.calories} cal'),
+                _MetaBadge(icon: LucideIcons.dumbbell,   label: '${r.protein}g protein', highlight: true),
+                _MetaBadge(icon: LucideIcons.signalHigh, label: r.difficulty),
+              ]),
+            ]),
           ),
+          // Back button
           Positioned(
             top: 48, left: 16,
             child: TapScale(
@@ -154,6 +207,7 @@ class _RecipeDetailScreenState extends State<RecipeDetailScreen> with TickerProv
               ),
             ),
           ),
+          // Favorite button
           Positioned(
             top: 48, right: 16,
             child: TapScale(
@@ -164,7 +218,8 @@ class _RecipeDetailScreenState extends State<RecipeDetailScreen> with TickerProv
                   color: _isFavorited ? AppTheme.red.withValues(alpha: 0.9) : Colors.black45,
                   borderRadius: BorderRadius.circular(12),
                 ),
-                child: Icon(LucideIcons.heart, color: _isFavorited ? Colors.white : Colors.white60, size: 18),
+                child: Icon(LucideIcons.heart,
+                    color: _isFavorited ? Colors.white : Colors.white60, size: 18),
               ),
             ),
           ),
@@ -177,7 +232,9 @@ class _RecipeDetailScreenState extends State<RecipeDetailScreen> with TickerProv
     return Container(
       margin: const EdgeInsets.fromLTRB(20, 14, 20, 0),
       height: 44,
-      decoration: BoxDecoration(color: AppTheme.lightGray.withValues(alpha: 0.5), borderRadius: BorderRadius.circular(14)),
+      decoration: BoxDecoration(
+          color: AppTheme.lightGray.withValues(alpha: 0.5),
+          borderRadius: BorderRadius.circular(14)),
       child: Row(children: [
         _Tab(label: 'Ingredients', selected: _showIngredients,  onTap: () => setState(() => _showIngredients = true)),
         _Tab(label: 'Steps',       selected: !_showIngredients, onTap: () => setState(() => _showIngredients = false)),
@@ -190,12 +247,15 @@ class _RecipeDetailScreenState extends State<RecipeDetailScreen> with TickerProv
     if (ings.isEmpty) {
       return const Padding(
         padding: EdgeInsets.symmetric(vertical: 32),
-        child: Center(child: Text('No ingredient details', style: TextStyle(fontFamily: 'DM Sans', color: AppTheme.mutedText))),
+        child: Center(child: Text('No ingredient details available.',
+            style: TextStyle(fontFamily: 'DM Sans', color: AppTheme.mutedText))),
       );
     }
     return Column(
       children: List.generate(ings.length, (i) {
         final ing = ings[i];
+        // Scale ingredient amount by serving multiplier
+        final scaledAmount = _scaleAmount(ing.amount, _servings);
         return TapScale(
           onTap: () => setState(() => _checked.contains(i) ? _checked.remove(i) : _checked.add(i)),
           child: Container(
@@ -205,87 +265,164 @@ class _RecipeDetailScreenState extends State<RecipeDetailScreen> with TickerProv
               color: Colors.white, borderRadius: BorderRadius.circular(14),
               boxShadow: const [BoxShadow(color: Color(0x06000000), blurRadius: 8, offset: Offset(0, 2))],
             ),
-            child: Row(
-              children: [
-                AnimatedContainer(
-                  duration: 200.ms,
-                  width: 22, height: 22,
-                  decoration: BoxDecoration(
-                    color: _checked.contains(i) ? AppTheme.green : Colors.transparent,
-                    borderRadius: BorderRadius.circular(6),
-                    border: Border.all(color: _checked.contains(i) ? AppTheme.green : AppTheme.borderGray, width: 1.5),
-                  ),
-                  child: _checked.contains(i) ? const Icon(LucideIcons.check, color: Colors.white, size: 13) : null,
+            child: Row(children: [
+              AnimatedContainer(
+                duration: 200.ms,
+                width: 22, height: 22,
+                decoration: BoxDecoration(
+                  color: _checked.contains(i) ? AppTheme.green : Colors.transparent,
+                  borderRadius: BorderRadius.circular(6),
+                  border: Border.all(
+                      color: _checked.contains(i) ? AppTheme.green : AppTheme.borderGray, width: 1.5),
                 ),
-                const SizedBox(width: 12),
-                Expanded(child: Text(ing.name, style: TextStyle(
-                  color: _checked.contains(i) ? AppTheme.mutedText : AppTheme.darkText,
-                  fontSize: 14, fontFamily: 'DM Sans', fontWeight: FontWeight.w500,
-                  decoration: _checked.contains(i) ? TextDecoration.lineThrough : null,
-                ))),
-                Text(ing.amount, style: const TextStyle(color: AppTheme.mutedText, fontSize: 13, fontFamily: 'DM Sans', fontWeight: FontWeight.w500)),
-              ],
-            ),
+                child: _checked.contains(i)
+                    ? const Icon(LucideIcons.check, color: Colors.white, size: 13) : null,
+              ),
+              const SizedBox(width: 12),
+              Expanded(child: Text(ing.name, style: TextStyle(
+                color: _checked.contains(i) ? AppTheme.mutedText : AppTheme.darkText,
+                fontSize: 14, fontFamily: 'DM Sans', fontWeight: FontWeight.w500,
+                decoration: _checked.contains(i) ? TextDecoration.lineThrough : null,
+              ))),
+              Text(scaledAmount, style: TextStyle(
+                color: _servings != 1.0 ? AppTheme.primaryDark : AppTheme.mutedText,
+                fontSize: 13, fontFamily: 'DM Sans',
+                fontWeight: _servings != 1.0 ? FontWeight.w700 : FontWeight.w500,
+              )),
+            ]),
           ).animate(delay: (i * 40).ms).fadeIn(duration: 300.ms).slideX(begin: 0.04),
         );
       }),
     );
   }
 
+  /// Scales an ingredient amount string by the serving multiplier.
+  /// Handles formats like "200g", "1 cup", "2 tbsp", "3 cloves", "to taste".
+  String _scaleAmount(String amount, double multiplier) {
+    if (multiplier == 1.0) return amount;
+    if (amount == 'to taste' || amount.isEmpty) return amount;
+    // Extract leading number
+    final match = RegExp(r'^([\d.\/]+)\s*(.*)$').firstMatch(amount.trim());
+    if (match == null) return amount;
+    final numStr = match.group(1)!;
+    final unit   = match.group(2) ?? '';
+    double? num;
+    if (numStr.contains('/')) {
+      final parts = numStr.split('/');
+      num = (double.tryParse(parts[0]) ?? 1) / (double.tryParse(parts[1]) ?? 1);
+    } else {
+      num = double.tryParse(numStr);
+    }
+    if (num == null) return amount;
+    final scaled = num * multiplier;
+    // Format: drop trailing .0, round to 1 decimal
+    final formatted = scaled == scaled.roundToDouble()
+        ? scaled.toInt().toString()
+        : scaled.toStringAsFixed(1);
+    return '$formatted${unit.isNotEmpty ? ' $unit' : ''}';
+  }
+
   Widget _buildSteps() {
     final steps = _steps;
     return Column(
-      children: List.generate(steps.length, (i) {
-        return Container(
-          margin: const EdgeInsets.only(bottom: 12),
-          padding: const EdgeInsets.all(16),
-          decoration: BoxDecoration(
-            color: Colors.white, borderRadius: BorderRadius.circular(16),
-            boxShadow: const [BoxShadow(color: Color(0x06000000), blurRadius: 8, offset: Offset(0, 2))],
+      children: List.generate(steps.length, (i) => Container(
+        margin: const EdgeInsets.only(bottom: 12),
+        padding: const EdgeInsets.all(16),
+        decoration: BoxDecoration(
+          color: Colors.white, borderRadius: BorderRadius.circular(16),
+          boxShadow: const [BoxShadow(color: Color(0x06000000), blurRadius: 8, offset: Offset(0, 2))],
+        ),
+        child: Row(crossAxisAlignment: CrossAxisAlignment.start, children: [
+          Container(
+            width: 28, height: 28,
+            decoration: const BoxDecoration(gradient: AppTheme.tealGradient, shape: BoxShape.circle),
+            child: Center(child: Text('${i + 1}', style: const TextStyle(
+                color: Colors.white, fontSize: 12, fontFamily: 'DM Sans', fontWeight: FontWeight.w700))),
           ),
-          child: Row(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Container(
-                width: 28, height: 28,
-                decoration: const BoxDecoration(gradient: AppTheme.tealGradient, shape: BoxShape.circle),
-                child: Center(child: Text('${i + 1}', style: const TextStyle(color: Colors.white, fontSize: 12, fontFamily: 'DM Sans', fontWeight: FontWeight.w700))),
-              ),
-              const SizedBox(width: 12),
-              Expanded(child: Text(steps[i], style: const TextStyle(color: AppTheme.darkText, fontSize: 14, fontFamily: 'DM Sans', height: 1.5))),
-            ],
-          ),
-        ).animate(delay: (i * 50).ms).fadeIn(duration: 300.ms).slideX(begin: 0.04);
-      }),
+          const SizedBox(width: 12),
+          Expanded(child: Text(steps[i], style: const TextStyle(
+              color: AppTheme.darkText, fontSize: 14, fontFamily: 'DM Sans', height: 1.5))),
+        ]),
+      ).animate(delay: (i * 50).ms).fadeIn(duration: 300.ms).slideX(begin: 0.04)),
     );
   }
 
   Widget _buildNutrition() {
+    // Scale all macros by serving multiplier
+    final cal  = (r.calories * _servings).round();
+    final pro  = (r.protein  * _servings).round();
+    final carb = (r.carbs    * _servings).round();
+    final fat  = (r.fat      * _servings).round();
+
     return Container(
       padding: const EdgeInsets.all(18),
       decoration: BoxDecoration(
         color: Colors.white, borderRadius: BorderRadius.circular(18),
         boxShadow: const [BoxShadow(color: Color(0x06000000), blurRadius: 8, offset: Offset(0, 2))],
       ),
-      child: Column(
-        children: [
-          const Row(children: [
-            Text('Nutrition per serving', style: TextStyle(color: AppTheme.darkText, fontSize: 14, fontFamily: 'DM Sans', fontWeight: FontWeight.w700)),
-            Spacer(),
-            Text('1 serving', style: TextStyle(color: AppTheme.mutedText, fontSize: 12, fontFamily: 'DM Sans')),
+      child: Column(children: [
+        // ── Header + serving scaler ────────────────────────────────────────
+        Row(children: [
+          const Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+            Text('Nutrition Facts', style: TextStyle(
+                color: AppTheme.darkText, fontSize: 14, fontFamily: 'DM Sans', fontWeight: FontWeight.w700)),
+            Text('Tap to adjust servings', style: TextStyle(
+                color: AppTheme.mutedText, fontSize: 11, fontFamily: 'DM Sans')),
           ]),
-          const SizedBox(height: 16),
-          Row(
-            mainAxisAlignment: MainAxisAlignment.spaceAround,
-            children: [
-              _NutriBadge(label: 'Calories', value: '${r.calories}', unit: 'kcal', color: AppTheme.orange),
-              _NutriBadge(label: 'Protein',  value: '${r.protein}',  unit: 'g',    color: AppTheme.green),
-              _NutriBadge(label: 'Carbs',    value: '${r.carbs}',    unit: 'g',    color: AppTheme.typeBlue),
-              _NutriBadge(label: 'Fat',      value: '${r.fat}',      unit: 'g',    color: AppTheme.askPurple),
-            ],
+          const Spacer(),
+          // Serving size picker chips
+          ...(_servingOptions.map((s) {
+            final selected = _servings == s;
+            final label = s == 0.5 ? '½x' : s == 1.0 ? '1x' : s == 1.5 ? '1.5x' : s == 2.0 ? '2x' : '3x';
+            return TapScale(
+              onTap: () => setState(() { _servings = s; _checked.clear(); }),
+              child: AnimatedContainer(
+                duration: const Duration(milliseconds: 180),
+                margin: const EdgeInsets.only(left: 4),
+                padding: const EdgeInsets.symmetric(horizontal: 9, vertical: 5),
+                decoration: BoxDecoration(
+                  color: selected ? AppTheme.primaryDark : AppTheme.creamBg,
+                  borderRadius: BorderRadius.circular(8),
+                  border: Border.all(color: selected ? AppTheme.primaryDark : AppTheme.borderGray),
+                ),
+                child: Text(label, style: TextStyle(
+                  color: selected ? Colors.white : AppTheme.mutedText,
+                  fontSize: 11, fontFamily: 'DM Sans', fontWeight: FontWeight.w700,
+                )),
+              ),
+            );
+          })),
+        ]),
+        const SizedBox(height: 16),
+        // ── Macro circles ─────────────────────────────────────────────────
+        Row(
+          mainAxisAlignment: MainAxisAlignment.spaceAround,
+          children: [
+            _NutriBadge(label: 'Calories', value: '$cal',  unit: 'kcal', color: AppTheme.orange),
+            _NutriBadge(label: 'Protein',  value: '$pro',  unit: 'g',    color: AppTheme.green),
+            _NutriBadge(label: 'Carbs',    value: '$carb', unit: 'g',    color: AppTheme.typeBlue),
+            _NutriBadge(label: 'Fat',      value: '$fat',  unit: 'g',    color: AppTheme.askPurple),
+          ],
+        ),
+        if (_servings != 1.0) ...[
+          const SizedBox(height: 12),
+          Container(
+            width: double.infinity, padding: const EdgeInsets.all(10),
+            decoration: BoxDecoration(
+              color: AppTheme.scanGreen.withValues(alpha: 0.3),
+              borderRadius: BorderRadius.circular(10),
+            ),
+            child: Text(
+              'Scaled to ${_servings == 0.5 ? "½" : _servings.toString().replaceAll(".0", "")} serving${_servings == 0.5 ? "" : "s"} — ingredient amounts adjusted below.',
+              style: const TextStyle(
+                color: Color(0xFF2E6B29), fontSize: 11,
+                fontFamily: 'DM Sans', fontWeight: FontWeight.w500,
+              ),
+              textAlign: TextAlign.center,
+            ),
           ),
         ],
-      ),
+      ]),
     );
   }
 
@@ -295,14 +432,16 @@ class _RecipeDetailScreenState extends State<RecipeDetailScreen> with TickerProv
         if (_showIngredients) {
           setState(() => _showIngredients = false);
         } else {
-          // Log this cooking session to backend + increment local count
           await Future.wait([
             ApiService.logHistory(
-              ingredientNames: r.ingredients.map((i) => i.name).join(', '),
+              ingredientNames: r.ingredients.isEmpty
+                  ? r.name
+                  : r.ingredients.map((i) => i.name).join(', '),
               actionType: 'cooked',
               recipeCount: 1,
             ),
             UserPrefsService.incrementRecipeCount(),
+            NotificationService.notifyCookingDone(r.name),
           ]);
           if (mounted) Navigator.pop(context);
         }
@@ -314,21 +453,20 @@ class _RecipeDetailScreenState extends State<RecipeDetailScreen> with TickerProv
           borderRadius: BorderRadius.circular(16),
           boxShadow: const [BoxShadow(color: Color(0x44043B3C), blurRadius: 16, offset: Offset(0, 6))],
         ),
-        child: Row(
-          mainAxisAlignment: MainAxisAlignment.center,
-          children: [
-            Icon(_showIngredients ? LucideIcons.chefHat : LucideIcons.circleCheck, color: Colors.white, size: 20),
-            const SizedBox(width: 10),
-            Text(_showIngredients ? "Let's Cook" : 'Finish Cooking',
-                style: const TextStyle(color: Colors.white, fontSize: 16, fontFamily: 'DM Sans', fontWeight: FontWeight.w700)),
-          ],
-        ),
+        child: Row(mainAxisAlignment: MainAxisAlignment.center, children: [
+          Icon(_showIngredients ? LucideIcons.chefHat : LucideIcons.circleCheck,
+              color: Colors.white, size: 20),
+          const SizedBox(width: 10),
+          Text(_showIngredients ? "Let's Cook" : 'Finish Cooking',
+              style: const TextStyle(color: Colors.white, fontSize: 16,
+                  fontFamily: 'DM Sans', fontWeight: FontWeight.w700)),
+        ]),
       ),
     );
   }
 }
 
-// ── Shared sub-widgets ─────────────────────────────────────────────────────
+// ── Sub-widgets ────────────────────────────────────────────────────────────────
 
 class _Tab extends StatelessWidget {
   final String label;
@@ -350,7 +488,8 @@ class _Tab extends StatelessWidget {
         ),
         child: Center(child: Text(label, style: TextStyle(
           color: selected ? AppTheme.primaryDark : AppTheme.mutedText,
-          fontSize: 13, fontFamily: 'DM Sans', fontWeight: selected ? FontWeight.w700 : FontWeight.w500,
+          fontSize: 13, fontFamily: 'DM Sans',
+          fontWeight: selected ? FontWeight.w700 : FontWeight.w500,
         ))),
       ),
     ),
@@ -391,10 +530,12 @@ class _NutriBadge extends StatelessWidget {
     Container(
       width: 58, height: 58,
       decoration: BoxDecoration(color: color.withValues(alpha: 0.12), shape: BoxShape.circle),
-      child: Center(child: Text(value, style: TextStyle(color: color, fontSize: 18, fontFamily: 'DM Sans', fontWeight: FontWeight.w800))),
+      child: Center(child: Text(value, style: TextStyle(
+          color: color, fontSize: 18, fontFamily: 'DM Sans', fontWeight: FontWeight.w800))),
     ),
     const SizedBox(height: 5),
     Text(unit, style: const TextStyle(color: AppTheme.mutedText, fontSize: 11, fontFamily: 'DM Sans')),
-    Text(label, style: const TextStyle(color: AppTheme.darkText, fontSize: 12, fontFamily: 'DM Sans', fontWeight: FontWeight.w600)),
+    Text(label, style: const TextStyle(
+        color: AppTheme.darkText, fontSize: 12, fontFamily: 'DM Sans', fontWeight: FontWeight.w600)),
   ]);
 }

@@ -1,0 +1,29 @@
+{
+  "project_info": {
+    "project_number": "97643516725",
+    "project_id": "plately-bb305",
+    "storage_bucket": "plately-bb305.firebasestorage.app"
+  },
+  "client": [
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:97643516725:android:983e87348ed9134ba8327c",
+        "android_client_info": {
+          "package_name": "com.plately.app"
+        }
+      },
+      "oauth_client": [],
+      "api_key": [
+        {
+          "current_key": "AIzaSyATLhrfRuvUmXlTK1zFKeb_W4HbpVglOfA"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": []
+        }
+      }
+    }
+  ],
+  "configuration_version": "1"
+}

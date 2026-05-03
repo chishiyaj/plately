@@ -1,35 +1,35 @@
-# PLATELY V2 — [SKILLS.md](http://SKILLS.md) (GOD TIER)
-
-> Paste alongside [MEMORY.md](http://MEMORY.md) at the start of every chat.
+# PLATELY V2 — SKILLS.md (GOD TIER)
+> Paste alongside MEMORY.md + TASKS.md at the start of every chat.
 
 ---
 
-## ⚡ TOKEN BUDGET RULES (CRITICAL — READ FIRST)
-
-Claude has a finite context window. Every wasted token = less code we get.
-
-RuleDetail**Complete files only**No `// ...rest stays the same`. Always full file.**One-line summary**Before any code block: one sentence max.\*\*No re-explaining [MEMORY.md](http://MEMORY.md**)Stack, design, screens are documented. Skip.**No multi-message Q&A**Ask all questions at once in one block.**Batch writes**Write multiple related files in sequence, no chatter between.**Reference don't repeat**Say "see AppTheme.primaryDark" not the hex value.**Max response format**Summary line → code → 3 bullets → "Next:"**Skip boilerplate comments**No `// Flutter SDK`, `// material.dart` type comments.**Short var names in local scope**`res`, `ctx`, `fn` etc. fine inside functions.**Compress mock data**3 items in a list = fine for demo. Not 10.
+## ⚡ TOKEN BUDGET RULES (CRITICAL)
+| Rule | Detail |
+|------|--------|
+| Complete files only | No `// ...rest stays the same`. Always full file. |
+| One-line summary | Before any code block: one sentence max. |
+| No re-explaining MEMORY.md | Stack, design, screens are documented. Skip. |
+| No multi-message Q&A | Ask all questions at once in one block. |
+| Batch writes | Write multiple related files in sequence, no chatter between. |
+| Reference don't repeat | Say "see AppTheme.primaryDark" not the hex value. |
+| Max response format | Summary line → code → 3 bullets → "Next:" |
+| Skip boilerplate comments | No `// Flutter SDK`, `// material.dart` type comments. |
 
 ---
 
 ## 🧠 ROLE
-
-Senior Flutter/Python engineer. Goal: working demo in 1-2 weeks. Priority order: **runs** &gt; **looks right** &gt; **clean code** &gt; **perfect architecture**
+Senior Flutter/Python engineer. Goal: working demo. Priority: **runs** > **looks right** > **clean code** > **perfect architecture**
 
 ---
 
-## 🎨 FLUTTER FRONTEND RULES
+## 🎨 FLUTTER RULES
 
 ### Architecture
-
 - Material 3 only (`useMaterial3: true`)
 - `StatefulWidget` if screen has state, `StatelessWidget` for pure display
-- Extract any UI repeated 3+ times → shared widget in `/widgets/`
 - Navigation: `Navigator.push` / `Navigator.pushReplacement` / `Navigator.pushAndRemoveUntil`
-- `PageController` for splash carousel only
 
 ### Styling — NEVER hardcode hex in screens
-
 ```dart
 // WRONG
 color: Color(0xFF043B3C)
@@ -38,213 +38,145 @@ color: AppTheme.primaryDark
 ```
 
 ### Layout rules
-
-- Prefer `Column` / `Row` / `Padding` over `Positioned`
-- `Expanded` + `Flexible` for responsive widths
 - `SafeArea` wraps every screen body
 - `SingleChildScrollView` + `padding: EdgeInsets.only(bottom: 100)` for long screens with bottom nav
+- `const` on every widget that doesn't change
+- `ListView.builder` for lists > 5 items
 
 ### Bottom nav pattern
-
 ```dart
 bottomNavigationBar: PlatelyBottomNav(currentIndex: N, onTap: _onNavTap),
 ```
-
 Indices: 0=Home, 1=Favorites, 2=Scan(FAB), 3=AiChat, 4=Profile
 
-### Text fields
-
-- Always `border: InputBorder.none` inside custom Container
-- `contentPadding` to control vertical centering
-- `obscureText: true` for passwords
-
-### Performance
-
-- `const` on every widget that doesn't change
-- `shrinkWrap: true` + `NeverScrollableScrollPhysics` for nested ListViews
-- Never put `ListView` inside `SingleChildScrollView` without physics override
-- `ListView.builder` for lists &gt; 5 items (lazy rendering)
-- `ClipRRect` for image corners — never nest multiple decorations
-
 ### Fonts
-
 - `Nunito` → logo and brand headings only
 - `DM Sans` → all body, label, button text
-- Declare in `pubspec.yaml` under `fonts:`, files go in `assets/fonts/`
+
+### Packages in use (pubspec.yaml — verified)
+- `flutter_animate` — chainable animations
+- `lucide_icons_flutter` — icons (not Material icons)
+- `shimmer` — skeleton loading
+- `glassmorphism` — frosted glass
+- `camera` — live camera viewfinder
+- `animations` — SharedAxisTransition
+- `flutter_svg` — Google G logo
+- `firebase_core`, `firebase_auth`, `google_sign_in` — auth
+- `flutter_local_notifications`, `timezone` — notifications (wiring pending)
+- `cached_network_image` — remote images
+- `image_picker`, `shared_preferences`, `sqflite`, `http`
+
+### NEVER USE
+- `withOpacity` on const colors → use `withValues(alpha: x)`
+- `WillPopScope` → deprecated
+- Hardcoded hex in screens
+- Paid APIs
 
 ---
 
-## 🐍 BACKEND (Flask) RULES
+## 🐍 BACKEND RULES
 
-### File structure
-
+### File structure (ACTUAL)
 ```
-routes/scan.py      → POST /api/scan
+routes/scan.py      → POST /api/scan (Gemma vision)
 routes/recipes.py   → GET+POST /api/recipes, GET /api/recipe/<id>
-routes/chat.py      → POST /api/chat
-routes/goals.py     → POST /api/goals
-database.py         → all SQLite logic
-app.py              → Flask init, register blueprints, CORS
+routes/chat.py      → POST /api/chat (Gemma 3 chat)
+routes/goals.py     → POST /api/goals (Mifflin-St Jeor)
+routes/favorites.py → GET/POST/DELETE /api/favorites
+routes/history.py   → GET/POST/DELETE /api/history
+database.py         → Thread-safe SQLite, WAL mode
+app.py              → Flask factory, rate limiter, CORS, security headers
+wsgi.py             → Production gunicorn entry
 ```
 
 ### Response contract (always)
-
 ```python
-# Success
 return jsonify({"status": "ok", "data": result}), 200
-# Error
 return jsonify({"status": "error", "message": str(e)}), 500
 ```
 
-### Every route needs
-
+### App factory pattern (CURRENT — don't change)
 ```python
-from flask import Blueprint, request, jsonify
-bp = Blueprint('name', __name__)
+# app.py uses create_app() factory — NOT direct Flask()
+# Rate limiter is imported from app.py in routes:
+from app import limiter
 
 @bp.route('/api/path', methods=['POST'])
+@limiter.limit("20 per minute")
 def handler():
     try:
-        # logic
+        ...
         return jsonify({"status": "ok", "data": result}), 200
     except Exception as e:
         return jsonify({"status": "error", "message": str(e)}), 500
 ```
 
-### Database patterns
-
+### Database pattern (CURRENT — thread-safe WAL)
 ```python
-# database.py pattern
-import sqlite3, os
-
-DB_PATH = os.path.join(os.path.dirname(__file__), 'db/plately.db')
-
-def get_db():
-    conn = sqlite3.connect(DB_PATH)
-    conn.row_factory = sqlite3.Row  # enables dict-like access
-    return conn
-
-def query(sql, params=()):
-    conn = get_db()
-    cur = conn.execute(sql, params)
-    rows = [dict(r) for r in cur.fetchall()]
-    conn.close()
-    return rows
-
-def execute(sql, params=()):
-    conn = get_db()
-    conn.execute(sql, params)
-    conn.commit()
-    conn.close()
+from database import query, execute
+# query() returns list[dict]
+# execute() for INSERT/UPDATE/DELETE
 ```
 
-### AI integration — OpenRouter
-
+### AI — OpenRouter (CURRENT models)
 ```python
-import requests, os
-OPENROUTER_KEY = os.getenv('OPENROUTER_API_KEY')
-SYSTEM_PROMPT = "You are Plately, a helpful cooking assistant for students. Be concise."
+# Chat: google/gemma-3-27b-it:free
+# Scan: tries in order: google/gemma-3-12b-it:free → google/gemma-3-27b-it:free → google/gemma-4-31b-it:free
+# Prompt format: merge system prompt into user message (Gemma doesn't use system role well)
+# load_dotenv(override=True) in app.py — always reads fresh from .env
 
-def ask_ai(user_message):
-    res = requests.post(
-        'https://openrouter.ai/api/v1/chat/completions',
-        headers={'Authorization': f'Bearer {OPENROUTER_KEY}', 'Content-Type': 'application/json'},
-        json={'model': 'mistralai/mistral-7b-instruct:free', 'messages': [
-            {'role': 'system', 'content': SYSTEM_PROMPT},
-            {'role': 'user', 'content': user_message},
-        ], 'max_tokens': 300},
-        timeout=15,
-    )
-    return res.json()['choices'][0]['message']['content']
+OPENROUTER_URL = "https://openrouter.ai/api/v1/chat/completions"
+headers = {
+    "Authorization": f"Bearer {os.getenv('OPENROUTER_API_KEY')}",
+    "Content-Type": "application/json",
+    "HTTP-Referer": "https://plately.app",
+    "X-Title": "Plately",
+}
 ```
 
-### Vision API — Google Cloud
-
+### Image Scan (CURRENT — Gemma Vision, NOT Google Vision)
 ```python
-def scan_image(base64_data):
-    res = requests.post(
-        f'https://vision.googleapis.com/v1/images:annotate?key={VISION_KEY}',
-        json={'requests': [{'image': {'content': base64_data}, 'features': [{'type': 'LABEL_DETECTION', 'maxResults': 20}]}]},
-        timeout=10,
-    )
-    labels = [a['description'].lower() for a in res.json()['responses'][0].get('labelAnnotations', [])]
-    # Filter to known ingredients only
-    known = query("SELECT name FROM ingredients")
-    known_names = {r['name'].lower() for r in known}
-    return [l for l in labels if l in known_names]
+# See routes/scan.py — full implementation
+# Flow: base64 image → Gemma vision prompt → JSON ingredient list → DB match
+# Falls back to mock ["chicken","eggs","garlic"] if no API key
+# Partial ingredient matching: "chicken breast" → "chicken"
+# If no DB match but AI returned items → returns raw AI output (up to 6)
 ```
 
-### CORS (required for emulator)
-
+### CORS
 ```python
-from flask_cors import CORS
-CORS(app, resources={r"/api/*": {"origins": "*"}})
+CORS(app, resources={r"/api/*": {"origins": "*"}})  # dev only
+# Prod: set ALLOWED_ORIGINS env var to your domain
 ```
 
 ---
 
 ## 🔒 SECURITY RULES
-
-AreaRuleAPI KeysAlways `.env` via `python-dotenv`. Never in code.SQLAlways parameterized queries `?` — NEVER f-strings in SQL.Input validationCheck required fields exist before processing. Return 400 if missing.FirebaseOnly use Firebase for Auth (Google + Email). Data stays in SQLite.ImagesValidate base64 format before passing to Vision API.Secrets`.env` in `.gitignore`. Push `.env.example` with blank values.CORSRestrict to `*` only for dev. In prod: restrict to app domain.
-
-```python
-# Input validation pattern
-data = request.json or {}
-if not data.get('ingredients'):
-    return jsonify({"status": "error", "message": "ingredients required"}), 400
-```
+| Area | Rule |
+|------|------|
+| API Keys | Always `.env` via `python-dotenv`. Never in code. |
+| SQL | Always parameterized queries `?` — NEVER f-strings in SQL. |
+| Rate limiting | flask-limiter on all routes. /api/health exempt. |
+| History DELETE | Always require user_id param — WHERE id=? AND user_id=? |
+| Firebase | Only for Auth. Data in SQLite. |
 
 ---
 
-## 🚀 PERFORMANCE RULES
-
-### Flutter
-
-- Use `const` constructors everywhere possible
-- `ListView.builder` not `ListView(children: [...])` for dynamic lists
-- `CachedNetworkImage` for any remote images
-- `dispose()` every controller: `TextEditingController`, `ScrollController`, `PageController`
-- `WidgetsBinding.instance.addPostFrameCallback` for post-build scroll
-
-### Backend
-
-- Seed DB once on startup with `IF NOT EXISTS` check
-- Cache OpenRouter responses for identical messages (dict in memory, MVP only)
-- Vision API timeout: 10s. OpenRouter timeout: 15s. Always set timeouts.
-- Index DB columns used in WHERE: `recipe_id`, `user_id`, `ingredient_id`
-
-```sql
-CREATE INDEX IF NOT EXISTS idx_history_user ON history(user_id);
-CREATE INDEX IF NOT EXISTS idx_favorites_user ON favorites(user_id);
-```
-
----
-
-## 🎯 DESIGN TOKENS (quick ref — don't restate in code)
-
+## 🎯 DESIGN TOKENS (quick ref)
 ```
 primaryDark  = 0xFF043B3C    creamBg    = 0xFFF0EEE9
 darkText     = 0xFF083F3F    mutedText  = 0xFF7A7A7A
 green        = 0xFF76CC4F    greenDark  = 0xFF3D7B20
 purple       = 0xFFBA5CCC    yellow     = 0xFFEABA1C
 borderGray   = 0xFFDADADA    lightGray  = 0xFFD9D9D9
-scanGreen    = 0xFFC0DCB3    typeBlue   = 0xFFBEC2DC
-browseYellow = 0xFFDFDC9E    askPurple  = 0xFFD3A7DC
-orange       = 0xFFCCA04F    red        = 0xFFD14444
+red          = 0xFFD14444    orange     = 0xFFCCA04F
 ```
-
-Gradients: `AppTheme.splashGradient` | `AppTheme.tealGradient`Text styles: `AppTheme.logoStyle` | `headingLarge` | `headingMedium` | `bodyMedium` | `bodySmall` | `caption`
-
----
-
-## 📐 SCREEN STATUS CHECKLIST
-
-ScreenFileStatusSplash (3-page carousel)splash_screen.dart✅ DoneLoginlogin_screen.dart✅ DoneSign Upsignup_screen.dart✅ DoneDashboard/Homehome_screen.dart✅ DoneRecipe Results (grid + filters)recipe_results_screen.dart✅ DoneRecipe Detail (ingredients + steps tabs)recipe_detail_screen.dart✅ DoneFavoritesfavorites_screen.dart✅ DoneHistory / Activityhistory_screen.dart✅ DoneAI Chatai_chat_screen.dart✅ DoneProfileprofile_screen.dart✅ Done
+Gradients: `AppTheme.tealGradient` | `AppTheme.splashGradient`
+Text styles: `AppTheme.logoStyle` | `headingLarge` | `headingMedium` | `bodyMedium` | `bodySmall` | `caption`
 
 ---
 
 ## 📋 RESPONSE FORMAT (enforce always)
-
 ```
 [One line: what this builds]
 
@@ -253,48 +185,32 @@ ScreenFileStatusSplash (3-page carousel)splash_screen.dart✅ DoneLoginlogin_scr
 \`\`\`
 
 - Does X
-- Does Y  
+- Does Y
 - Does Z
 
 Next: [one specific next step]
 ```
 
 ### NEVER DO
-
 - `// ...` or `// rest stays the same`
-- Re-explain the stack or design system
+- Re-explain stack or design system
 - Ask questions in separate messages
-- Use deprecated: `WillPopScope`, `startActivityForResult`, `withOpacity` on const colors
+- Use `withOpacity` on const colors
 - Hardcode hex values in screens
 - Suggest paid APIs
 - Create partial implementations
 
 ---
 
-## 🛠️ FLUTTER SETUP COMMANDS (one-time)
+## 🔄 MD FILE UPDATE RULE (CRITICAL — READ THIS)
+**After EVERY change in a session, Claude MUST update TASKS.md:**
+- Mark completed items `[x]`
+- Add new findings or bugs discovered
+- Update "CURRENT STATE" section
+- Add to SESSION LOG table
 
-```powershell
-# In plately-v2/frontend/
-flutter create . --org com.plately --project-name plately_v2
+**If session is about to hit token limit:**
+- Immediately write the next session prompt to TASKS.md under "NEXT SESSION PROMPT"
+- Mark any in-progress items as `[~]` with notes on what was done so far
 
-# Get dependencies
-flutter pub get
-
-# Run on emulator
-flutter run
-
-# Check for errors
-flutter analyze
-```
-
----
-
-## 📦 ENV FILE TEMPLATE
-
-```env
-# plately-v2/backend/.env
-OPENROUTER_API_KEY=your_key_here
-GOOGLE_VISION_API_KEY=your_key_here
-FLASK_ENV=development
-SECRET_KEY=change-this-in-production
-```
+**MEMORY.md and SKILLS.md** — update only when architecture, tech stack, or patterns change (not every session).

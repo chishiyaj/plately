@@ -1,10 +1,13 @@
+"""routes/favorites.py"""
 from flask import Blueprint, request, jsonify
 from database import query, execute
+import logging
 
-bp = Blueprint('favorites', __name__)
+bp     = Blueprint('favorites', __name__)
+logger = logging.getLogger(__name__)
 
 
-def _recipe_with_nutrition(r):
+def _recipe_with_nutrition_and_ingredients(r, ing_rows) -> dict:
     return {
         "id":           r['id'],
         "name":         r['name'],
@@ -13,17 +16,18 @@ def _recipe_with_nutrition(r):
         "instructions": r['instructions'],
         "tags":         r.get('tags', ''),
         "nutrition": {
-            "calories": r.get('calories', 0),
-            "protein":  r.get('protein', 0),
-            "carbs":    r.get('carbs', 0),
-            "fat":      r.get('fat', 0),
+            "calories": r.get('calories') or 0,
+            "protein":  r.get('protein')  or 0,
+            "carbs":    r.get('carbs')    or 0,
+            "fat":      r.get('fat')      or 0,
         },
+        # Include full ingredient list so recipe detail screen shows them
+        "ingredients": [{"name": i['name'], "amount": i['amount']} for i in ing_rows],
     }
 
 
 @bp.route('/api/favorites', methods=['GET'])
 def get_favorites():
-    """GET /api/favorites?user_id=default"""
     try:
         user_id = request.args.get('user_id', 'default')
         rows = query("""
@@ -34,52 +38,63 @@ def get_favorites():
             WHERE f.user_id = ?
             ORDER BY f.id DESC
         """, (user_id,))
-        return jsonify({"status": "ok", "data": [_recipe_with_nutrition(r) for r in rows]}), 200
-    except Exception as e:
-        return jsonify({"status": "error", "message": str(e)}), 500
+
+        result = []
+        for r in rows:
+            ing_rows = query("""
+                SELECT i.name, ri.amount
+                FROM recipe_ingredients ri
+                JOIN ingredients i ON i.id = ri.ingredient_id
+                WHERE ri.recipe_id = ?
+            """, (r['id'],))
+            result.append(_recipe_with_nutrition_and_ingredients(r, ing_rows))
+
+        return jsonify({"status": "ok", "data": result}), 200
+    except Exception:
+        logger.exception("get_favorites error")
+        return jsonify({"status": "error", "message": "Internal error."}), 500
 
 
 @bp.route('/api/favorites', methods=['POST'])
 def add_favorite():
-    """POST /api/favorites — body: {user_id, recipe_id}"""
     try:
-        data = request.json or {}
-        user_id   = data.get('user_id', 'default')
+        data      = request.json or {}
+        user_id   = (data.get('user_id') or 'default').strip()
         recipe_id = data.get('recipe_id')
         if not recipe_id:
             return jsonify({"status": "error", "message": "recipe_id required"}), 400
         execute(
             "INSERT OR IGNORE INTO favorites (user_id, recipe_id) VALUES (?,?)",
-            (user_id, recipe_id)
+            (user_id, int(recipe_id)),
         )
         return jsonify({"status": "ok", "data": {"saved": True}}), 200
-    except Exception as e:
-        return jsonify({"status": "error", "message": str(e)}), 500
+    except (ValueError, TypeError):
+        return jsonify({"status": "error", "message": "Invalid recipe_id"}), 400
+    except Exception:
+        logger.exception("add_favorite error")
+        return jsonify({"status": "error", "message": "Internal error."}), 500
 
 
 @bp.route('/api/favorites/<int:recipe_id>', methods=['DELETE'])
 def remove_favorite(recipe_id):
-    """DELETE /api/favorites/<recipe_id>?user_id=default"""
     try:
         user_id = request.args.get('user_id', 'default')
-        execute(
-            "DELETE FROM favorites WHERE user_id = ? AND recipe_id = ?",
-            (user_id, recipe_id)
-        )
+        execute("DELETE FROM favorites WHERE user_id = ? AND recipe_id = ?", (user_id, recipe_id))
         return jsonify({"status": "ok", "data": {"removed": True}}), 200
-    except Exception as e:
-        return jsonify({"status": "error", "message": str(e)}), 500
+    except Exception:
+        logger.exception("remove_favorite error")
+        return jsonify({"status": "error", "message": "Internal error."}), 500
 
 
 @bp.route('/api/favorites/check/<int:recipe_id>', methods=['GET'])
 def check_favorite(recipe_id):
-    """GET /api/favorites/check/<recipe_id>?user_id=default — is it saved?"""
     try:
         user_id = request.args.get('user_id', 'default')
-        rows = query(
+        rows    = query(
             "SELECT id FROM favorites WHERE user_id = ? AND recipe_id = ?",
-            (user_id, recipe_id)
+            (user_id, recipe_id),
         )
         return jsonify({"status": "ok", "data": {"is_favorite": len(rows) > 0}}), 200
-    except Exception as e:
-        return jsonify({"status": "error", "message": str(e)}), 500
+    except Exception:
+        logger.exception("check_favorite error")
+        return jsonify({"status": "error", "message": "Internal error."}), 500

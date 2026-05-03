@@ -4,7 +4,7 @@ import 'package:plately_v2/main.dart';
 
 void main() {
   testWidgets('App smoke test', (WidgetTester tester) async {
-    await tester.pumpWidget(const PlatelyApp());
+    await tester.pumpWidget(const PlatelyApp(startAtHome: false));
     expect(find.byType(MaterialApp), findsOneWidget);
   });
 }

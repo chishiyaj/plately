@@ -1,0 +1,23 @@
+# Python
+__pycache__/
+*.pyc
+*.pyo
+*.pyd
+.Python
+*.egg-info/
+dist/
+build/
+
+# Environment — NEVER commit real keys
+.env
+
+# SQLite local DB — Render uses PostgreSQL
+db/plately.db
+db/*.db
+
+# Test scripts (not needed in prod)
+test_*.py
+check_db.py
+fix_db.py
+list_models.py
+test_openrouter_direct.py

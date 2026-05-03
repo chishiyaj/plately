@@ -6,6 +6,7 @@ import '../theme/app_theme.dart';
 import '../widgets/tap_scale.dart';
 import '../widgets/plately_logo.dart';
 import '../widgets/google_g_logo.dart';
+import '../services/auth_service.dart';
 import '../main_shell.dart';
 import 'signup_screen.dart';
 
@@ -40,22 +41,38 @@ class _LoginScreenState extends State<LoginScreen> {
     super.dispose();
   }
 
-  void _login() {
+  void _login() async {
     FocusScope.of(context).unfocus();
     if (_loading) return;
-    if (_emailCtrl.text.trim().isEmpty || _passCtrl.text.isEmpty) {
+    final email = _emailCtrl.text.trim();
+    final pass  = _passCtrl.text;
+    if (email.isEmpty || pass.isEmpty) {
       _showSnack('Please enter your email and password.', isError: true);
       return;
     }
     setState(() => _loading = true);
-    Future.delayed(const Duration(milliseconds: 900), () {
-      if (!mounted) return;
+    final result = await AuthService.signInWithEmail(email, pass);
+    if (!mounted) return;
+    setState(() => _loading = false);
+    if (result.success) {
       Navigator.pushReplacement(context, AppTheme.fadeScale(const MainShell()));
-    });
+    } else {
+      _showSnack(result.error!, isError: true);
+    }
   }
 
-  void _googleLogin() =>
+  void _googleLogin() async {
+    if (_loading) return;
+    setState(() => _loading = true);
+    final result = await AuthService.signInWithGoogle();
+    if (!mounted) return;
+    setState(() => _loading = false);
+    if (result.success) {
       Navigator.pushReplacement(context, AppTheme.fadeScale(const MainShell()));
+    } else {
+      _showSnack(result.error!, isError: true);
+    }
+  }
 
   void _showSnack(String msg, {bool isError = false}) {
     ScaffoldMessenger.of(context).showSnackBar(SnackBar(
@@ -141,7 +158,7 @@ class _LoginScreenState extends State<LoginScreen> {
                 ),
                 const SizedBox(height: 20),
                 TapScale(
-                  onTap: () {
+                  onTap: () async {
                     if (ctrl.text.trim().isEmpty || !ctrl.text.contains('@')) {
                       ScaffoldMessenger.of(context).showSnackBar(SnackBar(
                         content: const Text('Enter a valid email', style: TextStyle(fontFamily: 'DM Sans')),
@@ -151,7 +168,22 @@ class _LoginScreenState extends State<LoginScreen> {
                       ));
                       return;
                     }
-                    setS(() => sent = true);
+                    // Capture messenger before async gap to avoid use_build_context_synchronously
+                    final messenger = ScaffoldMessenger.of(context);
+                    try {
+                      await AuthService.sendPasswordReset(ctrl.text.trim());
+                      if (ctx.mounted) { setS(() => sent = true); }
+                    } catch (e) {
+                      if (ctx.mounted) {
+                        messenger.showSnackBar(SnackBar(
+                          content: Text(e.toString().replaceAll('Exception: ', ''),
+                              style: const TextStyle(fontFamily: 'DM Sans')),
+                          backgroundColor: AppTheme.red, behavior: SnackBarBehavior.floating,
+                          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                          margin: const EdgeInsets.fromLTRB(16, 0, 16, 80),
+                        ));
+                      }
+                    }
                   },
                   child: Container(
                     width: double.infinity, height: 54,
@@ -280,15 +312,15 @@ class _LoginScreenState extends State<LoginScreen> {
                     ).animate().fadeIn(duration: 400.ms, delay: 420.ms),
                     const SizedBox(height: 22),
                     // Divider
-                    Row(children: [
-                      const Expanded(child: Divider(color: AppTheme.borderGray, thickness: 1)),
-                      const Padding(
+                    const Row(children: [
+                      Expanded(child: Divider(color: AppTheme.borderGray, thickness: 1)),
+                      Padding(
                         padding: EdgeInsets.symmetric(horizontal: 14),
                         child: Text('or', style: TextStyle(
                           color: AppTheme.mutedText, fontSize: 12, fontFamily: 'DM Sans',
                         )),
                       ),
-                      const Expanded(child: Divider(color: AppTheme.borderGray, thickness: 1)),
+                      Expanded(child: Divider(color: AppTheme.borderGray, thickness: 1)),
                     ]).animate().fadeIn(duration: 300.ms, delay: 460.ms),
                     const SizedBox(height: 18),
                     // Google

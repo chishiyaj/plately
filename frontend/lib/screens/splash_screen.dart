@@ -169,7 +169,7 @@ class _SlidePage extends StatelessWidget {
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
               // Logo — top left
-              PlatelyLogo(
+              const PlatelyLogo(
                 theme: PlatelyLogoTheme.onDark,
                 iconSize: 36,
                 wordmarkSize: 18,

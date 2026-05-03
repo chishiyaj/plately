@@ -14,7 +14,6 @@ import '../main_shell.dart';
 import 'recipe_results_screen.dart';
 import 'history_screen.dart';
 import 'ingredient_entry_screen.dart';
-import 'ai_chat_screen.dart';
 import 'recipe_detail_screen.dart';
 
 class HomeScreen extends StatefulWidget {
@@ -204,13 +203,16 @@ class _HomeScreenState extends State<HomeScreen> {
                 )),
               ])),
               Container(
-                width: 32, height: 32,
+                padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
                 decoration: BoxDecoration(
-                  color: AppTheme.green,
+                  color: Colors.white.withValues(alpha: 0.15),
                   borderRadius: BorderRadius.circular(10),
-                  boxShadow: const [BoxShadow(color: Color(0x5576CC4F), blurRadius: 10, offset: Offset(0, 4))],
+                  border: Border.all(color: Colors.white.withValues(alpha: 0.3)),
                 ),
-                child: const Icon(LucideIcons.arrowRight, color: Colors.white, size: 16),
+                child: const Text('Start', style: TextStyle(
+                  color: Colors.white, fontSize: 12,
+                  fontFamily: 'DM Sans', fontWeight: FontWeight.w700,
+                )),
               ),
             ]),
           ),
@@ -239,7 +241,7 @@ class _HomeScreenState extends State<HomeScreen> {
                   if (a['label'] == 'Browse') {
                     Navigator.push(context, AppTheme.zoomIn(const RecipeResultsScreen(ingredients: [])));
                   } else if (a['label'] == 'Ask AI') {
-                    Navigator.push(context, AppTheme.slideUp(const AiChatScreen()));
+                    MainShell.switchTab(2); // shell index 2 = AI tab
                   } else {
                     Navigator.push(context, AppTheme.slideUp(const HistoryScreen()));
                   }

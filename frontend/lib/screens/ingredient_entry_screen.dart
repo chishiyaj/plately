@@ -73,8 +73,17 @@ class _IngredientEntryScreenState extends State<IngredientEntryScreen>
       final file = await _cam!.takePicture();
       _capturedPath = file.path;
       final b64 = base64Encode(await File(file.path).readAsBytes());
-      final detected = await ApiService.scanImage(b64);
-      if (mounted) setState(() { _ingredients = detected; _scanning = false; });
+      final result = await ApiService.scanImage(b64);
+      if (mounted) {
+        setState(() {
+          _ingredients = result.ingredients;
+          _scanning = false;
+          // Show backend message if AI fell back (empty result with explanation)
+          if (result.ingredients.isEmpty && result.message != null) {
+            _scanError = result.message;
+          }
+        });
+      }
     } catch (_) {
       if (mounted) setState(() { _scanning = false; _scanError = 'Could not detect — add manually.'; });
     } finally {
@@ -89,13 +98,28 @@ class _IngredientEntryScreenState extends State<IngredientEntryScreen>
     setState(() {});
   }
 
+  static const _maxIngredients = 15;
+
   void _removeChip(String item) => setState(() => _ingredients.remove(item));
 
   void _addManual() {
     final raw = _typeCtrl.text.trim();
     if (raw.isEmpty) return;
+    final toAdd = raw.split(',').map((e) => e.trim().toLowerCase()).where((e) => e.isNotEmpty).toList();
+    final remaining = _maxIngredients - _ingredients.length;
+    if (remaining <= 0) {
+      ScaffoldMessenger.of(context).showSnackBar(SnackBar(
+        content: const Text('Maximum 15 ingredients — remove some first.',
+            style: TextStyle(fontFamily: 'DM Sans')),
+        backgroundColor: AppTheme.primaryDark,
+        behavior: SnackBarBehavior.floating,
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+        margin: const EdgeInsets.fromLTRB(16, 0, 16, 16),
+      ));
+      return;
+    }
     setState(() {
-      for (final p in raw.split(',').map((e) => e.trim().toLowerCase()).where((e) => e.isNotEmpty)) {
+      for (final p in toAdd.take(remaining)) {
         if (!_ingredients.contains(p)) _ingredients.add(p);
       }
     });
@@ -145,12 +169,17 @@ class _IngredientEntryScreenState extends State<IngredientEntryScreen>
     return Scaffold(
       backgroundColor: _isDark ? Colors.black : AppTheme.creamBg,
       body: Stack(children: [
-        // Camera layer
+        // Camera layer — shows live feed OR frozen captured image
         if (_camReady && _cam != null)
           AnimatedOpacity(
             opacity: _isDark ? 1.0 : 0.0,
             duration: const Duration(milliseconds: 300),
-            child: Positioned.fill(child: CameraPreview(_cam!)),
+            child: Positioned.fill(
+              child: _capturedPath != null
+                  // Freeze on captured image — no more live feed after shutter
+                  ? Image.file(File(_capturedPath!), fit: BoxFit.cover)
+                  : CameraPreview(_cam!),
+            ),
           ),
         // Vignette
         if (_isDark)
@@ -246,11 +275,35 @@ class _IngredientEntryScreenState extends State<IngredientEntryScreen>
     if (!_scanning && _capturedPath == null)
       _ScanFrame(pulse: _pulse)
     else if (_scanning)
-      _ScanningIndicator(),
+      const _ScanningIndicator(),
     const Spacer(),
     if (_ingredients.isNotEmpty || _scanError != null) _chipPanel(),
-    _addRow(dark: true),
-    const SizedBox(height: 8),
+    // _addRow only visible after scan — user can add more ingredients manually
+    if (!_scanning && _capturedPath != null) ...[
+      _addRow(dark: true),
+      const SizedBox(height: 8),
+    ],
+    if (_capturedPath != null) ...[
+      // Retake button — clears capture and restarts live viewfinder
+      GestureDetector(
+        onTap: () => setState(() {
+          _capturedPath = null;
+          _ingredients = [];
+          _scanError = null;
+        }),
+        child: Padding(
+          padding: const EdgeInsets.only(bottom: 8),
+          child: Row(mainAxisAlignment: MainAxisAlignment.center, children: [
+            const Icon(LucideIcons.refreshCw, color: Colors.white54, size: 13),
+            const SizedBox(width: 6),
+            Text('Retake', style: TextStyle(
+              color: Colors.white.withValues(alpha: 0.55),
+              fontSize: 13, fontFamily: 'DM Sans', fontWeight: FontWeight.w600,
+            )),
+          ]),
+        ),
+      ),
+    ],
     _findBtn(),
     const SizedBox(height: 8),
   ]);
@@ -440,9 +493,10 @@ class _IngredientEntryScreenState extends State<IngredientEntryScreen>
 
 // ── Scanning indicator (non-const safe) ───────────────────────────────────────
 class _ScanningIndicator extends StatelessWidget {
+  const _ScanningIndicator();
   @override
   Widget build(BuildContext context) => Column(children: [
-    SizedBox(width: 52, height: 52,
+    const SizedBox(width: 52, height: 52,
         child: CircularProgressIndicator(color: AppTheme.green, strokeWidth: 2.5)),
     const SizedBox(height: 16),
     Text('Identifying ingredients...', style: TextStyle(
@@ -515,8 +569,8 @@ class _FramePainter extends CustomPainter {
     final p = Paint()..color = color..strokeWidth = strokeWidth
         ..style = PaintingStyle.stroke..strokeCap = StrokeCap.round;
     const r = 10.0; final cl = cornerLength; final w = s.width; final h = s.height;
-    canvas.drawLine(Offset(r, 0), Offset(cl, 0), p);
-    canvas.drawLine(Offset(0, r), Offset(0, cl), p);
+    canvas.drawLine(const Offset(r, 0), Offset(cl, 0), p);
+    canvas.drawLine(const Offset(0, r), Offset(0, cl), p);
     canvas.drawArc(const Rect.fromLTWH(0, 0, r * 2, r * 2), -3.14159, 3.14159 / 2, false, p);
     canvas.drawLine(Offset(w - cl, 0), Offset(w - r, 0), p);
     canvas.drawLine(Offset(w, r), Offset(w, cl), p);

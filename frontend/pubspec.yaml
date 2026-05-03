@@ -48,6 +48,17 @@ dependencies:
   # SVG rendering — used for official Google G logo asset
   flutter_svg: ^2.0.10
 
+  # ── FIREBASE AUTH ──────────────────────────────────────────────
+  firebase_core: ^3.6.0
+  firebase_auth: ^5.3.1
+  google_sign_in: ^6.2.1
+
+  # ── NOTIFICATIONS ──────────────────────────────────────────────
+  # Real scheduled phone notifications for calorie/meal reminders
+  flutter_local_notifications: ^17.2.2
+  timezone: ^0.9.4
+
+
   cupertino_icons: ^1.0.8
 
 dev_dependencies:
