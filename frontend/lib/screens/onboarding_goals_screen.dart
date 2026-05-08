@@ -86,9 +86,11 @@ class _OnboardingGoalsScreenState extends State<OnboardingGoalsScreen> {
       );
       if (mounted) {
         setState(() {
-          _calGoal     = (result['calories'] as num?)?.toInt()  ?? _calGoal;
-          _proteinGoal = (result['protein']  as num?)?.toInt()  ?? _proteinGoal;
-          _loading     = false;
+          if (result != null) {
+            _calGoal     = (result['calories'] as num?)?.toInt()  ?? _calGoal;
+            _proteinGoal = (result['protein']  as num?)?.toInt()  ?? _proteinGoal;
+          }
+          _loading = false;
         });
       }
     } catch (_) {
