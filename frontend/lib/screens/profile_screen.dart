@@ -3,7 +3,9 @@ import 'package:flutter/material.dart';
 import 'package:lucide_icons_flutter/lucide_icons.dart';
 import 'package:flutter_animate/flutter_animate.dart';
 import 'package:package_info_plus/package_info_plus.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 import '../theme/app_theme.dart';
+import '../main.dart' show themeNotifier, themeModeToString;
 import '../widgets/tap_scale.dart';
 import '../services/user_prefs_service.dart';
 import '../services/auth_service.dart';
@@ -426,6 +428,8 @@ class _ProfileScreenState extends State<ProfileScreen> {
         border: Border.all(color: AppTheme.border(context)),
       ),
       child: Column(children: [
+        _themeTile(),
+        _divider(),
         _settingsTile(
           icon: LucideIcons.keyRound,
           label: 'Change Password',
@@ -502,7 +506,69 @@ class _ProfileScreenState extends State<ProfileScreen> {
 
   Widget _divider() => Divider(height: 1, color: AppTheme.border(context), indent: 18, endIndent: 18);
 
-  // ── Version footer ─────────────────────────────────────────────────────────
+  // ── Theme toggle tile ──────────────────────────────────────────────────────
+  Widget _themeTile() {
+    return ValueListenableBuilder<ThemeMode>(
+      valueListenable: themeNotifier,
+      builder: (_, mode, __) {
+        return Padding(
+          padding: const EdgeInsets.symmetric(horizontal: 18, vertical: 14),
+          child: Row(children: [
+            Container(
+              width: 36, height: 36,
+              decoration: BoxDecoration(
+                color: AppTheme.primaryDark.withValues(alpha: 0.08),
+                borderRadius: BorderRadius.circular(10),
+              ),
+              child: const Icon(LucideIcons.sunMoon, color: AppTheme.primaryDark, size: 17),
+            ),
+            const SizedBox(width: 14),
+            const Expanded(
+              child: Text('Display', style: TextStyle(
+                  color: AppTheme.darkText, fontSize: 14,
+                  fontFamily: 'DM Sans', fontWeight: FontWeight.w600)),
+            ),
+            _themeSegment(label: 'Light', value: ThemeMode.light, current: mode),
+            const SizedBox(width: 6),
+            _themeSegment(label: 'Dark', value: ThemeMode.dark, current: mode),
+            const SizedBox(width: 6),
+            _themeSegment(label: 'System', value: ThemeMode.system, current: mode),
+          ]),
+        );
+      },
+    );
+  }
+
+  Widget _themeSegment({
+    required String label,
+    required ThemeMode value,
+    required ThemeMode current,
+  }) {
+    final active = current == value;
+    return TapScale(
+      onTap: () async {
+        themeNotifier.value = value;
+        final prefs = await SharedPreferences.getInstance();
+        await prefs.setString('app_theme_mode', themeModeToString(value));
+      },
+      child: AnimatedContainer(
+        duration: const Duration(milliseconds: 160),
+        padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
+        decoration: BoxDecoration(
+          color: active ? AppTheme.primaryDark : Colors.transparent,
+          borderRadius: BorderRadius.circular(20),
+          border: Border.all(
+            color: active ? AppTheme.primaryDark : AppTheme.border(context),
+          ),
+        ),
+        child: Text(label, style: TextStyle(
+          color: active ? Colors.white : AppTheme.mutedText,
+          fontSize: 11, fontFamily: 'DM Sans', fontWeight: FontWeight.w600,
+        )),
+      ),
+    );
+  }
+
   Widget _versionFooter() => Padding(
     padding: const EdgeInsets.symmetric(horizontal: 20),
     child: Container(

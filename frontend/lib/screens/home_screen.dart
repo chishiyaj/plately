@@ -38,6 +38,7 @@ class _HomeScreenState extends State<HomeScreen> {
   final _screenshotCtrl = ScreenshotController();
   String _name = 'User';
   List<Recipe> _suggested = [];
+  List<Map<String, dynamic>> _allHistory = [];
   List<Map<String, dynamic>> _recentHistory = [];
   bool _loadingRecipes = true;
   bool _loadingHistory = true;
@@ -51,10 +52,12 @@ class _HomeScreenState extends State<HomeScreen> {
   int _streak = 0;
   DateTime _calendarMonth = DateTime(DateTime.now().year, DateTime.now().month);
   DateTime? _selectedDay;
+  Map<String, dynamic> _selectedDayData = {};
+  bool _loadingDayData = false;
 
   // ── Update checker ────────────────────────────────────────────────────────
   UpdateInfo? _updateInfo;
-  bool _updateDismissed = false; // session-only, not persisted
+  bool _updateDismissed = false;
 
   static const _cacheKey = 'cached_home_recipes';
 
@@ -77,14 +80,13 @@ class _HomeScreenState extends State<HomeScreen> {
     super.initState();
     _loadPrefs();
     _loadSuggested();
-    _loadRecentHistory();
+    _loadHistory();
     _checkForUpdate();
   }
 
   @override
   void didChangeDependencies() {
     super.didChangeDependencies();
-    // Reload prefs whenever user returns to this screen (e.g. after Finish Cooking)
     _loadPrefs();
   }
 
@@ -101,14 +103,13 @@ class _HomeScreenState extends State<HomeScreen> {
         _streak = (data['streak'] as int?) ?? 0;
       });
       _checkStreakMilestones(_streak);
-      // Reschedule personalised notifications with fresh user data
       final lastCooked = await UserPrefsService.getLastCookedName() ?? '';
       NotificationService.schedulePersonalized(
-        name:             name,
-        proteinGoal:      (data['protein_goal'] as int?) ?? 120,
-        proteinConsumed:  (data['protein_consumed'] as int?) ?? 0,
-        streak:           _streak,
-        lastCookedName:   lastCooked,
+        name: name,
+        proteinGoal: (data['protein_goal'] as int?) ?? 120,
+        proteinConsumed: (data['protein_consumed'] as int?) ?? 0,
+        streak: _streak,
+        lastCookedName: lastCooked,
       );
     }
   }
@@ -126,11 +127,11 @@ class _HomeScreenState extends State<HomeScreen> {
 
   static Map<String, String> _milestoneData(int streak) {
     switch (streak) {
-      case 3:  return {'emoji': '🔥', 'title': "You're on a hot streak fr"};
-      case 7:  return {'emoji': '💪', 'title': 'Week-long grind, no cap'};
-      case 14: return {'emoji': '👑', 'title': 'Two weeks of eating different'};
-      case 30: return {'emoji': '🐐', 'title': 'GOAT behavior, lowkey impressive'};
-      default: return {'emoji': '🔥', 'title': '$streak day streak'};
+      case 3:  return {'title': "You're on a hot streak fr"};
+      case 7:  return {'title': 'Week-long grind, no cap'};
+      case 14: return {'title': 'Two weeks of eating different'};
+      case 30: return {'title': 'GOAT behavior, lowkey impressive'};
+      default: return {'title': '$streak day streak'};
     }
   }
 
@@ -150,7 +151,14 @@ class _HomeScreenState extends State<HomeScreen> {
           child: Column(
             mainAxisSize: MainAxisSize.min,
             children: [
-              Text(data['emoji']!, style: const TextStyle(fontSize: 60)),
+              Container(
+                width: 64, height: 64,
+                decoration: BoxDecoration(
+                  color: AppTheme.yellow.withValues(alpha: 0.15),
+                  shape: BoxShape.circle,
+                ),
+                child: const Icon(LucideIcons.flame, color: AppTheme.orange, size: 32),
+              ),
               const SizedBox(height: 16),
               Text(data['title']!, style: const TextStyle(
                 color: AppTheme.darkText, fontSize: 20,
@@ -199,7 +207,7 @@ class _HomeScreenState extends State<HomeScreen> {
         Material(
           color: Colors.transparent,
           child: PlatelyShareCard(
-            dishName: '${data['emoji']} ${data['title']}',
+            dishName: data['title']!,
             calories: 0,
             protein: 0,
             streak: streak,
@@ -210,23 +218,19 @@ class _HomeScreenState extends State<HomeScreen> {
       );
       await Share.shareXFiles(
         [XFile.fromData(bytes, mimeType: 'image/png', name: 'plately_streak.png')],
-        text: '$streak days cooking with Plately 🔥 Pre-cook macro tracking hits different. #Plately #NoCap',
+        text: '$streak days cooking with Plately — Pre-cook macro tracking hits different. #Plately #NoCap',
       );
     } catch (_) {}
   }
 
   Future<void> _loadSuggested() async {
     if (mounted) setState(() { _loadingRecipes = true; _wakingUp = false; });
-
-    // Show "waking up" banner after 3s — stays visible until load completes
     _wakeTimer?.cancel();
     _wakeTimer = Timer(const Duration(seconds: 3), () {
       if (mounted && _loadingRecipes) setState(() => _wakingUp = true);
     });
-
     final recipes = await ApiService.getRecipes([]);
     _wakeTimer?.cancel();
-
     if (mounted) {
       if (recipes.isEmpty) {
         final cached = await _loadCachedRecipes();
@@ -234,7 +238,7 @@ class _HomeScreenState extends State<HomeScreen> {
           _suggested = cached.take(4).toList();
           _offline = true;
           _loadingRecipes = false;
-          _wakingUp = false;   // clear banner — load finished (offline)
+          _wakingUp = false;
         });
       } else {
         await _cacheRecipes(recipes);
@@ -242,26 +246,47 @@ class _HomeScreenState extends State<HomeScreen> {
           _suggested = recipes.take(4).toList();
           _offline = false;
           _loadingRecipes = false;
-          _wakingUp = false;   // clear banner — server responded
+          _wakingUp = false;
         });
       }
     }
   }
 
-  Future<void> _loadRecentHistory() async {
+  Future<void> _loadHistory() async {
     if (mounted) setState(() => _loadingHistory = true);
     final history = await ApiService.getHistory();
     if (mounted) {
-      setState(() { _recentHistory = history.take(2).toList(); _loadingHistory = false; });
+      setState(() {
+        _allHistory = history;
+        _recentHistory = history.take(2).toList();
+        _loadingHistory = false;
+      });
     }
   }
 
-  // ── Update checker ────────────────────────────────────────────────────────
+  Future<void> _selectDay(DateTime day) async {
+    final today = DateTime.now();
+    final todayDate = DateTime(today.year, today.month, today.day);
+    setState(() {
+      _selectedDay = day;
+      _selectedDayData = {};
+      _loadingDayData = day != todayDate;
+    });
+    if (day == todayDate) return; // today uses local prefs, no API call needed
+    final uid = await _getUid();
+    final dateStr = '${day.year}-${day.month.toString().padLeft(2,'0')}-${day.day.toString().padLeft(2,'0')}';
+    final data = await ApiService.getDailyHistory(uid, dateStr);
+    if (mounted) setState(() { _selectedDayData = data; _loadingDayData = false; });
+  }
+
+  Future<String> _getUid() async {
+    final data = await UserPrefsService.load();
+    return data['email'] as String? ?? 'anonymous';
+  }
+
   Future<void> _checkForUpdate() async {
     final info = await UpdateService.check();
-    if (info != null && mounted) {
-      setState(() => _updateInfo = info);
-    }
+    if (info != null && mounted) setState(() => _updateInfo = info);
   }
 
   Future<void> _cacheRecipes(List<Recipe> recipes) async {
@@ -279,9 +304,7 @@ class _HomeScreenState extends State<HomeScreen> {
       if (raw == null) return [];
       final decoded = jsonDecode(raw) as List;
       return decoded.map((r) => Recipe.fromJson(r as Map<String, dynamic>)).toList();
-    } catch (_) {
-      return [];
-    }
+    } catch (_) { return []; }
   }
 
   @override
@@ -294,7 +317,7 @@ class _HomeScreenState extends State<HomeScreen> {
   String get _greeting {
     final h = DateTime.now().hour;
     final first = _name.split(' ').first;
-    if (h < 12) return 'Good morning, $first 👋';
+    if (h < 12) return 'Good morning, $first';
     if (h < 17) return 'Good afternoon, $first';
     return 'Good evening, $first';
   }
@@ -322,7 +345,7 @@ class _HomeScreenState extends State<HomeScreen> {
         color: AppTheme.primaryDark,
         backgroundColor: AppTheme.cardBg(context),
         onRefresh: () async {
-          await Future.wait([_loadPrefs(), _loadSuggested(), _loadRecentHistory()]);
+          await Future.wait([_loadPrefs(), _loadSuggested(), _loadHistory()]);
         },
         child: CustomScrollView(
           controller: _scrollCtrl,
@@ -364,7 +387,7 @@ class _HomeScreenState extends State<HomeScreen> {
         borderRadius: BorderRadius.circular(14),
       ),
       child: Row(children: [
-        const Text('🆕', style: TextStyle(fontSize: 18)),
+        const Icon(LucideIcons.sparkles, color: Colors.white, size: 18),
         const SizedBox(width: 10),
         Expanded(
           child: Text(
@@ -379,15 +402,11 @@ class _HomeScreenState extends State<HomeScreen> {
         GestureDetector(
           onTap: () async {
             final uri = Uri.parse(info.downloadUrl);
-            // url_launcher is already imported via shopping_list usage — import added at top
             if (await canLaunchUrl(uri)) launchUrl(uri, mode: LaunchMode.externalApplication);
           },
           child: Container(
             padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
-            decoration: BoxDecoration(
-              color: AppTheme.green,
-              borderRadius: BorderRadius.circular(8),
-            ),
+            decoration: BoxDecoration(color: AppTheme.green, borderRadius: BorderRadius.circular(8)),
             child: const Text('Update', style: TextStyle(
               color: Colors.white, fontSize: 12,
               fontFamily: 'DM Sans', fontWeight: FontWeight.w700,
@@ -414,20 +433,14 @@ class _HomeScreenState extends State<HomeScreen> {
       border: Border.all(color: AppTheme.primaryDark.withValues(alpha: 0.18)),
     ),
     child: const Row(children: [
-      SizedBox(
-        width: 14, height: 14,
-        child: CircularProgressIndicator(strokeWidth: 2, color: AppTheme.primaryDark),
-      ),
+      SizedBox(width: 14, height: 14,
+        child: CircularProgressIndicator(strokeWidth: 2, color: AppTheme.primaryDark)),
       SizedBox(width: 10),
-      Expanded(
-        child: Text(
-          'Waking up server… first load may take 30–60s',
-          style: TextStyle(
-            color: AppTheme.primaryDark, fontSize: 12,
-            fontFamily: 'DM Sans', fontWeight: FontWeight.w500,
-          ),
-        ),
-      ),
+      Expanded(child: Text(
+        'Waking up server… first load may take 30–60s',
+        style: TextStyle(color: AppTheme.primaryDark, fontSize: 12,
+            fontFamily: 'DM Sans', fontWeight: FontWeight.w500),
+      )),
     ]),
   ).animate().fadeIn(duration: 300.ms);
 
@@ -442,15 +455,11 @@ class _HomeScreenState extends State<HomeScreen> {
     child: const Row(children: [
       Icon(LucideIcons.wifiOff, size: 14, color: Color(0xFF8B6914)),
       SizedBox(width: 10),
-      Expanded(
-        child: Text(
-          'No internet connection — showing cached data',
-          style: TextStyle(
-            color: Color(0xFF8B6914), fontSize: 12,
-            fontFamily: 'DM Sans', fontWeight: FontWeight.w500,
-          ),
-        ),
-      ),
+      Expanded(child: Text(
+        'No internet connection — showing cached data',
+        style: TextStyle(color: Color(0xFF8B6914), fontSize: 12,
+            fontFamily: 'DM Sans', fontWeight: FontWeight.w500),
+      )),
     ]),
   ).animate().fadeIn(duration: 300.ms);
 
@@ -501,13 +510,12 @@ class _HomeScreenState extends State<HomeScreen> {
               borderRadius: BorderRadius.circular(20),
             ),
             child: Row(mainAxisSize: MainAxisSize.min, children: [
-              const Text('🔥', style: TextStyle(fontSize: 16)),
+              const Icon(LucideIcons.flame, color: AppTheme.orange, size: 16),
               const SizedBox(width: 6),
-              Text('$_streak day streak!',
-                style: const TextStyle(
-                  color: AppTheme.orange, fontSize: 13,
-                  fontFamily: 'DM Sans', fontWeight: FontWeight.w700,
-                )),
+              Text('$_streak day streak!', style: const TextStyle(
+                color: AppTheme.orange, fontSize: 13,
+                fontFamily: 'DM Sans', fontWeight: FontWeight.w700,
+              )),
             ]),
           ),
         ],
@@ -564,36 +572,22 @@ class _HomeScreenState extends State<HomeScreen> {
 
   // ── Macro history calendar ────────────────────────────────────────────────
   Widget _buildCalendar() {
-    final now      = DateTime.now();
-    final today    = DateTime(now.year, now.month, now.day);
-    final firstDay = DateTime(_calendarMonth.year, _calendarMonth.month, 1);
-    final lastDay  = DateTime(_calendarMonth.year, _calendarMonth.month + 1, 0);
+    final now         = DateTime.now();
+    final today       = DateTime(now.year, now.month, now.day);
+    final firstDay    = DateTime(_calendarMonth.year, _calendarMonth.month, 1);
+    final lastDay     = DateTime(_calendarMonth.year, _calendarMonth.month + 1, 0);
     final startOffset = (firstDay.weekday - 1) % 7;
     final totalCells  = startOffset + lastDay.day;
     final rows        = (totalCells / 7).ceil();
 
     final historyDates = <DateTime>{};
-    for (final h in _recentHistory) {
+    for (final h in _allHistory) {
       final ts = h['timestamp'] as String? ?? '';
       if (ts.isEmpty) continue;
       try {
         final dt = DateTime.parse(ts);
         historyDates.add(DateTime(dt.year, dt.month, dt.day));
       } catch (_) {}
-    }
-
-    Map<String, dynamic>? selectedEntry;
-    if (_selectedDay != null) {
-      for (final h in _recentHistory) {
-        final ts = h['timestamp'] as String? ?? '';
-        try {
-          final dt = DateTime.parse(ts);
-          if (DateTime(dt.year, dt.month, dt.day) == _selectedDay) {
-            selectedEntry = h;
-            break;
-          }
-        } catch (_) {}
-      }
     }
 
     final monthLabel = [
@@ -609,8 +603,7 @@ class _HomeScreenState extends State<HomeScreen> {
           color: AppTheme.cardBg(context),
           borderRadius: BorderRadius.circular(22),
           border: Border.all(color: AppTheme.border(context)),
-          boxShadow: const [BoxShadow(
-              color: Color(0x06000000), blurRadius: 8, offset: Offset(0, 2))],
+          boxShadow: const [BoxShadow(color: Color(0x06000000), blurRadius: 8, offset: Offset(0, 2))],
         ),
         child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
           Row(children: [
@@ -625,15 +618,10 @@ class _HomeScreenState extends State<HomeScreen> {
                 _calendarMonth = DateTime(_calendarMonth.year, _calendarMonth.month - 1);
                 _selectedDay = null;
               }),
-              child: Container(
-                width: 28, height: 28,
-                decoration: BoxDecoration(
-                  color: AppTheme.cardAltBg(context),
-                  borderRadius: BorderRadius.circular(8),
-                  border: Border.all(color: AppTheme.border(context)),
-                ),
-                child: const Icon(LucideIcons.chevronLeft, color: AppTheme.primaryDark, size: 14),
-              ),
+              child: Container(width: 28, height: 28,
+                decoration: BoxDecoration(color: AppTheme.cardAltBg(context),
+                    borderRadius: BorderRadius.circular(8), border: Border.all(color: AppTheme.border(context))),
+                child: const Icon(LucideIcons.chevronLeft, color: AppTheme.primaryDark, size: 14)),
             ),
             const SizedBox(width: 6),
             TapScale(
@@ -641,15 +629,10 @@ class _HomeScreenState extends State<HomeScreen> {
                 _calendarMonth = DateTime(_calendarMonth.year, _calendarMonth.month + 1);
                 _selectedDay = null;
               }),
-              child: Container(
-                width: 28, height: 28,
-                decoration: BoxDecoration(
-                  color: AppTheme.cardAltBg(context),
-                  borderRadius: BorderRadius.circular(8),
-                  border: Border.all(color: AppTheme.border(context)),
-                ),
-                child: const Icon(LucideIcons.chevronRight, color: AppTheme.primaryDark, size: 14),
-              ),
+              child: Container(width: 28, height: 28,
+                decoration: BoxDecoration(color: AppTheme.cardAltBg(context),
+                    borderRadius: BorderRadius.circular(8), border: Border.all(color: AppTheme.border(context))),
+                child: const Icon(LucideIcons.chevronRight, color: AppTheme.primaryDark, size: 14)),
             ),
           ]),
           const SizedBox(height: 10),
@@ -673,8 +656,13 @@ class _HomeScreenState extends State<HomeScreen> {
               final isFuture   = cellDate.isAfter(today);
               return Expanded(
                 child: TapScale(
-                  onTap: isFuture ? null : () => setState(() =>
-                      _selectedDay = isSelected ? null : cellDate),
+                  onTap: isFuture ? null : () {
+                    if (isSelected) {
+                      setState(() { _selectedDay = null; _selectedDayData = {}; });
+                    } else {
+                      _selectDay(cellDate);
+                    }
+                  },
                   child: Container(
                     height: 32,
                     margin: const EdgeInsets.symmetric(horizontal: 1),
@@ -702,11 +690,9 @@ class _HomeScreenState extends State<HomeScreen> {
                       if (hasDot && !isSelected)
                         Positioned(
                           bottom: 3,
-                          child: Container(
-                            width: 4, height: 4,
-                            decoration: const BoxDecoration(
-                              color: AppTheme.primaryDark, shape: BoxShape.circle),
-                          ),
+                          child: Container(width: 4, height: 4,
+                              decoration: const BoxDecoration(
+                                  color: AppTheme.primaryDark, shape: BoxShape.circle)),
                         ),
                     ]),
                   ),
@@ -716,38 +702,129 @@ class _HomeScreenState extends State<HomeScreen> {
           )),
           if (_selectedDay != null) ...[
             const SizedBox(height: 10),
-            Container(
-              width: double.infinity,
-              padding: const EdgeInsets.all(12),
-              decoration: BoxDecoration(
-                color: AppTheme.cardAltBg(context),
-                borderRadius: BorderRadius.circular(12),
-                border: Border.all(color: AppTheme.border(context)),
-              ),
-              child: selectedEntry != null
-                  ? Row(children: [
-                      const Icon(LucideIcons.utensils, size: 14, color: AppTheme.primaryDark),
-                      const SizedBox(width: 8),
-                      Expanded(child: Text(
-                        _trimIngredientNames(selectedEntry['ingredient_names'] as String? ?? 'Cooking session'),
-                        style: const TextStyle(color: AppTheme.darkText, fontSize: 12,
-                            fontFamily: 'DM Sans', fontWeight: FontWeight.w600),
-                      )),
-                      Text(_formatTimestamp(selectedEntry['timestamp'] as String? ?? ''),
-                        style: const TextStyle(color: AppTheme.mutedText, fontSize: 11, fontFamily: 'DM Sans')),
-                    ])
-                  : const Row(children: [
-                      Icon(LucideIcons.moonStar, size: 14, color: AppTheme.mutedText),
-                      SizedBox(width: 8),
-                      Text('No cooking logged this day.',
-                          style: TextStyle(color: AppTheme.mutedText, fontSize: 12, fontFamily: 'DM Sans')),
-                    ]),
-            ),
+            _buildDayDetail(today),
           ],
         ]),
       ).animate().fadeIn(duration: 380.ms).slideY(begin: 0.05),
     );
   }
+
+  Widget _buildDayDetail(DateTime today) {
+    final isToday = _selectedDay == today;
+
+    if (_loadingDayData) {
+      return Container(
+        width: double.infinity,
+        padding: const EdgeInsets.all(12),
+        decoration: BoxDecoration(
+          color: AppTheme.cardAltBg(context),
+          borderRadius: BorderRadius.circular(12),
+          border: Border.all(color: AppTheme.border(context)),
+        ),
+        child: const Row(mainAxisAlignment: MainAxisAlignment.center, children: [
+          SizedBox(width: 14, height: 14,
+            child: CircularProgressIndicator(strokeWidth: 2, color: AppTheme.primaryDark)),
+          SizedBox(width: 10),
+          Text('Loading...', style: TextStyle(color: AppTheme.mutedText,
+              fontSize: 12, fontFamily: 'DM Sans')),
+        ]),
+      );
+    }
+
+    final int cal;
+    final int protein;
+    final List<String> recipes;
+
+    if (isToday) {
+      cal     = _calConsumed;
+      protein = _proteinConsumed;
+      // Pull recipe names from today's history entries
+      final todayEntries = _allHistory.where((h) {
+        final ts = h['timestamp'] as String? ?? '';
+        try {
+          final dt = DateTime.parse(ts);
+          return DateTime(dt.year, dt.month, dt.day) == today;
+        } catch (_) { return false; }
+      }).toList();
+      recipes = todayEntries
+          .map((h) => h['ingredient_names'] as String? ?? '')
+          .where((s) => s.isNotEmpty)
+          .take(3)
+          .toList();
+    } else {
+      cal     = (_selectedDayData['total_calories'] as int?) ?? 0;
+      protein = (_selectedDayData['total_protein']  as int?) ?? 0;
+      final raw = (_selectedDayData['recipes'] as List?)?.cast<String>() ?? [];
+      recipes = raw.take(3).toList();
+    }
+
+    final hasData = cal > 0 || protein > 0 || recipes.isNotEmpty;
+
+    return AnimatedContainer(
+      duration: const Duration(milliseconds: 200),
+      width: double.infinity,
+      padding: const EdgeInsets.all(12),
+      decoration: BoxDecoration(
+        color: AppTheme.cardAltBg(context),
+        borderRadius: BorderRadius.circular(12),
+        border: Border.all(color: AppTheme.border(context)),
+      ),
+      child: hasData
+          ? Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+              Row(children: [
+                _macroChip(cal, 'kcal', AppTheme.primaryDark),
+                const SizedBox(width: 8),
+                _macroChip(protein, 'g protein', AppTheme.green),
+                const Spacer(),
+                if (isToday)
+                  Container(
+                    padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
+                    decoration: BoxDecoration(
+                      color: AppTheme.primaryDark.withValues(alpha: 0.08),
+                      borderRadius: BorderRadius.circular(6),
+                    ),
+                    child: const Text('Today', style: TextStyle(color: AppTheme.primaryDark,
+                        fontSize: 10, fontFamily: 'DM Sans', fontWeight: FontWeight.w700)),
+                  ),
+              ]),
+              if (recipes.isNotEmpty) ...[
+                const SizedBox(height: 8),
+                Wrap(spacing: 6, runSpacing: 4, children: recipes.map((r) => Container(
+                  padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
+                  decoration: BoxDecoration(
+                    color: AppTheme.green.withValues(alpha: 0.1),
+                    borderRadius: BorderRadius.circular(6),
+                  ),
+                  child: Text(_trimIngredientNames(r), style: const TextStyle(
+                    color: AppTheme.primaryDark, fontSize: 11,
+                    fontFamily: 'DM Sans', fontWeight: FontWeight.w600,
+                  )),
+                )).toList()),
+              ],
+            ])
+          : const Row(children: [
+              Icon(LucideIcons.moonStar, size: 14, color: AppTheme.mutedText),
+              SizedBox(width: 8),
+              Text('No cooking logged this day.',
+                  style: TextStyle(color: AppTheme.mutedText, fontSize: 12, fontFamily: 'DM Sans')),
+            ]),
+    );
+  }
+
+  Widget _macroChip(int value, String unit, Color color) => Container(
+    padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+    decoration: BoxDecoration(
+      color: color.withValues(alpha: 0.1),
+      borderRadius: BorderRadius.circular(8),
+    ),
+    child: Row(mainAxisSize: MainAxisSize.min, children: [
+      Container(width: 6, height: 6, decoration: BoxDecoration(color: color, shape: BoxShape.circle)),
+      const SizedBox(width: 5),
+      Text('$value $unit', style: TextStyle(
+        color: color, fontSize: 12, fontFamily: 'DM Sans', fontWeight: FontWeight.w700,
+      )),
+    ]),
+  );
 
   // ── Daily macro rings ─────────────────────────────────────────────────────
   Widget _buildMacroRings() {
@@ -769,24 +846,18 @@ class _HomeScreenState extends State<HomeScreen> {
           SizedBox(
             width: 72, height: 72,
             child: Stack(children: [
-              CustomPaint(
-                size: const Size(72, 72),
-                painter: _RingPainter(progress: calPct.toDouble(), color: AppTheme.primaryDark, strokeWidth: 8),
-              ),
-              Padding(
-                padding: const EdgeInsets.all(12),
-                child: CustomPaint(
-                  size: const Size(48, 48),
-                  painter: _RingPainter(progress: proPct.toDouble(), color: AppTheme.green, strokeWidth: 7),
-                ),
-              ),
+              CustomPaint(size: const Size(72, 72),
+                  painter: _RingPainter(progress: calPct.toDouble(), color: AppTheme.primaryDark, strokeWidth: 8)),
+              Padding(padding: const EdgeInsets.all(12),
+                child: CustomPaint(size: const Size(48, 48),
+                    painter: _RingPainter(progress: proPct.toDouble(), color: AppTheme.green, strokeWidth: 7))),
               if (bothDone)
                 const Center(child: Icon(LucideIcons.check, color: AppTheme.green, size: 14)),
             ]),
           ),
           const SizedBox(width: 16),
           Expanded(child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-            const Text('Today\'s Macros', style: TextStyle(color: AppTheme.darkText,
+            const Text("Today's Macros", style: TextStyle(color: AppTheme.darkText,
                 fontSize: 13, fontFamily: 'DM Sans', fontWeight: FontWeight.w700)),
             const SizedBox(height: 6),
             Row(children: [
@@ -794,7 +865,7 @@ class _HomeScreenState extends State<HomeScreen> {
                   decoration: const BoxDecoration(color: AppTheme.primaryDark, shape: BoxShape.circle)),
               const SizedBox(width: 6),
               Text('$_calConsumed / $_calGoal cal',
-                style: const TextStyle(color: AppTheme.mutedText, fontSize: 12, fontFamily: 'DM Sans')),
+                  style: const TextStyle(color: AppTheme.mutedText, fontSize: 12, fontFamily: 'DM Sans')),
             ]),
             const SizedBox(height: 3),
             Row(children: [
@@ -802,7 +873,7 @@ class _HomeScreenState extends State<HomeScreen> {
                   decoration: const BoxDecoration(color: AppTheme.green, shape: BoxShape.circle)),
               const SizedBox(width: 6),
               Text('${_proteinConsumed}g / ${_proteinGoal}g protein',
-                style: const TextStyle(color: AppTheme.mutedText, fontSize: 12, fontFamily: 'DM Sans')),
+                  style: const TextStyle(color: AppTheme.mutedText, fontSize: 12, fontFamily: 'DM Sans')),
             ]),
           ])),
           Column(children: [
@@ -813,7 +884,7 @@ class _HomeScreenState extends State<HomeScreen> {
                 shape: BoxShape.circle,
               ),
               child: Icon(LucideIcons.flame,
-                color: _streak > 0 ? AppTheme.orange : AppTheme.mutedText, size: 20),
+                  color: _streak > 0 ? AppTheme.orange : AppTheme.mutedText, size: 20),
             ),
             const SizedBox(height: 4),
             Text('$_streak day${_streak != 1 ? 's' : ''}',
@@ -829,11 +900,10 @@ class _HomeScreenState extends State<HomeScreen> {
 
   Widget _buildActionRow() {
     const actions = [
-      {'icon': LucideIcons.utensils,     'label': 'Browse',  'bg': Color(0xFFDFDC9E), 'fg': Color(0xFF6B5A10)},
-      {'icon': LucideIcons.chefHat,      'label': 'Ask AI',  'bg': Color(0xFFD3A7DC), 'fg': Color(0xFF5A1F6B)},
-      {'icon': LucideIcons.clockFading,  'label': 'History', 'bg': Color(0xFFC0DCB3), 'fg': Color(0xFF2E6B29)},
+      {'icon': LucideIcons.utensils,    'label': 'Browse',  'bg': Color(0xFFDFDC9E), 'fg': Color(0xFF6B5A10)},
+      {'icon': LucideIcons.chefHat,     'label': 'Ask AI',  'bg': Color(0xFFD3A7DC), 'fg': Color(0xFF5A1F6B)},
+      {'icon': LucideIcons.clockFading, 'label': 'History', 'bg': Color(0xFFC0DCB3), 'fg': Color(0xFF2E6B29)},
     ];
-
     return Padding(
       padding: const EdgeInsets.fromLTRB(20, 16, 20, 0),
       child: Row(
@@ -923,7 +993,6 @@ class _HomeScreenState extends State<HomeScreen> {
         ),
       );
     }
-
     if (_suggested.isEmpty) {
       return const Padding(
         padding: EdgeInsets.fromLTRB(20, 14, 20, 0),
@@ -931,7 +1000,6 @@ class _HomeScreenState extends State<HomeScreen> {
             style: TextStyle(color: AppTheme.mutedText, fontSize: 13, fontFamily: 'DM Sans')),
       );
     }
-
     return SizedBox(
       height: 220,
       child: ListView.builder(
@@ -979,7 +1047,6 @@ class _HomeScreenState extends State<HomeScreen> {
          .shimmer(duration: 1200.ms, color: Colors.white.withValues(alpha: 0.6)))),
       );
     }
-
     if (_recentHistory.isEmpty) {
       return Padding(
         padding: const EdgeInsets.fromLTRB(20, 14, 20, 0),
@@ -999,7 +1066,6 @@ class _HomeScreenState extends State<HomeScreen> {
         ),
       );
     }
-
     return Padding(
       padding: const EdgeInsets.fromLTRB(20, 14, 20, 0),
       child: Column(
@@ -1007,11 +1073,10 @@ class _HomeScreenState extends State<HomeScreen> {
           final i = e.key;
           final h = e.value;
           final ts = h['timestamp'] as String? ?? '';
-          final timeLabel = _formatTimestamp(ts);
           return ActivityRow(
             recipeName: _trimIngredientNames(h['ingredient_names'] as String? ?? 'Cooking session'),
             ingredients: h['action_type'] as String? ?? 'cooked',
-            time: timeLabel,
+            time: _formatTimestamp(ts),
             onTap: () => Navigator.push(context, AppTheme.slideUp(const HistoryScreen())),
           ).animate(delay: (i * 60).ms).fadeIn(duration: 350.ms).slideX(begin: 0.04);
         }).toList(),
@@ -1034,9 +1099,7 @@ class _HomeScreenState extends State<HomeScreen> {
       if (diff.inHours < 24) return '${diff.inHours}h ago';
       if (diff.inDays == 1) return 'Yesterday';
       return '${diff.inDays}d ago';
-    } catch (_) {
-      return ts;
-    }
+    } catch (_) { return ts; }
   }
 }
 
@@ -1051,14 +1114,12 @@ class _RingPainter extends CustomPainter {
   void paint(Canvas canvas, Size size) {
     final center = Offset(size.width / 2, size.height / 2);
     final radius = (size.width - strokeWidth) / 2;
-
     canvas.drawCircle(center, radius,
       Paint()
         ..color = color.withValues(alpha: 0.12)
         ..style = PaintingStyle.stroke
         ..strokeWidth = strokeWidth
         ..strokeCap = StrokeCap.round);
-
     if (progress > 0) {
       canvas.drawArc(
         Rect.fromCircle(center: center, radius: radius),

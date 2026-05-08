@@ -21,6 +21,45 @@ def get_history():
         return jsonify({"status": "error", "message": "Internal error."}), 500
 
 
+@bp.route('/api/history/daily', methods=['GET'])
+def get_daily_history():
+    try:
+        user_id = request.args.get('user_id', 'default')
+        date    = request.args.get('date', '')      # expects YYYY-MM-DD
+        if not date:
+            return jsonify({"status": "error", "message": "date param required"}), 400
+
+        if USE_PG:
+            rows = query(
+                f"SELECT ingredient_names, recipe_count, calories_logged, protein_logged "
+                f"FROM history WHERE user_id = {ph} AND DATE(timestamp) = {ph}::date "
+                f"ORDER BY timestamp DESC",
+                (user_id, date)
+            )
+        else:
+            rows = query(
+                f"SELECT ingredient_names, recipe_count, calories_logged, protein_logged "
+                f"FROM history WHERE user_id = {ph} AND DATE(timestamp) = {ph} "
+                f"ORDER BY timestamp DESC",
+                (user_id, date)
+            )
+
+        total_calories = sum(int(r.get('calories_logged') or 0) for r in rows)
+        total_protein  = sum(int(r.get('protein_logged')  or 0) for r in rows)
+        meal_count     = sum(int(r.get('recipe_count')    or 0) for r in rows)
+        recipes        = [r['ingredient_names'] for r in rows if r.get('ingredient_names')]
+
+        return jsonify({"status": "ok", "data": {
+            "total_calories": total_calories,
+            "total_protein":  total_protein,
+            "meal_count":     meal_count,
+            "recipes":        recipes,
+        }}), 200
+    except Exception:
+        logger.exception("get_daily_history error")
+        return jsonify({"status": "error", "message": "Internal error."}), 500
+
+
 @bp.route('/api/history', methods=['POST'])
 def add_history():
     try:
@@ -57,7 +96,6 @@ def get_history_stats():
             f"FROM history WHERE user_id = {ph}",
             (user_id,)
         )
-        # Use DB-agnostic interval syntax
         if USE_PG:
             week = query(
                 f"SELECT COUNT(*) as c FROM history "
@@ -77,6 +115,47 @@ def get_history_stats():
         }}), 200
     except Exception:
         logger.exception("get_history_stats error")
+        return jsonify({"status": "error", "message": "Internal error."}), 500
+
+
+@bp.route('/api/history/daily', methods=['GET'])
+def get_daily_history():
+    try:
+        user_id = request.args.get('user_id', 'default')
+        date_str = request.args.get('date', '')  # YYYY-MM-DD
+        if not date_str:
+            return jsonify({"status": "error", "message": "date required"}), 400
+
+        from database import USE_PG
+        if USE_PG:
+            rows = query(
+                f"SELECT ingredient_names, calories_logged, protein_logged "
+                f"FROM history WHERE user_id = {ph} AND DATE(timestamp) = {ph}::date",
+                (user_id, date_str)
+            )
+        else:
+            rows = query(
+                f"SELECT ingredient_names, calories_logged, protein_logged "
+                f"FROM history WHERE user_id = {ph} AND DATE(timestamp) = {ph}",
+                (user_id, date_str)
+            )
+
+        if not rows:
+            return jsonify({"status": "ok", "data": {
+                "total_calories": 0, "total_protein": 0, "recipes": [], "meal_count": 0
+            }}), 200
+
+        total_cal     = sum((r.get('calories_logged') or 0) for r in rows)
+        total_protein = sum((r.get('protein_logged') or 0) for r in rows)
+        recipe_names  = [r['ingredient_names'] for r in rows if r.get('ingredient_names')]
+        return jsonify({"status": "ok", "data": {
+            "total_calories": total_cal,
+            "total_protein":  total_protein,
+            "recipes":        recipe_names,
+            "meal_count":     len(rows),
+        }}), 200
+    except Exception:
+        logger.exception("get_daily_history error")
         return jsonify({"status": "error", "message": "Internal error."}), 500
 
 

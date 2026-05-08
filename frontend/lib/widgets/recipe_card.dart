@@ -189,9 +189,9 @@ class RecipeCard extends StatelessWidget {
               padding: const EdgeInsets.fromLTRB(12, 10, 12, 12),
               child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
                 Text(title,
-                    style: const TextStyle(color: AppTheme.darkText, fontSize: 13,
+                    style: TextStyle(color: AppTheme.textPrimary(context), fontSize: 13,
                         fontFamily: 'DM Sans', fontWeight: FontWeight.w700),
-                    maxLines: 1, overflow: TextOverflow.ellipsis),
+                    maxLines: 2, overflow: TextOverflow.ellipsis),
                 const SizedBox(height: 6),
                 Row(children: [
                   _Stat(icon: LucideIcons.clock3, label: time),

@@ -436,7 +436,10 @@ class _Bubble extends StatelessWidget {
                   padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
                   constraints: BoxConstraints(maxWidth: MediaQuery.of(context).size.width * 0.78),
                   decoration: BoxDecoration(
-                    color: message.isUser ? null : AppTheme.cardAltBg(context),
+                    color: message.isUser ? null
+                        : message.text.startsWith('ERROR:')
+                            ? AppTheme.red.withValues(alpha: 0.12)
+                            : AppTheme.cardAltBg(context),
                     gradient: message.isUser ? AppTheme.tealGradient : null,
                     borderRadius: BorderRadius.only(
                       topLeft: const Radius.circular(20), topRight: const Radius.circular(20),
@@ -447,10 +450,20 @@ class _Bubble extends StatelessWidget {
                       color: message.isUser ? AppTheme.primaryDark.withValues(alpha: 0.18) : Colors.black.withValues(alpha: 0.05),
                       blurRadius: message.isUser ? 12 : 6, offset: const Offset(0, 3),
                     )],
+                    border: message.text.startsWith('ERROR:')
+                        ? Border.all(color: AppTheme.red.withValues(alpha: 0.3))
+                        : null,
                   ),
                   child: message.isUser
                       ? Text(message.text, style: const TextStyle(
                           color: Colors.white, fontSize: 14.5, fontFamily: 'DM Sans', height: 1.55))
+                      : message.text.startsWith('ERROR:')
+                          ? Row(mainAxisSize: MainAxisSize.min, crossAxisAlignment: CrossAxisAlignment.start, children: [
+                              const Padding(padding: EdgeInsets.only(top: 1, right: 6),
+                                child: Icon(LucideIcons.circleAlert, size: 14, color: AppTheme.red)),
+                              Flexible(child: Text(message.text.substring(6), style: const TextStyle(
+                                  color: AppTheme.red, fontSize: 14, fontFamily: 'DM Sans', height: 1.55))),
+                            ])
                       : MarkdownBody(
                           data: message.text,
                           styleSheet: MarkdownStyleSheet(

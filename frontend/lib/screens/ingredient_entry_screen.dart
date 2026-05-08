@@ -5,6 +5,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_animate/flutter_animate.dart';
 import 'package:lucide_icons_flutter/lucide_icons.dart';
+import 'package:permission_handler/permission_handler.dart';
 import '../theme/app_theme.dart';
 import '../widgets/tap_scale.dart';
 import '../services/api_service.dart';
@@ -25,7 +26,7 @@ class IngredientEntryScreen extends StatefulWidget {
 }
 
 class _IngredientEntryScreenState extends State<IngredientEntryScreen>
-    with SingleTickerProviderStateMixin {
+    with SingleTickerProviderStateMixin, WidgetsBindingObserver {
   _Mode _mode = _Mode.camera;
 
   CameraController? _cam;
@@ -33,6 +34,8 @@ class _IngredientEntryScreenState extends State<IngredientEntryScreen>
   bool _camReady = false;
   bool _capturing = false;
   bool _torchOn = false;
+  bool _camPermissionDenied = false;
+  String? _camError;           // non-null = show error overlay
   late AnimationController _pulse;
 
   List<String> _ingredients = [];
@@ -47,22 +50,63 @@ class _IngredientEntryScreenState extends State<IngredientEntryScreen>
   @override
   void initState() {
     super.initState();
+    WidgetsBinding.instance.addObserver(this);
     SystemChrome.setSystemUIOverlayStyle(SystemUiOverlayStyle.light);
     _pulse = AnimationController(vsync: this, duration: const Duration(milliseconds: 1800))
       ..repeat(reverse: true);
     _initCamera();
   }
 
+  @override
+  void didChangeAppLifecycleState(AppLifecycleState state) {
+    // Re-try camera when user returns from Settings after granting permission
+    if (state == AppLifecycleState.resumed && !_camReady && _camPermissionDenied) {
+      _initCamera();
+    }
+  }
+
   Future<void> _initCamera() async {
+    // Reset error state before retry
+    if (mounted) setState(() { _camError = null; _camPermissionDenied = false; });
+
+    // 1 — Request permission explicitly first
+    final status = await Permission.camera.request();
+    if (!status.isGranted) {
+      if (mounted) setState(() { _camPermissionDenied = true; _camError = 'Camera access denied. Tap below to grant permission.'; });
+      return;
+    }
+
+    // 2 — Enumerate cameras
     try {
       _cameras = await availableCameras();
-      if (_cameras.isEmpty) return;
-      _cam = CameraController(_cameras.first, ResolutionPreset.high,
+    } catch (e) {
+      if (mounted) setState(() { _camError = 'Could not access camera: ${e.toString().split('\n').first}'; });
+      return;
+    }
+
+    if (_cameras.isEmpty) {
+      if (mounted) setState(() { _camError = 'No camera found on this device.'; });
+      return;
+    }
+
+    // 3 — Initialize controller
+    try {
+      final ctrl = CameraController(_cameras.first, ResolutionPreset.high,
           enableAudio: false, imageFormatGroup: ImageFormatGroup.jpeg);
-      await _cam!.initialize();
-      if (mounted) setState(() => _camReady = true);
-    } catch (_) {
-      if (mounted) setState(() => _mode = _Mode.type);
+      await ctrl.initialize();
+      if (!mounted) { ctrl.dispose(); return; }
+      setState(() { _cam = ctrl; _camReady = true; _camPermissionDenied = false; _camError = null; });
+    } on CameraException catch (e) {
+      if (mounted) {
+        final msg = (e.description ?? '').toLowerCase();
+        if (msg.contains('permission') || msg.contains('denied')) {
+          setState(() { _camPermissionDenied = true; _camError = 'Camera permission denied. Please grant access in Settings.'; });
+        } else {
+          setState(() { _camError = 'Camera error: ${e.description ?? e.code}'; });
+        }
+      }
+    } catch (e) {
+      if (mounted) setState(() { _camError = 'Camera unavailable: ${e.toString().split('\n').first}'; });
     }
   }
 
@@ -186,10 +230,12 @@ class _IngredientEntryScreenState extends State<IngredientEntryScreen>
     _typeCtrl.dispose();
     _typeFocus.dispose();
     SystemChrome.setSystemUIOverlayStyle(SystemUiOverlayStyle.dark);
+    WidgetsBinding.instance.removeObserver(this);
     super.dispose();
   }
 
-  bool get _isDark => _mode == _Mode.camera;
+  // Dark only when camera mode AND (camera is ready OR an error is showing)
+  bool get _isDark => _mode == _Mode.camera && (_camReady || _camError != null);
 
   @override
   Widget build(BuildContext context) {
@@ -209,7 +255,7 @@ class _IngredientEntryScreenState extends State<IngredientEntryScreen>
             ),
           ),
         // Vignette
-        if (_isDark)
+        if (_isDark && _camReady)
           Positioned.fill(child: DecoratedBox(
             decoration: BoxDecoration(gradient: LinearGradient(
               begin: Alignment.topCenter, end: Alignment.bottomCenter,
@@ -220,14 +266,88 @@ class _IngredientEntryScreenState extends State<IngredientEntryScreen>
               stops: const [0.0, 0.22, 0.62, 1.0],
             )),
           )),
-        // UI
+        // Camera error overlay — shown when permission denied or init failed
+        if (_mode == _Mode.camera && _camError != null)
+          Positioned.fill(
+            child: Container(
+              color: Colors.black,
+              child: SafeArea(
+                child: Column(mainAxisAlignment: MainAxisAlignment.center, children: [
+                  Container(
+                    width: 72, height: 72,
+                    decoration: BoxDecoration(
+                      color: AppTheme.red.withValues(alpha: 0.15),
+                      shape: BoxShape.circle,
+                      border: Border.all(color: AppTheme.red.withValues(alpha: 0.4)),
+                    ),
+                    child: Icon(
+                      _camPermissionDenied ? LucideIcons.lock : LucideIcons.cameraOff,
+                      color: AppTheme.red, size: 30,
+                    ),
+                  ),
+                  const SizedBox(height: 20),
+                  Text(
+                    _camPermissionDenied ? 'Camera Access Required' : 'Camera Unavailable',
+                    style: const TextStyle(color: Colors.white, fontSize: 18,
+                        fontFamily: 'DM Sans', fontWeight: FontWeight.w800),
+                  ),
+                  const SizedBox(height: 8),
+                  Padding(
+                    padding: const EdgeInsets.symmetric(horizontal: 40),
+                    child: Text(
+                      _camError!,
+                      textAlign: TextAlign.center,
+                      style: TextStyle(color: Colors.white.withValues(alpha: 0.6),
+                          fontSize: 13, fontFamily: 'DM Sans'),
+                    ),
+                  ),
+                  const SizedBox(height: 28),
+                  TapScale(
+                    onTap: _initCamera,
+                    child: Container(
+                      padding: const EdgeInsets.symmetric(horizontal: 28, vertical: 14),
+                      decoration: BoxDecoration(
+                        gradient: AppTheme.tealGradient,
+                        borderRadius: BorderRadius.circular(16),
+                      ),
+                      child: Text(
+                        _camPermissionDenied ? 'Grant Camera Access' : 'Try Again',
+                        style: const TextStyle(color: Colors.white, fontSize: 15,
+                            fontFamily: 'DM Sans', fontWeight: FontWeight.w700),
+                      ),
+                    ),
+                  ),
+                  const SizedBox(height: 16),
+                  TapScale(
+                    onTap: () => _switchMode(_Mode.type),
+                    child: Text('Type instead',
+                      style: TextStyle(color: Colors.white.withValues(alpha: 0.5),
+                          fontSize: 13, fontFamily: 'DM Sans', fontWeight: FontWeight.w600),
+                    ),
+                  ),
+                ]),
+              ),
+            ),
+          ),
+        // Loading spinner while camera initializes (permission granted, not ready yet, no error)
+        if (_mode == _Mode.camera && !_camReady && _camError == null)
+          const Positioned.fill(
+            child: Center(
+              child: SizedBox(width: 32, height: 32,
+                  child: CircularProgressIndicator(color: Colors.white, strokeWidth: 2.5)),
+            ),
+          ),
+        // UI chrome (top bar + mode pill + content)
         SafeArea(child: Column(children: [
           _topBar(),
           _modePill(),
           if (_isDark) ...[
             Expanded(child: _cameraContent()),
-            _shutterBar(),
-          ] else
+            if (_camReady) _shutterBar(),
+          ] else if (_mode == _Mode.camera && !_camReady)
+            // Camera mode but not ready — show empty spacer so top bar stays visible
+            const Spacer()
+          else
             Expanded(child: _typeContent()),
         ])),
       ]),
@@ -290,9 +410,9 @@ class _IngredientEntryScreenState extends State<IngredientEntryScreen>
       ),
       child: Row(children: [
         _PillTab(label: 'Camera', icon: LucideIcons.camera,
-            active: _isDark, darkBg: _isDark, onTap: () => _switchMode(_Mode.camera)),
+            active: _mode == _Mode.camera, darkBg: _isDark, onTap: () => _switchMode(_Mode.camera)),
         _PillTab(label: 'Type', icon: LucideIcons.pencilLine,
-            active: !_isDark, darkBg: _isDark, onTap: () => _switchMode(_Mode.type)),
+            active: _mode == _Mode.type, darkBg: _isDark, onTap: () => _switchMode(_Mode.type)),
       ]),
     ),
   ).animate().fadeIn(duration: 350.ms, delay: 80.ms);
@@ -311,7 +431,6 @@ class _IngredientEntryScreenState extends State<IngredientEntryScreen>
       const SizedBox(height: 8),
     ],
     if (_capturedPath != null) ...[
-      // Retake button — clears capture and restarts live viewfinder
       GestureDetector(
         onTap: () => setState(() {
           _capturedPath = null;
@@ -552,7 +671,7 @@ class _IngredientEntryScreenState extends State<IngredientEntryScreen>
   );
 }
 
-// ── Scanning indicator (non-const safe) ───────────────────────────────────────
+// ── Scanning indicator ─────────────────────────────────────────────────────────
 class _ScanningIndicator extends StatelessWidget {
   const _ScanningIndicator();
   @override

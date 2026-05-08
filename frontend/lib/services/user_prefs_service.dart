@@ -17,7 +17,7 @@ class UserPrefsService {
   static const _kProteinGoal     = 'protein_goal';
   static const _kCalConsumed     = 'cal_consumed';
   static const _kProteinConsumed = 'protein_consumed';
-  static const _kCalDate         = 'cal_date';   // tracks which day consumed values belong to
+  static const _kCalDate         = 'cal_date';
   static const _kPrefVeg         = 'pref_veg';
   static const _kPrefGluten      = 'pref_gluten';
   static const _kPrefDairy       = 'pref_dairy';
@@ -28,6 +28,10 @@ class UserPrefsService {
   static const _kStreak          = 'streak_days';
   static const _kSessionsWeek    = 'sessions_week';
   static const _kOnboardingDone  = 'onboarding_done';
+  static const _kWeight          = 'weight_kg';
+  static const _kHeight          = 'height_cm';
+  static const _kAge             = 'age_years';
+  static const _kSex             = 'sex';
 
   // ── READ ──────────────────────────────────────────────────────────────────
   static Future<Map<String, dynamic>> load() async {
@@ -61,6 +65,10 @@ class UserPrefsService {
       'recipe_count':     p.getInt(_k(_kRecipeCount))       ?? 0,
       'streak':           p.getInt(_k(_kStreak))            ?? 0,
       'sessions_week':    p.getInt(_k(_kSessionsWeek))      ?? 0,
+      'weight_kg':        p.getDouble(_k(_kWeight)),
+      'height_cm':        p.getDouble(_k(_kHeight)),
+      'age':              p.getInt(_k(_kAge)),
+      'sex':              p.getString(_k(_kSex))            ?? 'male',
     };
   }
 
@@ -77,6 +85,12 @@ class UserPrefsService {
   // ── WRITE — goals ─────────────────────────────────────────────────────────
   static Future<void> saveCalGoal(int v)     async => (await _p()).setInt(_k(_kCalGoal), v);
   static Future<void> saveProteinGoal(int v) async => (await _p()).setInt(_k(_kProteinGoal), v);
+
+  // ── WRITE — body stats ────────────────────────────────────────────────────
+  static Future<void> saveWeight(double v) async => (await _p()).setDouble(_k(_kWeight), v);
+  static Future<void> saveHeight(double v) async => (await _p()).setDouble(_k(_kHeight), v);
+  static Future<void> saveAge(int v)       async => (await _p()).setInt(_k(_kAge), v);
+  static Future<void> saveSex(String v)    async => (await _p()).setString(_k(_kSex), v);
 
   // ── WRITE — daily tracking ────────────────────────────────────────────────
   static Future<void> saveCalConsumed(int v)     async => (await _p()).setInt(_k(_kCalConsumed), v);
@@ -116,7 +130,7 @@ class UserPrefsService {
     final p = await _p();
     final today = _todayString();
     final lastCook = p.getString(_k(_kLastCookDate)) ?? '';
-    if (lastCook == today) return; // already cooked today, no change
+    if (lastCook == today) return;
     final yesterday = () {
       final d = DateTime.now().subtract(const Duration(days: 1));
       return '${d.year}-${d.month.toString().padLeft(2,'0')}-${d.day.toString().padLeft(2,'0')}';
@@ -142,14 +156,13 @@ class UserPrefsService {
       (await _p()).setString(_k('last_cooked_name'), name);
 
   // ── WRITE — onboarding ────────────────────────────────────────────────────
-  /// Call on BOTH skip and save in onboarding. Replaces the calGoal == 2200 sentinel.
   static Future<void> setOnboardingDone() async =>
       (await _p()).setBool(_k(_kOnboardingDone), true);
 
   static Future<bool> isOnboardingDone() async =>
       (await _p()).getBool(_k(_kOnboardingDone)) ?? false;
 
-  // ── DELETE — only clears THIS user's keys ────────────────────────────────
+  // ── DELETE — only clears THIS user's keys ─────────────────────────────────
   static Future<void> clearAll() async {
     final p      = await _p();
     final prefix = '${_uid()}:';

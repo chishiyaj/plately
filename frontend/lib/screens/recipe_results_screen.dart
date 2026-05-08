@@ -24,6 +24,7 @@ class _RecipeResultsScreenState extends State<RecipeResultsScreen> {
   bool _loading = true;
   bool _offline = false;
   bool _fromCache = false;
+  String? _errorMsg;    // non-null = API returned an error to show
 
   // ── Search ─────────────────────────────────────────────────────────────────
   final _searchCtrl = TextEditingController();
@@ -92,18 +93,22 @@ class _RecipeResultsScreenState extends State<RecipeResultsScreen> {
   }
 
   Future<void> _loadRecipes() async {
-    setState(() { _loading = true; _offline = false; _fromCache = false; _visibleCount = _pageSize; });
-    final recipes = await ApiService.getRecipes(widget.ingredients);
+    setState(() { _loading = true; _offline = false; _fromCache = false; _errorMsg = null; _visibleCount = _pageSize; });
+
+    RecipesResult? result;
+    try {
+      result = await ApiService.getRecipesResult(widget.ingredients);
+    } on RecipeApiException catch (e) {
+      if (!mounted) return;
+      // Cache browse-mode results even on previous success
+      setState(() { _errorMsg = e.message; _loading = false; });
+      return;
+    }
+
     if (!mounted) return;
 
-    if (recipes.isNotEmpty) {
-      // Cache browse-mode results (no ingredients = catalogue)
-      if (widget.ingredients.isEmpty) {
-        await OfflineRecipeService.cacheRecipes(recipes);
-      }
-      setState(() { _all = recipes; _offline = false; _fromCache = false; _loading = false; });
-    } else {
-      // API failed — try offline cache (browse mode only)
+    if (result.offline) {
+      // Network unreachable — try cache for browse mode
       if (widget.ingredients.isEmpty) {
         final cached = await OfflineRecipeService.getCachedRecipes();
         if (!mounted) return;
@@ -115,7 +120,14 @@ class _RecipeResultsScreenState extends State<RecipeResultsScreen> {
       } else {
         setState(() { _all = []; _offline = true; _fromCache = false; _loading = false; });
       }
+      return;
     }
+
+    final recipes = result.recipes;
+    if (recipes.isNotEmpty && widget.ingredients.isEmpty) {
+      await OfflineRecipeService.cacheRecipes(recipes);
+    }
+    setState(() { _all = recipes; _offline = false; _fromCache = false; _loading = false; });
   }
 
   @override
@@ -230,6 +242,7 @@ class _RecipeResultsScreenState extends State<RecipeResultsScreen> {
 
   Widget _buildContent() {
     if (_loading) return _buildShimmer();
+    if (_errorMsg != null) return _buildErrorState(_errorMsg!);
     if (_offline) return _buildOfflineState();
     if (_filtered.isEmpty && _searchQuery.isNotEmpty) return _buildNoSearchResults();
     if (_filtered.isEmpty) return _buildEmpty();
@@ -275,6 +288,45 @@ class _RecipeResultsScreenState extends State<RecipeResultsScreen> {
         ),
       ),
     ]);
+  }
+
+  Widget _buildErrorState(String msg) {
+    final isBusy = msg.toLowerCase().contains('busy') || msg.toLowerCase().contains('429');
+    return RefreshIndicator(
+      color: AppTheme.primaryDark,
+      backgroundColor: AppTheme.cardBg(context),
+      onRefresh: _loadRecipes,
+      child: ListView(padding: const EdgeInsets.all(32), children: [
+        const SizedBox(height: 48),
+        Center(child: Icon(
+          isBusy ? LucideIcons.clockAlert : LucideIcons.serverOff,
+          size: 52, color: AppTheme.mutedText)),
+        const SizedBox(height: 20),
+        Center(child: Text(
+          isBusy ? 'AI is busy right now' : 'Could not load recipes',
+          style: const TextStyle(fontFamily: 'DM Sans', fontWeight: FontWeight.w700,
+              fontSize: 17, color: AppTheme.darkText))),
+        const SizedBox(height: 8),
+        Center(child: Text(
+          isBusy ? 'Showing saved recipes instead — try again in a moment.' : msg,
+          textAlign: TextAlign.center,
+          style: const TextStyle(fontFamily: 'DM Sans', fontSize: 13, color: AppTheme.mutedText))),
+        const SizedBox(height: 28),
+        Center(child: TapScale(
+          onTap: _loadRecipes,
+          child: Container(
+            padding: const EdgeInsets.symmetric(horizontal: 28, vertical: 14),
+            decoration: BoxDecoration(color: AppTheme.primaryDark, borderRadius: BorderRadius.circular(24)),
+            child: const Row(mainAxisSize: MainAxisSize.min, children: [
+              Icon(LucideIcons.refreshCw, color: Colors.white, size: 15),
+              SizedBox(width: 8),
+              Text('Try Again', style: TextStyle(fontFamily: 'DM Sans',
+                  fontWeight: FontWeight.w700, color: Colors.white, fontSize: 14)),
+            ]),
+          ),
+        )),
+      ]),
+    );
   }
 
   Widget _buildOfflineState() {

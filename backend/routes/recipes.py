@@ -21,21 +21,11 @@ _VALID_TAGS = {"Asian", "Italian", "Vegetarian", "Low-Cal", "High-Protein", "Fil
 
 
 def _normalise_tags(raw: str) -> str:
-    """Force tag values to match the exact strings the Flutter filter expects."""
     aliases = {
-        "high protein": "High-Protein",
-        "high-protein": "High-Protein",
-        "highprotein": "High-Protein",
-        "low cal": "Low-Cal",
-        "low-cal": "Low-Cal",
-        "lowcal": "Low-Cal",
-        "low calorie": "Low-Cal",
-        "vegetarian": "Vegetarian",
-        "vegan": "Vegetarian",
-        "asian": "Asian",
-        "italian": "Italian",
-        "filipino": "Filipino",
-        "pinoy": "Filipino",
+        "high protein": "High-Protein", "high-protein": "High-Protein", "highprotein": "High-Protein",
+        "low cal": "Low-Cal", "low-cal": "Low-Cal", "lowcal": "Low-Cal", "low calorie": "Low-Cal",
+        "vegetarian": "Vegetarian", "vegan": "Vegetarian",
+        "asian": "Asian", "italian": "Italian", "filipino": "Filipino", "pinoy": "Filipino",
     }
     parts = [t.strip() for t in raw.split(",")]
     normalised = []
@@ -76,13 +66,20 @@ def _cache_get(fp: str):
                 (fp,)
             )
         if rows:
-            return json.loads(rows[0]["recipes_json"])
+            cached = json.loads(rows[0]["recipes_json"])
+            # Guard: never return empty cached results
+            if isinstance(cached, list) and len(cached) > 0:
+                return cached
     except Exception as e:
         logger.warning("Cache read error: %s", e)
     return None
 
 
 def _cache_set(fp: str, data: list):
+    # Guard: only cache non-empty results
+    if not data or len(data) == 0:
+        logger.info("Skipping cache write — empty result set")
+        return
     try:
         recipes_json = json.dumps(data)
         if USE_PG:
@@ -165,6 +162,28 @@ Respond ONLY with a valid JSON array. No markdown fences, no explanation, no ext
 ]"""
 
 
+def _extract_json_array(raw: str) -> str:
+    """Robustly extract a JSON array from AI response, even if wrapped in markdown."""
+    # Strip markdown fences
+    if "```" in raw:
+        parts = raw.split("```")
+        for p in parts:
+            stripped = p.strip()
+            if stripped.startswith("json"):
+                stripped = stripped[4:].strip()
+            if stripped.startswith("["):
+                raw = stripped
+                break
+
+    raw = raw.strip()
+    # Find the outermost JSON array
+    start = raw.find("[")
+    end   = raw.rfind("]")
+    if start != -1 and end != -1 and end > start:
+        return raw[start:end + 1]
+    return raw
+
+
 def _generate_ai_recipes(ingredients: list, prefs: dict) -> list:
     key = os.getenv("OPENROUTER_API_KEY", "")
     if not key:
@@ -187,38 +206,34 @@ def _generate_ai_recipes(ingredients: list, prefs: dict) -> list:
         },
         timeout=35,
     )
+
+    # Log rate limit / status before raise_for_status
+    if resp.status_code == 429:
+        logger.warning("OpenRouter 429 rate limit — AI recipe gen failed")
+        raise requests.exceptions.HTTPError(response=resp)
+    if resp.status_code == 503:
+        logger.warning("OpenRouter 503 unavailable — AI recipe gen failed")
+        raise requests.exceptions.HTTPError(response=resp)
+
     resp.raise_for_status()
     raw = resp.json()["choices"][0]["message"]["content"].strip()
 
-    # Strip markdown fences if model adds them
-    if "```" in raw:
-        parts = raw.split("```")
-        for p in parts:
-            stripped = p.strip()
-            if stripped.startswith("json"):
-                stripped = stripped[4:].strip()
-            if stripped.startswith("["):
-                raw = stripped
-                break
+    # Log raw response for Railway debugging
+    logger.info("Raw OpenRouter recipe response (first 400 chars): %s", raw[:400])
 
-    raw = raw.strip()
-    # Ensure it starts with [ and ends with ]
-    start = raw.find("[")
-    end   = raw.rfind("]")
-    if start != -1 and end != -1:
-        raw = raw[start:end + 1]
-
+    raw = _extract_json_array(raw)
     recipes = json.loads(raw)
+
     if not isinstance(recipes, list):
+        logger.warning("AI returned non-list JSON — got: %s", type(recipes))
         return []
 
     cleaned = []
     for i, r in enumerate(recipes):
         if not isinstance(r, dict):
             continue
-        # Normalise tags so Flutter filters always match
         r["tags"]         = _normalise_tags(str(r.get("tags", "")))
-        r["id"]           = -(i + 1)   # negative = AI-generated, won't conflict with DB
+        r["id"]           = -(i + 1)
         r["difficulty"]   = str(r.get("difficulty", "Easy")).strip()
         r["cook_time"]    = str(r.get("cook_time", "20 min")).strip()
         r["instructions"] = str(r.get("instructions", "")).strip()
@@ -234,28 +249,10 @@ def _generate_ai_recipes(ingredients: list, prefs: dict) -> list:
 
 @bp.route("/api/recipes", methods=["POST"])
 def get_recipes():
-    """
-    POST body:
-    {
-      "ingredients": ["chicken", "eggs"],
-      "prefs": {
-        "goal": "lose",           # lose | maintain | gain
-        "cal_goal": 1800,
-        "protein_goal": 140,
-        "pref_veg": false,
-        "pref_gluten": false,
-        "pref_dairy": false,
-        "pref_hipro": true
-      },
-      "page": 1, "per_page": 20   # browse mode only
-    }
-    """
-    # Import limiter lazily to avoid circular import at module load time
     from app import limiter
     try:
         data = request.json or {}
 
-        # ── Input validation ──────────────────────────────────────────────
         raw_ings = data.get("ingredients", [])
         if not isinstance(raw_ings, list):
             return jsonify({"status": "error", "message": "ingredients must be an array"}), 400
@@ -285,19 +282,16 @@ def get_recipes():
             result = []
             for r in rows:
                 nutrition = {
-                    "calories": r.get("calories") or 0,
-                    "protein":  r.get("protein")  or 0,
-                    "carbs":    r.get("carbs")    or 0,
-                    "fat":      r.get("fat")      or 0,
+                    "calories": r.get("calories") or 0, "protein": r.get("protein") or 0,
+                    "carbs":    r.get("carbs")    or 0, "fat":     r.get("fat")      or 0,
                     "cost_php": r.get("cost_php") or 0,
                 }
                 d = _recipe_row_to_dict(r, nutrition=nutrition)
                 d["image_url"] = r.get("image_url", "")
                 result.append(d)
             return jsonify({
-                "status": "ok",
-                "data":   result,
-                "meta":   {"page": page, "per_page": per_page, "total": total},
+                "status": "ok", "data": result,
+                "meta": {"page": page, "per_page": per_page, "total": total},
             }), 200
 
         # ── Ingredient mode — AI-generated tailored recipes ───────────────
@@ -309,26 +303,32 @@ def get_recipes():
             "dairy": prefs.get("pref_dairy", False),
             "hipro": prefs.get("pref_hipro", True),
         }
-        fingerprint = hashlib.md5(
-            json.dumps(fp_data, sort_keys=True).encode()
-        ).hexdigest()
+        fingerprint = hashlib.md5(json.dumps(fp_data, sort_keys=True).encode()).hexdigest()
 
         cached = _cache_get(fingerprint)
         if cached:
             logger.info("AI recipe cache hit (%s)", fingerprint[:8])
             return jsonify({"status": "ok", "data": cached, "meta": {"source": "cache"}}), 200
 
+        ai_error_msg = None
         try:
             ai_recipes = _generate_ai_recipes(ingredients, prefs)
         except requests.exceptions.Timeout:
             logger.warning("AI recipe generation timed out — DB fallback")
             ai_recipes = []
+            ai_error_msg = "AI timed out"
         except requests.exceptions.HTTPError as e:
+            status_code = e.response.status_code if e.response is not None else 0
+            if status_code == 429:
+                ai_error_msg = "AI busy — showing saved recipes instead"
+            else:
+                ai_error_msg = f"AI service error ({status_code})"
             logger.warning("AI recipe HTTP error (%s) — DB fallback", e)
             ai_recipes = []
         except (json.JSONDecodeError, KeyError, IndexError, ValueError) as e:
             logger.warning("AI recipe parse error (%s) — DB fallback", e)
             ai_recipes = []
+            ai_error_msg = "AI response parse error"
 
         if ai_recipes:
             _cache_set(fingerprint, ai_recipes)
@@ -347,17 +347,26 @@ def get_recipes():
         result = []
         for r in rows:
             nutrition = {
-                "calories": r.get("calories") or 0,
-                "protein":  r.get("protein")  or 0,
-                "carbs":    r.get("carbs")    or 0,
-                "fat":      r.get("fat")      or 0,
+                "calories": r.get("calories") or 0, "protein": r.get("protein") or 0,
+                "carbs":    r.get("carbs")    or 0, "fat":     r.get("fat")      or 0,
                 "cost_php": r.get("cost_php") or 0,
             }
             d = _recipe_row_to_dict(r, nutrition=nutrition)
             d["image_url"] = r.get("image_url", "")
             result.append(d)
-        logger.info("DB fallback returned %d recipes", len(result))
-        return jsonify({"status": "ok", "data": result, "meta": {"source": "db"}}), 200
+
+        logger.info("DB fallback returned %d recipes (ai_error: %s)", len(result), ai_error_msg)
+
+        if result:
+            # DB has matches — return them with a note about AI failure
+            meta = {"source": "db"}
+            if ai_error_msg:
+                meta["ai_note"] = ai_error_msg
+            return jsonify({"status": "ok", "data": result, "meta": meta}), 200
+        else:
+            # Nothing from AI or DB
+            msg = ai_error_msg or "No recipes found for those ingredients"
+            return jsonify({"status": "error", "message": msg, "data": []}), 200
 
     except (ValueError, TypeError) as e:
         return jsonify({"status": "error", "message": f"Invalid params: {e}"}), 400
@@ -368,11 +377,10 @@ def get_recipes():
 
 @bp.route("/api/recipe/<int:recipe_id>", methods=["GET"])
 def get_recipe(recipe_id):
-    """GET /api/recipe/<id> — full detail. Negative IDs are AI-generated (not in DB)."""
     try:
         if recipe_id < 0:
             return jsonify({
-                "status":  "error",
+                "status": "error",
                 "message": "AI-generated recipe — use full data from results list.",
             }), 404
 

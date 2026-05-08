@@ -646,9 +646,14 @@ class _RecipeDetailScreenState extends State<RecipeDetailScreen> with TickerProv
           })),
         ]),
         const SizedBox(height: 16),
-        // ── Macro circles ─────────────────────────────────────────────────
-        Row(
-          mainAxisAlignment: MainAxisAlignment.spaceAround,
+        // ── Macro 2×2 grid ────────────────────────────────────────────────
+        GridView.count(
+          crossAxisCount: 2,
+          shrinkWrap: true,
+          physics: const NeverScrollableScrollPhysics(),
+          crossAxisSpacing: 8,
+          mainAxisSpacing: 8,
+          childAspectRatio: 2.4,
           children: [
             _NutriBadge(label: 'Calories', value: '$cal',  unit: 'kcal', color: AppTheme.orange),
             _NutriBadge(label: 'Protein',  value: '$pro',  unit: 'g',    color: AppTheme.green),
@@ -900,18 +905,24 @@ class _NutriBadge extends StatelessWidget {
   const _NutriBadge({required this.label, required this.value, required this.unit, required this.color});
 
   @override
-  Widget build(BuildContext context) => Column(children: [
-    Container(
-      width: 58, height: 58,
-      decoration: BoxDecoration(color: color.withValues(alpha: 0.12), shape: BoxShape.circle),
-      child: Center(child: Text(value, style: TextStyle(
-          color: color, fontSize: 18, fontFamily: 'DM Sans', fontWeight: FontWeight.w800))),
+  Widget build(BuildContext context) => Container(
+    padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+    decoration: BoxDecoration(
+      color: color.withValues(alpha: 0.10),
+      borderRadius: BorderRadius.circular(12),
     ),
-    const SizedBox(height: 5),
-    Text(unit, style: const TextStyle(color: AppTheme.mutedText, fontSize: 11, fontFamily: 'DM Sans')),
-    Text(label, style: const TextStyle(
-        color: AppTheme.darkText, fontSize: 12, fontFamily: 'DM Sans', fontWeight: FontWeight.w600)),
-  ]);
+    child: Row(children: [
+      Container(width: 8, height: 8,
+        decoration: BoxDecoration(color: color, shape: BoxShape.circle)),
+      const SizedBox(width: 8),
+      Column(crossAxisAlignment: CrossAxisAlignment.start, mainAxisSize: MainAxisSize.min, children: [
+        Text('$value $unit', style: TextStyle(color: color, fontSize: 15,
+            fontFamily: 'DM Sans', fontWeight: FontWeight.w800)),
+        Text(label, style: TextStyle(color: color.withValues(alpha: 0.75), fontSize: 10,
+            fontFamily: 'DM Sans', fontWeight: FontWeight.w500)),
+      ]),
+    ]),
+  );
 }
 
 class _ShareStat extends StatelessWidget {
@@ -920,15 +931,21 @@ class _ShareStat extends StatelessWidget {
   const _ShareStat(this.value, this.label, this.color);
   @override
   Widget build(BuildContext context) => Container(
-    padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+    padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
     decoration: BoxDecoration(
-      color: color.withValues(alpha: 0.15),
-      borderRadius: BorderRadius.circular(10),
+      color: color.withValues(alpha: 0.10),
+      borderRadius: BorderRadius.circular(12),
     ),
-    child: Column(mainAxisSize: MainAxisSize.min, children: [
-      Text(value, style: TextStyle(color: color, fontSize: 16,
-          fontFamily: 'DM Sans', fontWeight: FontWeight.w800)),
-      Text(label, style: TextStyle(color: color.withValues(alpha: 0.8), fontSize: 10, fontFamily: 'DM Sans')),
+    child: Row(children: [
+      Container(width: 8, height: 8,
+        decoration: BoxDecoration(color: color, shape: BoxShape.circle)),
+      const SizedBox(width: 8),
+      Column(crossAxisAlignment: CrossAxisAlignment.start, mainAxisSize: MainAxisSize.min, children: [
+        Text('$value$unit', style: TextStyle(color: color, fontSize: 15,
+            fontFamily: 'DM Sans', fontWeight: FontWeight.w800)),
+        Text(label, style: TextStyle(color: color.withValues(alpha: 0.75), fontSize: 10,
+            fontFamily: 'DM Sans', fontWeight: FontWeight.w500)),
+      ]),
     ]),
   );
 }
@@ -1004,7 +1021,7 @@ class _ShareBottomSheetState extends State<_ShareBottomSheet> {
             ),
           ),
           const SizedBox(height: 20),
-          const Text('Share your W 🔥', style: TextStyle(
+          const Text('Share your W', style: TextStyle(
             color: AppTheme.darkText, fontSize: 18,
             fontFamily: 'DM Sans', fontWeight: FontWeight.w800,
           )),

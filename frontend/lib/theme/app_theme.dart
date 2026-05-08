@@ -25,56 +25,69 @@ class AppTheme {
   static const Color cardWhite    = Color(0xFFFFFFFF);
 
   // ── Dark mode colors ───────────────────────────────────────────────────────
-  static const Color darkBg       = Color(0xFF0E1A1A); // scaffold background
-  static const Color darkCard     = Color(0xFF1A2B2B); // card / container fill
-  static const Color darkCardAlt  = Color(0xFF162525); // slightly different card
-  static const Color darkBorder   = Color(0xFF2A3D3D); // borders in dark mode
-  static const Color darkTextPrimary = Color(0xFFF0EEE9); // headings in dark
-  static const Color darkTextMuted   = Color(0xFF8A9A9A); // muted in dark
+  static const Color darkBg          = Color(0xFF0A1414);
+  static const Color darkCard        = Color(0xFF152020);
+  static const Color darkCardAlt     = Color(0xFF1C2B2B);
+  static const Color darkBorder      = Color(0xFF2C4040);
+  static const Color darkTextPrimary = Color(0xFFF0EEE9);
+  static const Color darkTextMuted   = Color(0xFF8AABAB);
 
   // ── Context-aware helpers ──────────────────────────────────────────────────
-  /// Main scaffold background (cream in light, near-black in dark)
+  static bool isDark(BuildContext context) =>
+      Theme.of(context).brightness == Brightness.dark;
+
   static Color scaffoldBg(BuildContext context) =>
-      Theme.of(context).brightness == Brightness.dark ? darkBg : creamBg;
+      isDark(context) ? darkBg : creamBg;
 
-  /// Card / container background (white in light, dark teal in dark)
   static Color cardBg(BuildContext context) =>
-      Theme.of(context).brightness == Brightness.dark ? darkCard : Colors.white;
+      isDark(context) ? darkCard : Colors.white;
 
-  /// Alternative card (slightly darker in dark mode)
   static Color cardAltBg(BuildContext context) =>
-      Theme.of(context).brightness == Brightness.dark ? darkCardAlt : creamBg;
+      isDark(context) ? darkCardAlt : creamBg;
 
-  /// Primary text
   static Color textPrimary(BuildContext context) =>
-      Theme.of(context).brightness == Brightness.dark ? darkTextPrimary : darkText;
+      isDark(context) ? darkTextPrimary : darkText;
 
-  /// Muted text
   static Color textMuted(BuildContext context) =>
-      Theme.of(context).brightness == Brightness.dark ? darkTextMuted : mutedText;
+      isDark(context) ? darkTextMuted : mutedText;
 
-  /// Border color
   static Color border(BuildContext context) =>
-      Theme.of(context).brightness == Brightness.dark ? darkBorder : borderGray;
+      isDark(context) ? darkBorder : borderGray;
 
-  // ── Gradients ──────────────────────────────────────────────────────────────
-  static const LinearGradient tealGradient = LinearGradient(
-    begin: Alignment.topLeft, end: Alignment.bottomRight,
-    colors: [Color(0xFF043B3C), Color(0xFF075E5F), Color(0xFF0A8183)],
-  );
-  static const LinearGradient greenGradient = LinearGradient(
-    begin: Alignment.topLeft, end: Alignment.bottomRight,
-    colors: [Color(0xFF76CC4F), Color(0xFF3D7B20)],
-  );
-  static const LinearGradient creamGradient = LinearGradient(
-    begin: Alignment.topCenter, end: Alignment.bottomCenter,
-    colors: [Color(0xFFF0EEE9), Color(0xFFE8E4DC)],
+  static Color iconColor(BuildContext context) =>
+      isDark(context) ? darkTextPrimary : primaryDark;
+
+  // ── Dynamic text styles (use these in screens — they respect dark mode) ──
+  static TextStyle headingLargeStyle(BuildContext context) => TextStyle(
+    color: textPrimary(context), fontSize: 24,
+    fontFamily: 'DM Sans', fontWeight: FontWeight.w800,
   );
 
-  // ── Text styles ────────────────────────────────────────────────────────────
+  static TextStyle headingMediumStyle(BuildContext context) => TextStyle(
+    color: textPrimary(context), fontSize: 20,
+    fontFamily: 'DM Sans', fontWeight: FontWeight.w700,
+  );
+
+  static TextStyle bodyMediumStyle(BuildContext context) => TextStyle(
+    color: textPrimary(context), fontSize: 15,
+    fontFamily: 'DM Sans', fontWeight: FontWeight.w600,
+  );
+
+  static TextStyle bodySmallStyle(BuildContext context) => TextStyle(
+    color: textMuted(context), fontSize: 13,
+    fontFamily: 'DM Sans', fontWeight: FontWeight.w400,
+  );
+
+  static TextStyle captionStyle(BuildContext context) => TextStyle(
+    color: textMuted(context), fontSize: 11,
+    fontFamily: 'DM Sans', fontWeight: FontWeight.w500,
+  );
+
+  // ── Static text styles (light-mode only — use on dark backgrounds, teal cards)
   static const TextStyle logoStyle = TextStyle(
     color: primaryDark, fontSize: 24, fontFamily: 'Nunito', fontWeight: FontWeight.w800,
   );
+  // Keep these for backward compat — screens should migrate to dynamic versions above
   static const TextStyle headingLarge = TextStyle(
     color: darkText, fontSize: 24, fontFamily: 'DM Sans', fontWeight: FontWeight.w800,
   );
@@ -89,6 +102,20 @@ class AppTheme {
   );
   static const TextStyle caption = TextStyle(
     color: mutedText, fontSize: 11, fontFamily: 'DM Sans', fontWeight: FontWeight.w500,
+  );
+
+  // ── Gradients ──────────────────────────────────────────────────────────────
+  static const LinearGradient tealGradient = LinearGradient(
+    begin: Alignment.topLeft, end: Alignment.bottomRight,
+    colors: [Color(0xFF043B3C), Color(0xFF075E5F), Color(0xFF0A8183)],
+  );
+  static const LinearGradient greenGradient = LinearGradient(
+    begin: Alignment.topLeft, end: Alignment.bottomRight,
+    colors: [Color(0xFF76CC4F), Color(0xFF3D7B20)],
+  );
+  static const LinearGradient creamGradient = LinearGradient(
+    begin: Alignment.topCenter, end: Alignment.bottomCenter,
+    colors: [Color(0xFFF0EEE9), Color(0xFFE8E4DC)],
   );
 
   // ── Page transitions ───────────────────────────────────────────────────────
@@ -168,6 +195,21 @@ class AppTheme {
     colorScheme: ColorScheme.fromSeed(seedColor: primaryDark),
     scaffoldBackgroundColor: creamBg,
     fontFamily: 'DM Sans',
+    appBarTheme: const AppBarTheme(
+      backgroundColor: Colors.white,
+      foregroundColor: darkText,
+      elevation: 0,
+    ),
+    cardTheme: const CardThemeData(color: Colors.white),
+    dividerColor: borderGray,
+    inputDecorationTheme: InputDecorationTheme(
+      filled: true,
+      fillColor: creamBg,
+      border: OutlineInputBorder(
+        borderRadius: BorderRadius.circular(12),
+        borderSide: const BorderSide(color: borderGray),
+      ),
+    ),
   );
 
   static ThemeData get darkTheme => ThemeData(
@@ -176,10 +218,43 @@ class AppTheme {
     colorScheme: ColorScheme.fromSeed(
       seedColor: primaryDark,
       brightness: Brightness.dark,
+      surface: darkCard,
+      onSurface: darkTextPrimary,
     ),
     scaffoldBackgroundColor: darkBg,
     fontFamily: 'DM Sans',
     cardColor: darkCard,
     dividerColor: darkBorder,
+    appBarTheme: const AppBarTheme(
+      backgroundColor: darkCard,
+      foregroundColor: darkTextPrimary,
+      elevation: 0,
+    ),
+    inputDecorationTheme: InputDecorationTheme(
+      filled: true,
+      fillColor: darkCardAlt,
+      labelStyle: const TextStyle(color: darkTextMuted),
+      hintStyle: const TextStyle(color: darkTextMuted),
+      border: OutlineInputBorder(
+        borderRadius: BorderRadius.circular(12),
+        borderSide: const BorderSide(color: darkBorder),
+      ),
+      enabledBorder: OutlineInputBorder(
+        borderRadius: BorderRadius.circular(12),
+        borderSide: const BorderSide(color: darkBorder),
+      ),
+      focusedBorder: OutlineInputBorder(
+        borderRadius: BorderRadius.circular(12),
+        borderSide: const BorderSide(color: primaryDark, width: 1.5),
+      ),
+    ),
+    switchTheme: SwitchThemeData(
+      thumbColor: WidgetStateProperty.resolveWith((s) =>
+          s.contains(WidgetState.selected) ? primaryDark : darkTextMuted),
+      trackColor: WidgetStateProperty.resolveWith((s) =>
+          s.contains(WidgetState.selected)
+              ? primaryDark.withValues(alpha: 0.4)
+              : darkBorder),
+    ),
   );
 }
