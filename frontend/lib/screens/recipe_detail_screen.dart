@@ -941,7 +941,7 @@ class _ShareStat extends StatelessWidget {
         decoration: BoxDecoration(color: color, shape: BoxShape.circle)),
       const SizedBox(width: 8),
       Column(crossAxisAlignment: CrossAxisAlignment.start, mainAxisSize: MainAxisSize.min, children: [
-        Text('$value$unit', style: TextStyle(color: color, fontSize: 15,
+        Text(value, style: TextStyle(color: color, fontSize: 15,
             fontFamily: 'DM Sans', fontWeight: FontWeight.w800)),
         Text(label, style: TextStyle(color: color.withValues(alpha: 0.75), fontSize: 10,
             fontFamily: 'DM Sans', fontWeight: FontWeight.w500)),

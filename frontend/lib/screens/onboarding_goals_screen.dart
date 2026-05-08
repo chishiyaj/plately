@@ -77,9 +77,9 @@ class _OnboardingGoalsScreenState extends State<OnboardingGoalsScreen> {
     }
     setState(() => _loading = true);
     try {
-      final result = await ApiService.calculateGoals(
-        weightKg: weight,
-        heightCm: height,
+      final result = await ApiService.setGoals(
+        weight: weight,
+        height: height,
         age: age,
         sex: _sex,
         goal: _goal,
