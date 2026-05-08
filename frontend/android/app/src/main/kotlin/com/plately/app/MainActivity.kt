@@ -1,4 +1,4 @@
-package com.plately.plately_v2
+package com.plately.app
 
 import io.flutter.embedding.android.FlutterActivity
 

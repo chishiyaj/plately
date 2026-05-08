@@ -2,9 +2,10 @@ import 'package:flutter/material.dart';
 import 'package:lucide_icons_flutter/lucide_icons.dart';
 import 'package:flutter_animate/flutter_animate.dart';
 import '../theme/app_theme.dart';
+import '../models/recipe.dart';
 import '../widgets/recipe_card.dart';
-import '../widgets/bottom_nav.dart';
 import '../widgets/tap_scale.dart';
+import '../services/api_service.dart';
 import 'recipe_detail_screen.dart';
 
 class FavoritesScreen extends StatefulWidget {
@@ -17,17 +18,22 @@ class _FavoritesScreenState extends State<FavoritesScreen> {
   String _filter = 'All';
   final _searchCtrl = TextEditingController();
   String _query = '';
+  List<Recipe> _favorites = [];
+  bool _loading = true;
 
-  final _filters = const ['All', 'Breakfast', 'Lunch', 'Dinner', 'Asian', 'Italian', 'Vegan'];
+  final _filters = const ['All', 'Asian', 'Filipino', 'Italian', 'Vegetarian', 'High-Protein', 'Low-Cal'];
 
-  final _favorites = const [
-    {'title': 'Chicken Stir Fry', 'time': '20 min', 'cal': '420 cal', 'protein': '38g protein', 'diff': 'Easy'},
-    {'title': 'Egg Fried Rice',   'time': '15 min', 'cal': '380 cal', 'protein': '22g protein', 'diff': 'Easy'},
-    {'title': 'Tuna Pasta',       'time': '18 min', 'cal': '490 cal', 'protein': '34g protein', 'diff': 'Medium'},
-    {'title': 'Greek Salad',      'time': '10 min', 'cal': '280 cal', 'protein': '14g protein', 'diff': 'Easy'},
-    {'title': 'Beef Bowl',        'time': '25 min', 'cal': '550 cal', 'protein': '45g protein', 'diff': 'Medium'},
-    {'title': 'Omelette',         'time': '8 min',  'cal': '240 cal', 'protein': '18g protein', 'diff': 'Easy'},
-  ];
+  @override
+  void initState() {
+    super.initState();
+    _loadFavorites();
+  }
+
+  Future<void> _loadFavorites() async {
+    setState(() => _loading = true);
+    final favs = await ApiService.getFavorites();
+    if (mounted) setState(() { _favorites = favs; _loading = false; });
+  }
 
   @override
   void dispose() {
@@ -35,13 +41,19 @@ class _FavoritesScreenState extends State<FavoritesScreen> {
     super.dispose();
   }
 
-  List<Map<String, String>> get _filtered =>
-      _favorites.where((r) => r['title']!.toLowerCase().contains(_query.toLowerCase())).toList();
+  List<Recipe> get _filtered {
+    var list = _favorites.where((r) =>
+        r.name.toLowerCase().contains(_query.toLowerCase())).toList();
+    if (_filter != 'All') {
+      list = list.where((r) => r.tags.contains(_filter)).toList();
+    }
+    return list;
+  }
 
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      backgroundColor: AppTheme.creamBg,
+      backgroundColor: AppTheme.scaffoldBg(context),
       body: SafeArea(
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
@@ -51,11 +63,15 @@ class _FavoritesScreenState extends State<FavoritesScreen> {
             const SizedBox(height: 12),
             _buildFilters(),
             const SizedBox(height: 4),
-            Expanded(child: _buildGrid()),
+            Expanded(child: _loading ? _buildShimmer() : RefreshIndicator(
+              color: AppTheme.primaryDark,
+              backgroundColor: AppTheme.cardBg(context),
+              onRefresh: _loadFavorites,
+              child: _buildGrid(),
+            )),
           ],
         ),
       ),
-      bottomNavigationBar: PlatelyBottomNav(currentIndex: 1, onTap: (_) {}, onScanTap: () {}),
     );
   }
 
@@ -64,41 +80,27 @@ class _FavoritesScreenState extends State<FavoritesScreen> {
       padding: const EdgeInsets.fromLTRB(24, 16, 24, 16),
       child: Row(
         children: [
-          TapScale(
-            onTap: () => Navigator.pop(context),
-            child: Container(
-              width: 42, height: 42,
-              decoration: BoxDecoration(
-                color: Colors.white,
-                borderRadius: BorderRadius.circular(12),
-                border: Border.all(color: AppTheme.borderGray),
-                boxShadow: const [BoxShadow(color: Color(0x08000000), blurRadius: 6, offset: Offset(0, 2))],
-              ),
-              child: const Icon(LucideIcons.arrowLeft, color: AppTheme.primaryDark, size: 18),
-            ),
-          ),
-          const SizedBox(width: 14),
           Expanded(
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
                 const Text('Favorites',
-                    style: TextStyle(color: AppTheme.darkText, fontSize: 20,
+                    style: TextStyle(color: AppTheme.darkText, fontSize: 24,
                         fontFamily: 'DM Sans', fontWeight: FontWeight.w800)),
-                Text('${_favorites.length} saved recipes',
-                    style: const TextStyle(color: AppTheme.mutedText, fontSize: 12, fontFamily: 'DM Sans')),
+                Text(_loading ? 'Loading...' : '${_favorites.length} saved recipes',
+                    style: const TextStyle(color: AppTheme.mutedText, fontSize: 13, fontFamily: 'DM Sans')),
               ],
             ),
           ),
           TapScale(
-            onTap: () {},
+            onTap: _loadFavorites,
             child: Container(
               width: 42, height: 42,
               decoration: BoxDecoration(
-                color: Colors.white, borderRadius: BorderRadius.circular(12),
-                border: Border.all(color: AppTheme.borderGray),
+                color: AppTheme.cardBg(context), borderRadius: BorderRadius.circular(12),
+                border: Border.all(color: AppTheme.border(context)),
               ),
-              child: const Icon(LucideIcons.arrowUpDown, color: AppTheme.primaryDark, size: 18),
+              child: const Icon(LucideIcons.refreshCw, color: AppTheme.primaryDark, size: 18),
             ),
           ),
         ],
@@ -111,9 +113,9 @@ class _FavoritesScreenState extends State<FavoritesScreen> {
       margin: const EdgeInsets.symmetric(horizontal: 24),
       height: 50,
       decoration: BoxDecoration(
-        color: Colors.white,
+        color: AppTheme.cardBg(context),
         borderRadius: BorderRadius.circular(14),
-        border: Border.all(color: AppTheme.borderGray),
+        border: Border.all(color: AppTheme.border(context)),
         boxShadow: const [BoxShadow(color: Color(0x06000000), blurRadius: 8, offset: Offset(0, 2))],
       ),
       child: TextField(
@@ -151,9 +153,9 @@ class _FavoritesScreenState extends State<FavoritesScreen> {
               margin: const EdgeInsets.only(right: 10),
               padding: const EdgeInsets.symmetric(horizontal: 16),
               decoration: BoxDecoration(
-                color: sel ? AppTheme.primaryDark : Colors.white,
+                color: sel ? AppTheme.primaryDark : AppTheme.cardBg(context),
                 borderRadius: BorderRadius.circular(20),
-                border: Border.all(color: sel ? AppTheme.primaryDark : AppTheme.borderGray),
+                border: Border.all(color: sel ? AppTheme.primaryDark : AppTheme.border(context)),
                 boxShadow: sel
                     ? [const BoxShadow(color: Color(0x22043B3C), blurRadius: 8, offset: Offset(0, 3))]
                     : [],
@@ -172,8 +174,56 @@ class _FavoritesScreenState extends State<FavoritesScreen> {
     );
   }
 
+  Widget _buildShimmer() {
+    return GridView.builder(
+      padding: const EdgeInsets.fromLTRB(24, 14, 24, 24),
+      gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
+        crossAxisCount: 2, crossAxisSpacing: 14, mainAxisSpacing: 14, childAspectRatio: 0.72,
+      ),
+      itemCount: 6,
+      itemBuilder: (_, __) => Container(
+        decoration: BoxDecoration(
+          color: AppTheme.lightGray.withValues(alpha: 0.5),
+          borderRadius: BorderRadius.circular(18),
+        ),
+      ).animate(onPlay: (c) => c.repeat(reverse: true))
+       .shimmer(duration: 1200.ms, color: Colors.white.withValues(alpha: 0.6)),
+    );
+  }
+
   Widget _buildGrid() {
     final items = _filtered;
+
+    if (_favorites.isEmpty) {
+      return Center(
+        child: Column(
+          mainAxisAlignment: MainAxisAlignment.center,
+          children: [
+            Container(
+              width: 80, height: 80,
+              decoration: const BoxDecoration(gradient: LinearGradient(
+                colors: [Color(0x22BA5CCC), Color(0x11BA5CCC)],
+                begin: Alignment.topLeft, end: Alignment.bottomRight,
+              ), shape: BoxShape.circle),
+              child: const Icon(LucideIcons.heart, size: 36, color: AppTheme.purple),
+            ),
+            const SizedBox(height: 18),
+            const Text('No favourites yet',
+                style: TextStyle(color: AppTheme.darkText, fontSize: 16,
+                    fontFamily: 'DM Sans', fontWeight: FontWeight.w700)),
+            const SizedBox(height: 8),
+            const Padding(
+              padding: EdgeInsets.symmetric(horizontal: 40),
+              child: Text('Save recipes you love — tap the ♥ on any recipe.',
+                  textAlign: TextAlign.center,
+                  style: TextStyle(color: AppTheme.mutedText, fontSize: 13,
+                      fontFamily: 'DM Sans', height: 1.5)),
+            ),
+          ],
+        ).animate().fadeIn(duration: 300.ms),
+      );
+    }
+
     if (items.isEmpty) {
       return Center(
         child: Column(
@@ -191,10 +241,10 @@ class _FavoritesScreenState extends State<FavoritesScreen> {
                 style: TextStyle(color: AppTheme.darkText, fontSize: 16,
                     fontFamily: 'DM Sans', fontWeight: FontWeight.w600)),
             const SizedBox(height: 6),
-            const Text('Try a different search',
+            const Text('Try a different search or filter',
                 style: TextStyle(color: AppTheme.mutedText, fontSize: 13, fontFamily: 'DM Sans')),
           ],
-        ).animate().fadeIn(duration: 300.ms).scale(begin: const Offset(0.95, 0.95), end: const Offset(1, 1)),
+        ).animate().fadeIn(duration: 300.ms),
       );
     }
 
@@ -207,10 +257,14 @@ class _FavoritesScreenState extends State<FavoritesScreen> {
       itemBuilder: (_, i) {
         final r = items[i];
         return RecipeCard(
-          title: r['title']!, time: r['time']!, calories: r['cal']!,
-          protein: r['protein']!, difficulty: r['diff']!, index: i,
+          title: r.name, time: r.cookTime,
+          calories: '${r.calories} cal',
+          protein: '${r.protein}g protein',
+          difficulty: r.difficulty, index: i,
+          imageUrl: r.imageUrl,
+          costPhp: r.costPhp,
           onTap: () => Navigator.push(context,
-              AppTheme.slideUp(RecipeDetailScreen(title: r['title']!))),
+              AppTheme.slideUp(RecipeDetailScreen(recipe: r))).then((_) => _loadFavorites()),
         ).animate().fadeIn(delay: (i * 60).ms, duration: 300.ms)
             .slideY(begin: 0.1, end: 0, delay: (i * 60).ms, duration: 300.ms);
       },

@@ -27,9 +27,12 @@ frontend/android/key.properties
 
 # Backend
 backend/__pycache__/
+backend/**/__pycache__/
+backend/**/*.pyc
 backend/*.pyc
 backend/.env
 backend/db/plately.db
+backend/db/*.db
 
 # OS
 .DS_Store

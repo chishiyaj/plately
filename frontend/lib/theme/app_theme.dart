@@ -1,7 +1,8 @@
 import 'package:flutter/material.dart';
+import 'package:animations/animations.dart';
 
 class AppTheme {
-  // Core colors
+  // ── Light mode colors ──────────────────────────────────────────────────────
   static const Color primaryDark  = Color(0xFF043B3C);
   static const Color primaryMid   = Color(0xFF075E5F);
   static const Color creamBg      = Color(0xFFF0EEE9);
@@ -23,7 +24,40 @@ class AppTheme {
   static const Color red          = Color(0xFFD14444);
   static const Color cardWhite    = Color(0xFFFFFFFF);
 
-  // Gradients
+  // ── Dark mode colors ───────────────────────────────────────────────────────
+  static const Color darkBg       = Color(0xFF0E1A1A); // scaffold background
+  static const Color darkCard     = Color(0xFF1A2B2B); // card / container fill
+  static const Color darkCardAlt  = Color(0xFF162525); // slightly different card
+  static const Color darkBorder   = Color(0xFF2A3D3D); // borders in dark mode
+  static const Color darkTextPrimary = Color(0xFFF0EEE9); // headings in dark
+  static const Color darkTextMuted   = Color(0xFF8A9A9A); // muted in dark
+
+  // ── Context-aware helpers ──────────────────────────────────────────────────
+  /// Main scaffold background (cream in light, near-black in dark)
+  static Color scaffoldBg(BuildContext context) =>
+      Theme.of(context).brightness == Brightness.dark ? darkBg : creamBg;
+
+  /// Card / container background (white in light, dark teal in dark)
+  static Color cardBg(BuildContext context) =>
+      Theme.of(context).brightness == Brightness.dark ? darkCard : Colors.white;
+
+  /// Alternative card (slightly darker in dark mode)
+  static Color cardAltBg(BuildContext context) =>
+      Theme.of(context).brightness == Brightness.dark ? darkCardAlt : creamBg;
+
+  /// Primary text
+  static Color textPrimary(BuildContext context) =>
+      Theme.of(context).brightness == Brightness.dark ? darkTextPrimary : darkText;
+
+  /// Muted text
+  static Color textMuted(BuildContext context) =>
+      Theme.of(context).brightness == Brightness.dark ? darkTextMuted : mutedText;
+
+  /// Border color
+  static Color border(BuildContext context) =>
+      Theme.of(context).brightness == Brightness.dark ? darkBorder : borderGray;
+
+  // ── Gradients ──────────────────────────────────────────────────────────────
   static const LinearGradient tealGradient = LinearGradient(
     begin: Alignment.topLeft, end: Alignment.bottomRight,
     colors: [Color(0xFF043B3C), Color(0xFF075E5F), Color(0xFF0A8183)],
@@ -37,7 +71,7 @@ class AppTheme {
     colors: [Color(0xFFF0EEE9), Color(0xFFE8E4DC)],
   );
 
-  // Text styles
+  // ── Text styles ────────────────────────────────────────────────────────────
   static const TextStyle logoStyle = TextStyle(
     color: primaryDark, fontSize: 24, fontFamily: 'Nunito', fontWeight: FontWeight.w800,
   );
@@ -57,7 +91,15 @@ class AppTheme {
     color: mutedText, fontSize: 11, fontFamily: 'DM Sans', fontWeight: FontWeight.w500,
   );
 
-  // Page transitions
+  // ── Page transitions ───────────────────────────────────────────────────────
+  static Route<T> crossFade<T>(Widget page) => PageRouteBuilder<T>(
+    pageBuilder: (_, a, __) => page,
+    transitionDuration: const Duration(milliseconds: 260),
+    reverseTransitionDuration: const Duration(milliseconds: 220),
+    transitionsBuilder: (_, a, __, child) =>
+        FadeTransition(opacity: CurvedAnimation(parent: a, curve: Curves.easeInOut), child: child),
+  );
+
   static Route<T> slideUp<T>(Widget page) => PageRouteBuilder<T>(
     pageBuilder: (_, a, __) => page,
     transitionDuration: const Duration(milliseconds: 380),
@@ -93,10 +135,51 @@ class AppTheme {
     },
   );
 
+  static Route<T> sharedAxisH<T>(Widget page, {required bool goingRight}) =>
+      PageRouteBuilder<T>(
+        pageBuilder: (_, __, ___) => page,
+        transitionDuration: const Duration(milliseconds: 300),
+        reverseTransitionDuration: const Duration(milliseconds: 260),
+        transitionsBuilder: (_, anim, secAnim, child) =>
+            SharedAxisTransition(
+              animation: anim,
+              secondaryAnimation: secAnim,
+              transitionType: SharedAxisTransitionType.horizontal,
+              child: child,
+            ),
+      );
+
+  static Route<T> zoomIn<T>(Widget page) => PageRouteBuilder<T>(
+    pageBuilder: (_, __, ___) => page,
+    transitionDuration: const Duration(milliseconds: 340),
+    reverseTransitionDuration: const Duration(milliseconds: 280),
+    transitionsBuilder: (_, anim, secAnim, child) => SharedAxisTransition(
+      animation: anim,
+      secondaryAnimation: secAnim,
+      transitionType: SharedAxisTransitionType.scaled,
+      child: child,
+    ),
+  );
+
+  // ── Themes ─────────────────────────────────────────────────────────────────
   static ThemeData get theme => ThemeData(
     useMaterial3: true,
+    brightness: Brightness.light,
     colorScheme: ColorScheme.fromSeed(seedColor: primaryDark),
     scaffoldBackgroundColor: creamBg,
     fontFamily: 'DM Sans',
+  );
+
+  static ThemeData get darkTheme => ThemeData(
+    useMaterial3: true,
+    brightness: Brightness.dark,
+    colorScheme: ColorScheme.fromSeed(
+      seedColor: primaryDark,
+      brightness: Brightness.dark,
+    ),
+    scaffoldBackgroundColor: darkBg,
+    fontFamily: 'DM Sans',
+    cardColor: darkCard,
+    dividerColor: darkBorder,
   );
 }
