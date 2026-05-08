@@ -211,16 +211,37 @@ def _create_tables():
             ]
             for stmt in statements:
                 cur.execute(stmt)
-            # Migration guards for existing DBs
-            cur.execute("ALTER TABLE recipes ADD COLUMN IF NOT EXISTS image_url TEXT DEFAULT ''")
-            cur.execute("ALTER TABLE history ADD COLUMN IF NOT EXISTS calories_logged INTEGER NOT NULL DEFAULT 0")
-            cur.execute("ALTER TABLE history ADD COLUMN IF NOT EXISTS protein_logged INTEGER NOT NULL DEFAULT 0")
-            cur.execute("ALTER TABLE nutrition ADD COLUMN IF NOT EXISTS cost_php INTEGER NOT NULL DEFAULT 0")
             conn.commit()
         except Exception:
             conn.rollback()
             raise
         finally:
+            putconn(conn)
+
+        # Migration guards — run with advisory lock so only ONE worker executes
+        # this at a time, preventing deadlocks on multi-worker startup.
+        conn = get_db()
+        try:
+            cur = conn.cursor()
+            cur.execute("SELECT pg_advisory_lock(987654321)")
+            migrations = [
+                "ALTER TABLE recipes ADD COLUMN IF NOT EXISTS image_url TEXT DEFAULT ''",
+                "ALTER TABLE history ADD COLUMN IF NOT EXISTS calories_logged INTEGER NOT NULL DEFAULT 0",
+                "ALTER TABLE history ADD COLUMN IF NOT EXISTS protein_logged INTEGER NOT NULL DEFAULT 0",
+                "ALTER TABLE nutrition ADD COLUMN IF NOT EXISTS cost_php INTEGER NOT NULL DEFAULT 0",
+            ]
+            for m in migrations:
+                cur.execute(m)
+            conn.commit()
+        except Exception:
+            conn.rollback()
+            raise
+        finally:
+            try:
+                cur.execute("SELECT pg_advisory_unlock(987654321)")
+                conn.commit()
+            except Exception:
+                pass
             putconn(conn)
     else:
         conn = get_db()
