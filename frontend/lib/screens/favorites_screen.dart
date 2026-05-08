@@ -21,7 +21,7 @@ class _FavoritesScreenState extends State<FavoritesScreen> {
   List<Recipe> _favorites = [];
   bool _loading = true;
 
-  final _filters = const ['All', 'Asian', 'Italian', 'Vegetarian', 'High-Protein', 'Low-Cal'];
+  final _filters = const ['All', 'Asian', 'Filipino', 'Italian', 'Vegetarian', 'High-Protein', 'Low-Cal'];
 
   @override
   void initState() {
@@ -53,7 +53,7 @@ class _FavoritesScreenState extends State<FavoritesScreen> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      backgroundColor: AppTheme.creamBg,
+      backgroundColor: AppTheme.scaffoldBg(context),
       body: SafeArea(
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
@@ -63,7 +63,12 @@ class _FavoritesScreenState extends State<FavoritesScreen> {
             const SizedBox(height: 12),
             _buildFilters(),
             const SizedBox(height: 4),
-            Expanded(child: _loading ? _buildShimmer() : _buildGrid()),
+            Expanded(child: _loading ? _buildShimmer() : RefreshIndicator(
+              color: AppTheme.primaryDark,
+              backgroundColor: AppTheme.cardBg(context),
+              onRefresh: _loadFavorites,
+              child: _buildGrid(),
+            )),
           ],
         ),
       ),
@@ -92,8 +97,8 @@ class _FavoritesScreenState extends State<FavoritesScreen> {
             child: Container(
               width: 42, height: 42,
               decoration: BoxDecoration(
-                color: Colors.white, borderRadius: BorderRadius.circular(12),
-                border: Border.all(color: AppTheme.borderGray),
+                color: AppTheme.cardBg(context), borderRadius: BorderRadius.circular(12),
+                border: Border.all(color: AppTheme.border(context)),
               ),
               child: const Icon(LucideIcons.refreshCw, color: AppTheme.primaryDark, size: 18),
             ),
@@ -108,9 +113,9 @@ class _FavoritesScreenState extends State<FavoritesScreen> {
       margin: const EdgeInsets.symmetric(horizontal: 24),
       height: 50,
       decoration: BoxDecoration(
-        color: Colors.white,
+        color: AppTheme.cardBg(context),
         borderRadius: BorderRadius.circular(14),
-        border: Border.all(color: AppTheme.borderGray),
+        border: Border.all(color: AppTheme.border(context)),
         boxShadow: const [BoxShadow(color: Color(0x06000000), blurRadius: 8, offset: Offset(0, 2))],
       ),
       child: TextField(
@@ -148,9 +153,9 @@ class _FavoritesScreenState extends State<FavoritesScreen> {
               margin: const EdgeInsets.only(right: 10),
               padding: const EdgeInsets.symmetric(horizontal: 16),
               decoration: BoxDecoration(
-                color: sel ? AppTheme.primaryDark : Colors.white,
+                color: sel ? AppTheme.primaryDark : AppTheme.cardBg(context),
                 borderRadius: BorderRadius.circular(20),
-                border: Border.all(color: sel ? AppTheme.primaryDark : AppTheme.borderGray),
+                border: Border.all(color: sel ? AppTheme.primaryDark : AppTheme.border(context)),
                 boxShadow: sel
                     ? [const BoxShadow(color: Color(0x22043B3C), blurRadius: 8, offset: Offset(0, 3))]
                     : [],
@@ -196,18 +201,24 @@ class _FavoritesScreenState extends State<FavoritesScreen> {
           children: [
             Container(
               width: 80, height: 80,
-              decoration: BoxDecoration(
-                  color: AppTheme.borderGray.withValues(alpha: 0.5),
-                  shape: BoxShape.circle),
-              child: const Icon(LucideIcons.heart, size: 36, color: AppTheme.mutedText),
+              decoration: const BoxDecoration(gradient: LinearGradient(
+                colors: [Color(0x22BA5CCC), Color(0x11BA5CCC)],
+                begin: Alignment.topLeft, end: Alignment.bottomRight,
+              ), shape: BoxShape.circle),
+              child: const Icon(LucideIcons.heart, size: 36, color: AppTheme.purple),
             ),
-            const SizedBox(height: 16),
-            const Text('No favorites yet',
+            const SizedBox(height: 18),
+            const Text('No favourites yet',
                 style: TextStyle(color: AppTheme.darkText, fontSize: 16,
-                    fontFamily: 'DM Sans', fontWeight: FontWeight.w600)),
-            const SizedBox(height: 6),
-            const Text('Tap the heart on any recipe to save it',
-                style: TextStyle(color: AppTheme.mutedText, fontSize: 13, fontFamily: 'DM Sans')),
+                    fontFamily: 'DM Sans', fontWeight: FontWeight.w700)),
+            const SizedBox(height: 8),
+            const Padding(
+              padding: EdgeInsets.symmetric(horizontal: 40),
+              child: Text('Save recipes you love — tap the ♥ on any recipe.',
+                  textAlign: TextAlign.center,
+                  style: TextStyle(color: AppTheme.mutedText, fontSize: 13,
+                      fontFamily: 'DM Sans', height: 1.5)),
+            ),
           ],
         ).animate().fadeIn(duration: 300.ms),
       );
@@ -250,6 +261,8 @@ class _FavoritesScreenState extends State<FavoritesScreen> {
           calories: '${r.calories} cal',
           protein: '${r.protein}g protein',
           difficulty: r.difficulty, index: i,
+          imageUrl: r.imageUrl,
+          costPhp: r.costPhp,
           onTap: () => Navigator.push(context,
               AppTheme.slideUp(RecipeDetailScreen(recipe: r))).then((_) => _loadFavorites()),
         ).animate().fadeIn(delay: (i * 60).ms, duration: 300.ms)

@@ -82,7 +82,7 @@ class _MainShellState extends State<MainShell> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      backgroundColor: AppTheme.creamBg,
+      backgroundColor: AppTheme.scaffoldBg(context),
       resizeToAvoidBottomInset: false,
       extendBody: true, // needed so other tabs' content scrolls behind the floating pill nav
       body: PageTransitionSwitcher(
@@ -92,7 +92,7 @@ class _MainShellState extends State<MainShell> {
           animation: anim,
           secondaryAnimation: secAnim,
           transitionType: SharedAxisTransitionType.horizontal,
-          fillColor: AppTheme.creamBg,
+          fillColor: AppTheme.scaffoldBg(context),
           child: child,
         ),
         child: KeyedSubtree(
@@ -232,7 +232,7 @@ class _ScanFab extends StatelessWidget {
       decoration: BoxDecoration(
         gradient: AppTheme.tealGradient,
         shape: BoxShape.circle,
-        border: Border.all(color: AppTheme.creamBg, width: 3),
+        border: Border.all(color: AppTheme.scaffoldBg(context), width: 3),
         boxShadow: const [
           BoxShadow(color: Color(0x88043B3C), blurRadius: 20, offset: Offset(0, 6)),
         ],

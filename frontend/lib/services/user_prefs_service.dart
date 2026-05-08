@@ -27,6 +27,7 @@ class UserPrefsService {
   static const _kRecipeCount     = 'recipe_count';
   static const _kStreak          = 'streak_days';
   static const _kSessionsWeek    = 'sessions_week';
+  static const _kOnboardingDone  = 'onboarding_done';
 
   // ── READ ──────────────────────────────────────────────────────────────────
   static Future<Map<String, dynamic>> load() async {
@@ -103,6 +104,50 @@ class UserPrefsService {
   }
 
   static Future<void> setStreak(int v) async => (await _p()).setInt(_k(_kStreak), v);
+
+  static Future<int> getStreak() async =>
+      (await _p()).getInt(_k(_kStreak)) ?? 0;
+
+  static const _kLastCookDate = 'last_cook_date';
+
+  /// Increments streak if user hasn't cooked today yet.
+  /// Resets to 1 if last cook was not yesterday.
+  static Future<void> incrementStreak() async {
+    final p = await _p();
+    final today = _todayString();
+    final lastCook = p.getString(_k(_kLastCookDate)) ?? '';
+    if (lastCook == today) return; // already cooked today, no change
+    final yesterday = () {
+      final d = DateTime.now().subtract(const Duration(days: 1));
+      return '${d.year}-${d.month.toString().padLeft(2,'0')}-${d.day.toString().padLeft(2,'0')}';
+    }();
+    final current = p.getInt(_k(_kStreak)) ?? 0;
+    final newStreak = (lastCook == yesterday) ? current + 1 : 1;
+    await p.setInt(_k(_kStreak), newStreak);
+    await p.setString(_k(_kLastCookDate), today);
+  }
+
+  // ── WRITE — streak milestones ─────────────────────────────────────────────
+  static Future<bool> hasSeenStreakMilestone(int n) async =>
+      (await _p()).getBool(_k('streak_milestone_$n')) ?? false;
+
+  static Future<void> markStreakMilestoneSeen(int n) async =>
+      (await _p()).setBool(_k('streak_milestone_$n'), true);
+
+  // ── WRITE — last cooked name (for notifications) ──────────────────────────
+  static Future<String?> getLastCookedName() async =>
+      (await _p()).getString(_k('last_cooked_name'));
+
+  static Future<void> saveLastCookedName(String name) async =>
+      (await _p()).setString(_k('last_cooked_name'), name);
+
+  // ── WRITE — onboarding ────────────────────────────────────────────────────
+  /// Call on BOTH skip and save in onboarding. Replaces the calGoal == 2200 sentinel.
+  static Future<void> setOnboardingDone() async =>
+      (await _p()).setBool(_k(_kOnboardingDone), true);
+
+  static Future<bool> isOnboardingDone() async =>
+      (await _p()).getBool(_k(_kOnboardingDone)) ?? false;
 
   // ── DELETE — only clears THIS user's keys ────────────────────────────────
   static Future<void> clearAll() async {

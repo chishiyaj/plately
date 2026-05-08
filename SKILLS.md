@@ -1,5 +1,6 @@
 # PLATELY V2 — SKILLS.md (GOD TIER)
-> Paste alongside MEMORY.md + TASKS.md at the start of every chat.
+> Paste alongside MEMORY.md + TASKS.md at start of every chat.
+> Last updated: Session 7 — verified against pubspec.yaml and source.
 
 ---
 
@@ -13,7 +14,7 @@
 | Batch writes | Write multiple related files in sequence, no chatter between. |
 | Reference don't repeat | Say "see AppTheme.primaryDark" not the hex value. |
 | Max response format | Summary line → code → 3 bullets → "Next:" |
-| Skip boilerplate comments | No `// Flutter SDK`, `// material.dart` type comments. |
+| Skip boilerplate comments | No `// Flutter SDK`, `// material.dart` comments. |
 
 ---
 
@@ -43,28 +44,33 @@ color: AppTheme.primaryDark
 - `const` on every widget that doesn't change
 - `ListView.builder` for lists > 5 items
 
-### Bottom nav pattern
+### Shell / tab switching pattern
 ```dart
-bottomNavigationBar: PlatelyBottomNav(currentIndex: N, onTap: _onNavTap),
+// Switch tabs from anywhere:
+MainShell.switchTab(shellIndex); // 0=Home, 1=Favorites, 2=AiChat, 3=Profile
+// Nav bar indices: 0=Home, 1=Saved, 2=Scan(FAB), 3=AI, 4=Profile
 ```
-Indices: 0=Home, 1=Favorites, 2=Scan(FAB), 3=AiChat, 4=Profile
 
 ### Fonts
 - `Nunito` → logo and brand headings only
 - `DM Sans` → all body, label, button text
 
-### Packages in use (pubspec.yaml — verified)
+### Packages in use (pubspec.yaml — verified Session 7)
 - `flutter_animate` — chainable animations
-- `lucide_icons_flutter` — icons (not Material icons)
+- `lucide_icons_flutter` — icons (not Material)
 - `shimmer` — skeleton loading
 - `glassmorphism` — frosted glass
 - `camera` — live camera viewfinder
 - `animations` — SharedAxisTransition
 - `flutter_svg` — Google G logo
 - `firebase_core`, `firebase_auth`, `google_sign_in` — auth
-- `flutter_local_notifications`, `timezone` — notifications (wiring pending)
-- `cached_network_image` — remote images
-- `image_picker`, `shared_preferences`, `sqflite`, `http`
+- `flutter_local_notifications`, `timezone` — notifications
+- `cached_network_image` — recipe image URLs
+- `flutter_markdown` — markdown in AI chat responses (**in pubspec, not removed**)
+- `fl_chart` — macro dashboard bar chart
+- `url_launcher` — Shopee deep-links from shopping list
+- `screenshot` + `share_plus` — recipe share card
+- `image_picker`, `shared_preferences`, `sqflite`, `http`, `path` — core
 
 ### NEVER USE
 - `withOpacity` on const colors → use `withValues(alpha: x)`
@@ -76,17 +82,38 @@ Indices: 0=Home, 1=Favorites, 2=Scan(FAB), 3=AiChat, 4=Profile
 
 ## 🐍 BACKEND RULES
 
-### File structure (ACTUAL)
+### File structure (ACTUAL — verified Session 7)
 ```
-routes/scan.py      → POST /api/scan (Gemma vision)
-routes/recipes.py   → GET+POST /api/recipes, GET /api/recipe/<id>
-routes/chat.py      → POST /api/chat (Gemma 3 chat)
+routes/scan.py      → POST /api/scan (Gemma vision, partial match, fallback chain)
+routes/recipes.py   → POST /api/recipes (DB browse OR AI-gen 5 recipes, 1hr cache, tag normaliser)
+routes/chat.py      → POST /api/chat (Gemma 3 27B, system merged into user msg)
 routes/goals.py     → POST /api/goals (Mifflin-St Jeor)
-routes/favorites.py → GET/POST/DELETE /api/favorites
-routes/history.py   → GET/POST/DELETE /api/history
-database.py         → Thread-safe SQLite, WAL mode
-app.py              → Flask factory, rate limiter, CORS, security headers
-wsgi.py             → Production gunicorn entry
+routes/favorites.py → GET/POST/DELETE /api/favorites (full ingredient list in response)
+routes/history.py   → GET/POST/DELETE /api/history (DELETE requires user_id)
+database.py         → Dual-mode PostgreSQL (prod) / SQLite (local), 34 recipes, ~84 ingredients
+app.py              → Flask factory, structured logging, rate limiter, CORS, security headers
+wsgi.py             → waitress (Windows) / gunicorn (Linux) auto-detects OS
+railway.json        → Nixpacks, python wsgi.py start command
+_seed_data.py       → Standalone seed script (run manually if DB needs reset)
+```
+
+### Database mode detection
+```python
+# database.py — reads DATABASE_URL env var
+USE_PG = bool(os.getenv("DATABASE_URL", ""))
+# If True  → PostgreSQL (Render/Railway), uses psycopg2, PLACEHOLDER = "%s", RETURNING id
+# If False → SQLite at backend/db/plately.db, uses sqlite3, PLACEHOLDER = "?"
+```
+
+### SQL placeholder pattern (CRITICAL — must use PLACEHOLDER variable)
+```python
+from database import query, execute, PLACEHOLDER as ph
+
+# WRONG — breaks on PostgreSQL
+execute("INSERT INTO history (user_id) VALUES (?)", (uid,))
+
+# RIGHT — works on both
+execute(f"INSERT INTO history (user_id) VALUES ({ph})", (uid,))
 ```
 
 ### Response contract (always)
@@ -97,8 +124,6 @@ return jsonify({"status": "error", "message": str(e)}), 500
 
 ### App factory pattern (CURRENT — don't change)
 ```python
-# app.py uses create_app() factory — NOT direct Flask()
-# Rate limiter is imported from app.py in routes:
 from app import limiter
 
 @bp.route('/api/path', methods=['POST'])
@@ -111,18 +136,12 @@ def handler():
         return jsonify({"status": "error", "message": str(e)}), 500
 ```
 
-### Database pattern (CURRENT — thread-safe WAL)
-```python
-from database import query, execute
-# query() returns list[dict]
-# execute() for INSERT/UPDATE/DELETE
-```
-
 ### AI — OpenRouter (CURRENT models)
 ```python
-# Chat: google/gemma-3-27b-it:free
-# Scan: tries in order: google/gemma-3-12b-it:free → google/gemma-3-27b-it:free → google/gemma-4-31b-it:free
-# Prompt format: merge system prompt into user message (Gemma doesn't use system role well)
+# Chat:      google/gemma-3-27b-it:free
+# Scan:      tries 27b → 12b → 4-31b (fallback chain, first non-429 wins)
+# Recipe gen: google/gemma-3-27b-it:free — 1hr in-memory cache by fingerprint
+# Prompt: merge system into user message (Gemma doesn't handle system role well)
 # load_dotenv(override=True) in app.py — always reads fresh from .env
 
 OPENROUTER_URL = "https://openrouter.ai/api/v1/chat/completions"
@@ -134,19 +153,18 @@ headers = {
 }
 ```
 
-### Image Scan (CURRENT — Gemma Vision, NOT Google Vision)
-```python
-# See routes/scan.py — full implementation
-# Flow: base64 image → Gemma vision prompt → JSON ingredient list → DB match
-# Falls back to mock ["chicken","eggs","garlic"] if no API key
-# Partial ingredient matching: "chicken breast" → "chicken"
-# If no DB match but AI returned items → returns raw AI output (up to 6)
+### Recipe tags (valid values — client filter depends on these exact strings)
 ```
+"Asian" | "Italian" | "Vegetarian" | "Low-Cal" | "High-Protein" | "Filipino"
+```
+Tag normaliser in `recipes.py` maps aliases ("high protein" → "High-Protein", etc.)
 
 ### CORS
 ```python
-CORS(app, resources={r"/api/*": {"origins": "*"}})  # dev only
-# Prod: set ALLOWED_ORIGINS env var to your domain
+# Dev: origins="*"
+# Prod: set ALLOWED_ORIGINS env var to Railway domain
+allowed_origins = os.getenv("ALLOWED_ORIGINS", "*" if IS_DEV else "")
+CORS(app, resources={r"/api/*": {"origins": allowed_origins}})
 ```
 
 ---
@@ -155,10 +173,10 @@ CORS(app, resources={r"/api/*": {"origins": "*"}})  # dev only
 | Area | Rule |
 |------|------|
 | API Keys | Always `.env` via `python-dotenv`. Never in code. |
-| SQL | Always parameterized queries `?` — NEVER f-strings in SQL. |
+| SQL | Always parameterized — use `PLACEHOLDER` variable, NEVER f-strings in values. |
 | Rate limiting | flask-limiter on all routes. /api/health exempt. |
-| History DELETE | Always require user_id param — WHERE id=? AND user_id=? |
-| Firebase | Only for Auth. Data in SQLite. |
+| History DELETE | Always require user_id — WHERE id={ph} AND user_id={ph} |
+| Firebase | Auth only. All data in PostgreSQL/SQLite. |
 
 ---
 
@@ -198,19 +216,85 @@ Next: [one specific next step]
 - Use `withOpacity` on const colors
 - Hardcode hex values in screens
 - Suggest paid APIs
-- Create partial implementations
+- Partial implementations
 
 ---
 
-## 🔄 MD FILE UPDATE RULE (CRITICAL — READ THIS)
+## 🔄 MD FILE UPDATE RULE (CRITICAL)
 **After EVERY change in a session, Claude MUST update TASKS.md:**
-- Mark completed items `[x]`
-- Add new findings or bugs discovered
-- Update "CURRENT STATE" section
-- Add to SESSION LOG table
+- Mark completed items `[x]`, move to correct `COMPLETED — SESSION N` block
+- Add new bugs/findings to BACKLOG
+- Update "CURRENT STATE" section with accurate counts and flags
+- Add row to SESSION LOG
 
-**If session is about to hit token limit:**
-- Immediately write the next session prompt to TASKS.md under "NEXT SESSION PROMPT"
-- Mark any in-progress items as `[~]` with notes on what was done so far
+**If hitting token limit:** Write next session prompt to TASKS.md under "NEXT SESSION — START HERE", mark in-progress as `[~]`
 
-**MEMORY.md and SKILLS.md** — update only when architecture, tech stack, or patterns change (not every session).
+---
+
+## ⚠️ CUT-OFF RECOVERY PROTOCOL
+If the previous session was cut off mid-file (token limit hit while writing code), the file on disk may be half-written and broken. Always follow this before continuing:
+
+1. **Read the broken file first:**
+   Use Desktop Commander `read_file` on every file that was being edited
+2. **Diagnose out loud:**
+   State what is complete, what is missing, and what is syntactically broken
+3. **Continue, don't restart:**
+   Append or patch only what's missing — do not rewrite correct sections
+4. **Verify after:**
+   After fixing, re-read the file and confirm it is complete and valid
+
+**Recovery prompt template (user pastes this):**
+```
+Last session cut off mid-task. Before doing anything:
+1. Read current state of [filename] with Desktop Commander
+2. Tell me what's complete, what's broken, what's missing
+3. Continue from exactly where it stopped — do not restart
+
+Task that was cut: [describe what was being done]
+```
+
+---
+
+## 💡 EFFICIENT PROMPTING RULES (for Marc/team)
+To save tokens and get better responses:
+
+**DO:**
+- State the exact filename and function name — never make Claude guess
+- Paste the error message verbatim if there is one
+- One task per message — multi-asks produce rushed output
+- Put hard constraints first ("Full file only. No hex. DM Sans.")
+- Trust the .md files — don't re-explain the stack in your prompt
+
+**DON'T:**
+- Re-explain what Plately is or what the stack is — it's in MEMORY.md
+- Say "you might want to" or "maybe consider" — be direct
+- Ask Claude to fix AND add AND update in one message
+- Paste all 3 .md files if you only need a single isolated fix (SKILLS + TASKS is enough for frontend-only sessions)
+
+**Minimum viable prompt for a fix:**
+```
+[SKILLS.md] [TASKS.md]
+Fix: [symptom in one sentence]
+File: [exact filename]
+Error: [paste error if any]
+Full file output, no partials.
+```
+
+---
+
+## 🗂️ WHEN TO UPDATE EACH FILE
+
+**Update MEMORY.md when:**
+- Recipe / ingredient counts change
+- New screens or widgets are added
+- New packages added to pubspec
+- Setup status changes (❌ → ✅)
+- DB schema changes
+
+**Update SKILLS.md when:**
+- New package added to pubspec
+- Backend pattern changes (new model, new route structure)
+- New NEVER USE rule discovered
+- DB mode or deployment config changes
+
+**Update TASKS.md:** every single session, no exceptions.

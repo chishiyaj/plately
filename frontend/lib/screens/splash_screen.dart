@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_animate/flutter_animate.dart';
 import 'package:lucide_icons_flutter/lucide_icons.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 import '../theme/app_theme.dart';
 import '../widgets/tap_scale.dart';
 import '../widgets/plately_logo.dart';
@@ -52,6 +53,20 @@ class _SplashScreenState extends State<SplashScreen> {
   void initState() {
     super.initState();
     SystemChrome.setSystemUIOverlayStyle(SystemUiOverlayStyle.light);
+    _checkOnboarding();
+  }
+
+  Future<void> _checkOnboarding() async {
+    final prefs = await SharedPreferences.getInstance();
+    final seen = prefs.getBool('onboarding_done') ?? false;
+    if (seen && mounted) {
+      Navigator.pushReplacement(context, AppTheme.fadeScale(const LoginScreen()));
+    }
+  }
+
+  Future<void> _markOnboardingDone() async {
+    final prefs = await SharedPreferences.getInstance();
+    await prefs.setBool('onboarding_done', true);
   }
 
   @override
@@ -61,11 +76,15 @@ class _SplashScreenState extends State<SplashScreen> {
     if (_current < 2) {
       _page.nextPage(duration: const Duration(milliseconds: 600), curve: Curves.easeInOutCubic);
     } else {
+      _markOnboardingDone();
       Navigator.pushReplacement(context, AppTheme.fadeScale(const LoginScreen()));
     }
   }
 
-  void _skip() => Navigator.pushReplacement(context, AppTheme.fadeScale(const LoginScreen()));
+  void _skip() {
+    _markOnboardingDone();
+    Navigator.pushReplacement(context, AppTheme.fadeScale(const LoginScreen()));
+  }
 
   @override
   Widget build(BuildContext context) {

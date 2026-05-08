@@ -11,6 +11,7 @@ import logging
 import logging.config
 from flask import Flask, g, request
 from flask_cors import CORS
+from flask_compress import Compress
 from flask_limiter import Limiter
 from flask_limiter.util import get_remote_address
 from dotenv import load_dotenv
@@ -67,6 +68,18 @@ limiter = Limiter(
 def create_app() -> Flask:
     app = Flask(__name__)
     app.secret_key = SECRET or "plately-dev-only-secret"
+
+    # ── Gzip compression ──────────────────────────────────────────────────────
+    # Compresses JSON API responses automatically. Min 500 bytes — no point
+    # compressing tiny pings. Excludes image/* (already compressed).
+    app.config["COMPRESS_MIMETYPES"] = [
+        "application/json",
+        "text/plain",
+        "text/html",
+    ]
+    app.config["COMPRESS_LEVEL"] = 6        # balanced speed/size
+    app.config["COMPRESS_MIN_SIZE"] = 500   # skip compressing tiny responses
+    Compress(app)
 
     # ── CORS ──────────────────────────────────────────────────────────────────
     # Dev: open. Prod: lock to your actual domain.

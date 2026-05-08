@@ -5,6 +5,7 @@ Message capped at 500 chars. Accepts optional history for multi-turn conversatio
 """
 
 from flask import Blueprint, request, jsonify
+from flask_limiter.util import get_remote_address
 from app import limiter
 import os
 import time
@@ -15,7 +16,7 @@ bp     = Blueprint("chat", __name__)
 logger = logging.getLogger(__name__)
 
 OPENROUTER_URL = "https://openrouter.ai/api/v1/chat/completions"
-MODEL          = "google/gemma-3-12b-it:free"
+MODEL          = "google/gemma-3-27b-it:free"
 MAX_MSG_LEN    = 500
 MAX_HISTORY    = 6   # keep last N exchanges (N/2 turns each)
 CACHE_TTL      = 3600
@@ -32,7 +33,7 @@ STRICT TOPIC RULE:
 You ONLY answer questions about: cooking, recipes, ingredients, nutrition, meal planning, and food budgeting.
 If asked about anything else, say: "I'm Plately, your cooking assistant! I can only help with food and nutrition topics."
 
-NEVER USE: markdown symbols (**, ##, *, `, ~~), HTML tags, or emojis.
+NEVER USE: HTML tags or emojis. You MAY use markdown: **bold** for recipe names and key numbers, numbered lists for steps, bullet points (-) for facts and ingredients. No headers (##). Keep it clean and readable.
 
 RESPONSE FORMATS — match the format to the question type:
 
@@ -150,7 +151,8 @@ def _ask_ai(message: str, history: list) -> str:
     )
     resp.raise_for_status()
     reply = resp.json()["choices"][0]["message"]["content"].strip()
-    reply = reply.replace("**", "").replace("##", "").replace("```", "")
+    # Strip only code fences and HTML — keep ** and bullet markdown (rendered by MarkdownBody)
+    reply = reply.replace("```", "").replace("<br>", "\n").strip()
 
     if not history:
         _set_cached(message, reply)
@@ -158,8 +160,21 @@ def _ask_ai(message: str, history: list) -> str:
     return reply
 
 
+def _get_user_id() -> str:
+    """Rate limit key: use Firebase UID from request body, fall back to IP.
+    Prevents all users sharing one IP (Railway NAT) from hitting the same bucket."""
+    try:
+        data = request.get_json(silent=True) or {}
+        uid = str(data.get("user_id", "")).strip()
+        if uid and uid != "anonymous":
+            return uid
+    except Exception:
+        pass
+    return get_remote_address()
+
+
 @bp.route("/api/chat", methods=["POST"])
-@limiter.limit("10 per minute")
+@limiter.limit("15 per minute", key_func=_get_user_id)
 def chat():
     try:
         data    = request.json or {}

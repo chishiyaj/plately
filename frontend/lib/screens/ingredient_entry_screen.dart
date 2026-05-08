@@ -37,6 +37,7 @@ class _IngredientEntryScreenState extends State<IngredientEntryScreen>
 
   List<String> _ingredients = [];
   bool _scanning = false;
+  bool _scanFailed = false;
   String? _scanError;
   String? _capturedPath;
 
@@ -68,24 +69,40 @@ class _IngredientEntryScreenState extends State<IngredientEntryScreen>
   Future<void> _capture() async {
     if (!_camReady || _capturing || _cam == null) return;
     HapticFeedback.mediumImpact();
-    setState(() { _capturing = true; _scanning = true; _ingredients = []; _scanError = null; });
+    setState(() { _capturing = true; _scanning = true; _ingredients = []; _scanError = null; _scanFailed = false; });
     try {
       final file = await _cam!.takePicture();
       _capturedPath = file.path;
       final b64 = base64Encode(await File(file.path).readAsBytes());
       final result = await ApiService.scanImage(b64);
       if (mounted) {
+        final empty = result.ingredients.isEmpty;
         setState(() {
           _ingredients = result.ingredients;
           _scanning = false;
-          // Show backend message if AI fell back (empty result with explanation)
-          if (result.ingredients.isEmpty && result.message != null) {
+          _scanFailed = empty;
+          if (empty && result.message != null) {
             _scanError = result.message;
           }
         });
+        // Show SnackBar feedback
+        final count = result.ingredients.length;
+        final msg = count > 0
+            ? '$count ingredient${count == 1 ? '' : 's'} found'
+            : 'No ingredients detected — try better lighting or add manually';
+        if (mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(SnackBar(
+            content: Text(msg, style: const TextStyle(fontFamily: 'DM Sans', fontWeight: FontWeight.w500)),
+            backgroundColor: count > 0 ? AppTheme.primaryDark : AppTheme.red,
+            behavior: SnackBarBehavior.floating,
+            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+            margin: const EdgeInsets.fromLTRB(16, 0, 16, 80),
+            duration: const Duration(seconds: 3),
+          ));
+        }
       }
     } catch (_) {
-      if (mounted) setState(() { _scanning = false; _scanError = 'Could not detect — add manually.'; });
+      if (mounted) setState(() { _scanning = false; _scanFailed = true; _scanError = 'Could not detect — add manually.'; });
     } finally {
       if (mounted) setState(() => _capturing = false);
     }
@@ -101,6 +118,15 @@ class _IngredientEntryScreenState extends State<IngredientEntryScreen>
   static const _maxIngredients = 15;
 
   void _removeChip(String item) => setState(() => _ingredients.remove(item));
+
+  void _clearAndRetry() {
+    setState(() {
+      _capturedPath = null;
+      _ingredients = [];
+      _scanError = null;
+      _scanFailed = false;
+    });
+  }
 
   void _addManual() {
     final raw = _typeCtrl.text.trim();
@@ -144,7 +170,8 @@ class _IngredientEntryScreenState extends State<IngredientEntryScreen>
   void _switchMode(_Mode m) {
     if (_mode == m) return;
     HapticFeedback.selectionClick();
-    setState(() { _mode = m; _ingredients = []; _scanError = null; _capturedPath = null; });
+    // Do NOT reset _ingredients — both tabs share the same list
+    setState(() { _mode = m; _scanError = null; _scanFailed = false; _capturedPath = null; });
     if (m == _Mode.type) {
       WidgetsBinding.instance.addPostFrameCallback((_) => FocusScope.of(context).requestFocus(_typeFocus));
     } else {
@@ -215,9 +242,9 @@ class _IngredientEntryScreenState extends State<IngredientEntryScreen>
         child: Container(
           width: 42, height: 42,
           decoration: BoxDecoration(
-            color: _isDark ? Colors.black.withValues(alpha: 0.4) : Colors.white,
+            color: _isDark ? Colors.black.withValues(alpha: 0.4) : AppTheme.cardBg(context),
             shape: BoxShape.circle,
-            border: Border.all(color: _isDark ? Colors.white.withValues(alpha: 0.15) : AppTheme.borderGray),
+            border: Border.all(color: _isDark ? Colors.white.withValues(alpha: 0.15) : AppTheme.border(context)),
           ),
           child: Icon(LucideIcons.x, color: _isDark ? Colors.white : AppTheme.primaryDark, size: 18),
         ),
@@ -257,9 +284,9 @@ class _IngredientEntryScreenState extends State<IngredientEntryScreen>
     child: Container(
       height: 46, padding: const EdgeInsets.all(4),
       decoration: BoxDecoration(
-        color: _isDark ? Colors.black.withValues(alpha: 0.35) : Colors.white,
+        color: _isDark ? Colors.black.withValues(alpha: 0.35) : AppTheme.cardBg(context),
         borderRadius: BorderRadius.circular(50),
-        border: Border.all(color: _isDark ? Colors.white.withValues(alpha: 0.12) : AppTheme.borderGray),
+        border: Border.all(color: _isDark ? Colors.white.withValues(alpha: 0.12) : AppTheme.border(context)),
       ),
       child: Row(children: [
         _PillTab(label: 'Camera', icon: LucideIcons.camera,
@@ -277,7 +304,7 @@ class _IngredientEntryScreenState extends State<IngredientEntryScreen>
     else if (_scanning)
       const _ScanningIndicator(),
     const Spacer(),
-    if (_ingredients.isNotEmpty || _scanError != null) _chipPanel(),
+    if (_ingredients.isNotEmpty || _scanError != null || _scanFailed) _chipPanel(),
     // _addRow only visible after scan — user can add more ingredients manually
     if (!_scanning && _capturedPath != null) ...[
       _addRow(dark: true),
@@ -315,19 +342,53 @@ class _IngredientEntryScreenState extends State<IngredientEntryScreen>
       color: Colors.black.withValues(alpha: 0.4), borderRadius: BorderRadius.circular(18),
       border: Border.all(color: Colors.white.withValues(alpha: 0.1)),
     ),
-    child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-      Row(children: [
-        const Icon(LucideIcons.sparkles, color: AppTheme.green, size: 14),
-        const SizedBox(width: 6),
-        Text(_scanError ?? '${_ingredients.length} detected — tap × to remove',
-            style: TextStyle(color: Colors.white.withValues(alpha: 0.65), fontSize: 12, fontFamily: 'DM Sans')),
-      ]),
-      if (_ingredients.isNotEmpty) ...[
-        const SizedBox(height: 10),
-        Wrap(spacing: 6, runSpacing: 6,
-            children: _ingredients.map((i) => _Chip(label: i, dark: true, onRemove: () => _removeChip(i))).toList()),
-      ],
-    ]),
+    child: _scanFailed && _ingredients.isEmpty
+        ? Column(mainAxisSize: MainAxisSize.min, children: [
+            const Icon(LucideIcons.cameraOff, size: 40, color: Colors.white54),
+            const SizedBox(height: 12),
+            const Text('Nothing detected',
+              style: TextStyle(color: Colors.white, fontSize: 14,
+                  fontFamily: 'DM Sans', fontWeight: FontWeight.w600)),
+            const SizedBox(height: 4),
+            Text('Try better lighting or a closer angle',
+              style: TextStyle(color: Colors.white.withValues(alpha: 0.6), fontSize: 12, fontFamily: 'DM Sans'),
+              textAlign: TextAlign.center),
+            const SizedBox(height: 16),
+            Row(children: [
+              Expanded(child: OutlinedButton(
+                onPressed: _clearAndRetry,
+                style: OutlinedButton.styleFrom(
+                  foregroundColor: Colors.white,
+                  side: BorderSide(color: Colors.white.withValues(alpha: 0.4)),
+                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                ),
+                child: const Text('Try Again', style: TextStyle(fontFamily: 'DM Sans', fontWeight: FontWeight.w600)),
+              )),
+              const SizedBox(width: 12),
+              Expanded(child: ElevatedButton(
+                onPressed: () => _switchMode(_Mode.type),
+                style: ElevatedButton.styleFrom(
+                  backgroundColor: AppTheme.green,
+                  foregroundColor: AppTheme.primaryDark,
+                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                ),
+                child: const Text('Type Instead', style: TextStyle(fontFamily: 'DM Sans', fontWeight: FontWeight.w600)),
+              )),
+            ]),
+          ])
+        : Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+            Row(children: [
+              const Icon(LucideIcons.sparkles, color: AppTheme.green, size: 14),
+              const SizedBox(width: 6),
+              Text(_scanError ?? '${_ingredients.length} detected — tap × to remove',
+                  style: TextStyle(color: Colors.white.withValues(alpha: 0.65), fontSize: 12, fontFamily: 'DM Sans')),
+            ]),
+            if (_ingredients.isNotEmpty) ...[
+              const SizedBox(height: 10),
+              Wrap(spacing: 6, runSpacing: 6,
+                  children: _ingredients.map((i) => _Chip(label: i, dark: true, onRemove: () => _removeChip(i))).toList()),
+            ],
+          ]),
   );
 
   Widget _typeContent() => SingleChildScrollView(
@@ -432,19 +493,19 @@ class _IngredientEntryScreenState extends State<IngredientEntryScreen>
       child: Container(
         height: 50,
         decoration: BoxDecoration(
-          color: dark ? Colors.black.withValues(alpha: 0.35) : Colors.white,
+          color: dark ? Colors.black.withValues(alpha: 0.35) : AppTheme.cardBg(context),
           borderRadius: BorderRadius.circular(16),
-          border: Border.all(color: dark ? Colors.white.withValues(alpha: 0.15) : AppTheme.borderGray),
+          border: Border.all(color: dark ? Colors.white.withValues(alpha: 0.15) : AppTheme.border(context)),
         ),
         child: TextField(
           controller: _typeCtrl,
           focusNode: !_isDark ? _typeFocus : null,
           onSubmitted: (_) => _addManual(),
-          style: TextStyle(fontSize: 14, fontFamily: 'DM Sans', color: dark ? Colors.white : AppTheme.darkText),
+          style: TextStyle(fontSize: 14, fontFamily: 'DM Sans', color: dark ? Colors.white : AppTheme.textPrimary(context)),
           decoration: InputDecoration(
             hintText: 'Add ingredient (e.g. garlic, rice)',
-            hintStyle: TextStyle(color: dark ? Colors.white38 : AppTheme.mutedText, fontSize: 14, fontFamily: 'DM Sans'),
-            prefixIcon: Icon(LucideIcons.plus, size: 16, color: dark ? Colors.white38 : AppTheme.mutedText),
+            hintStyle: TextStyle(color: dark ? Colors.white38 : AppTheme.textMuted(context), fontSize: 14, fontFamily: 'DM Sans'),
+            prefixIcon: Icon(LucideIcons.plus, size: 16, color: dark ? Colors.white38 : AppTheme.textMuted(context)),
             contentPadding: const EdgeInsets.symmetric(vertical: 16),
             border: InputBorder.none,
           ),

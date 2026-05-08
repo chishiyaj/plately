@@ -8,7 +8,9 @@ import '../widgets/plately_logo.dart';
 import '../widgets/google_g_logo.dart';
 import '../services/auth_service.dart';
 import '../main_shell.dart';
+import '../services/user_prefs_service.dart';
 import 'signup_screen.dart';
+import 'onboarding_goals_screen.dart';
 
 class LoginScreen extends StatefulWidget {
   const LoginScreen({super.key});
@@ -55,7 +57,7 @@ class _LoginScreenState extends State<LoginScreen> {
     if (!mounted) return;
     setState(() => _loading = false);
     if (result.success) {
-      Navigator.pushReplacement(context, AppTheme.fadeScale(const MainShell()));
+      await _navigateAfterLogin();
     } else {
       _showSnack(result.error!, isError: true);
     }
@@ -68,10 +70,22 @@ class _LoginScreenState extends State<LoginScreen> {
     if (!mounted) return;
     setState(() => _loading = false);
     if (result.success) {
-      Navigator.pushReplacement(context, AppTheme.fadeScale(const MainShell()));
+      await _navigateAfterLogin();
     } else {
       _showSnack(result.error!, isError: true);
     }
+  }
+
+  // Shared post-login navigation: check if goals are set first
+  Future<void> _navigateAfterLogin() async {
+    final prefs   = await UserPrefsService.load();
+    final calGoal = (prefs['cal_goal'] as int?) ?? 2200;
+    final goalsSet = calGoal != 2200;
+    if (!mounted) return;
+    Navigator.pushReplacement(
+      context,
+      AppTheme.fadeScale(goalsSet ? const MainShell() : const OnboardingGoalsScreen()),
+    );
   }
 
   void _showSnack(String msg, {bool isError = false}) {
@@ -259,13 +273,16 @@ class _LoginScreenState extends State<LoginScreen> {
                       focused: _passFocused, focusNode: _passFocus,
                       obscure: !_passVisible,
                       onTap: () => _passFocus.requestFocus(),
-                      suffix: TapScale(
-                        onTap: () => setState(() => _passVisible = !_passVisible),
-                        child: Padding(
-                          padding: const EdgeInsets.only(right: 16),
-                          child: Icon(
-                            _passVisible ? LucideIcons.eyeOff : LucideIcons.eye,
-                            size: 18, color: AppTheme.mutedText,
+                      suffix: SizedBox(
+                        width: 48, height: 48,
+                        child: TapScale(
+                          onTap: () => setState(() => _passVisible = !_passVisible),
+                          child: Padding(
+                            padding: const EdgeInsets.only(right: 16),
+                            child: Icon(
+                              _passVisible ? LucideIcons.eyeOff : LucideIcons.eye,
+                              size: 18, color: AppTheme.mutedText,
+                            ),
                           ),
                         ),
                       ),

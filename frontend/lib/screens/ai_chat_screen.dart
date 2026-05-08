@@ -2,6 +2,7 @@ import 'dart:convert';
 import 'dart:math' show pi;
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
+import 'package:flutter_markdown/flutter_markdown.dart';
 import 'package:lucide_icons_flutter/lucide_icons.dart';
 import 'package:flutter_animate/flutter_animate.dart';
 import 'package:shared_preferences/shared_preferences.dart';
@@ -182,7 +183,7 @@ class _AiChatScreenState extends State<AiChatScreen>
 
     return Scaffold(
       key: _scaffoldKey,
-      backgroundColor: Colors.white,
+      backgroundColor: AppTheme.scaffoldBg(context),
       resizeToAvoidBottomInset: false,
       drawer: _SessionsDrawer(
         sessions: _sessions, activeIdx: _activeIdx,
@@ -231,7 +232,7 @@ class _Header extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) => Container(
-    color: Colors.white,
+    color: AppTheme.cardBg(context),
     padding: const EdgeInsets.fromLTRB(8, 12, 12, 10),
     child: Row(children: [
       if (canGoBack)
@@ -279,11 +280,22 @@ class _Header extends StatelessWidget {
         ),
       ),
       const SizedBox(width: 4),
-      TapScale(onTap: onNew, child: Container(
-        width: 36, height: 36,
-        decoration: BoxDecoration(gradient: AppTheme.tealGradient, borderRadius: BorderRadius.circular(10)),
-        child: const Icon(LucideIcons.squarePen, color: Colors.white, size: 16),
-      )),
+      // New Chat button — greyed out when current session is already empty (no messages)
+      Opacity(
+        opacity: isEmpty ? 0.35 : 1.0,
+        child: TapScale(
+          onTap: isEmpty ? null : onNew,
+          child: Container(
+            width: 36, height: 36,
+            decoration: BoxDecoration(
+              gradient: isEmpty ? null : AppTheme.tealGradient,
+              color: isEmpty ? AppTheme.borderGray : null,
+              borderRadius: BorderRadius.circular(10),
+            ),
+            child: Icon(LucideIcons.squarePen, color: isEmpty ? AppTheme.mutedText : Colors.white, size: 16),
+          ),
+        ),
+      ),
     ]),
   );
 }
@@ -402,63 +414,6 @@ class _Bubble extends StatelessWidget {
     return '$hh:${m.toString().padLeft(2, '0')} $pm';
   }
 
-  Widget _buildAiText(String text) {
-    final lines = text.split('\n');
-    final children = <Widget>[];
-    for (int i = 0; i < lines.length; i++) {
-      final line = lines[i].trim();
-      if (line.isEmpty) { children.add(const SizedBox(height: 6)); continue; }
-      final numMatch  = RegExp(r'^(\d+)[.)]\s+(.+)').firstMatch(line);
-      final bullMatch = RegExp(r'^[-•*]\s+(.+)').firstMatch(line);
-      // Bold headers: **text** or lines ending with ":"
-      final boldMatch = RegExp(r'^\*\*(.+)\*\*$').firstMatch(line);
-      final isLabel   = (line.endsWith(':') && line.length < 40) || boldMatch != null;
-
-      if (numMatch != null) {
-        children.add(Padding(
-          padding: const EdgeInsets.only(bottom: 4),
-          child: Row(crossAxisAlignment: CrossAxisAlignment.start, children: [
-            Container(
-              width: 20, height: 20, margin: const EdgeInsets.only(right: 8, top: 1),
-              decoration: BoxDecoration(color: AppTheme.primaryDark.withValues(alpha: 0.1), shape: BoxShape.circle),
-              child: Center(child: Text(numMatch.group(1)!, style: const TextStyle(
-                color: AppTheme.primaryDark, fontSize: 10, fontFamily: 'DM Sans', fontWeight: FontWeight.w800))),
-            ),
-            Expanded(child: Text(numMatch.group(2)!, style: const TextStyle(
-              color: AppTheme.darkText, fontSize: 14, fontFamily: 'DM Sans', height: 1.5))),
-          ]),
-        ));
-      } else if (bullMatch != null) {
-        children.add(Padding(
-          padding: const EdgeInsets.only(bottom: 3),
-          child: Row(crossAxisAlignment: CrossAxisAlignment.start, children: [
-            Container(width: 6, height: 6, margin: const EdgeInsets.only(right: 8, top: 7),
-                decoration: BoxDecoration(color: AppTheme.primaryDark.withValues(alpha: 0.45), shape: BoxShape.circle)),
-            Expanded(child: Text(bullMatch.group(1)!, style: const TextStyle(
-              color: AppTheme.darkText, fontSize: 14, fontFamily: 'DM Sans', height: 1.5))),
-          ]),
-        ));
-      } else if (isLabel) {
-        if (i > 0) children.add(const SizedBox(height: 6));
-        final labelText = boldMatch != null ? boldMatch.group(1)! : line;
-        children.add(Padding(
-          padding: const EdgeInsets.only(bottom: 4),
-          child: Text(labelText, style: const TextStyle(
-            color: AppTheme.darkText, fontSize: 13, fontFamily: 'DM Sans', fontWeight: FontWeight.w800)),
-        ));
-      } else {
-        // Strip inline **bold** markers for plain text lines
-        final cleaned = line.replaceAllMapped(RegExp(r'\*\*(.+?)\*\*'), (m) => m.group(1)!);
-        children.add(Padding(
-          padding: const EdgeInsets.only(bottom: 2),
-          child: Text(cleaned, style: const TextStyle(
-            color: AppTheme.darkText, fontSize: 14, fontFamily: 'DM Sans', height: 1.55)),
-        ));
-      }
-    }
-    return Column(crossAxisAlignment: CrossAxisAlignment.start, children: children);
-  }
-
   @override
   Widget build(BuildContext context) => Padding(
     padding: const EdgeInsets.only(bottom: 4),
@@ -481,7 +436,7 @@ class _Bubble extends StatelessWidget {
                   padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
                   constraints: BoxConstraints(maxWidth: MediaQuery.of(context).size.width * 0.78),
                   decoration: BoxDecoration(
-                    color: message.isUser ? null : const Color(0xFFF4F2EE),
+                    color: message.isUser ? null : AppTheme.cardAltBg(context),
                     gradient: message.isUser ? AppTheme.tealGradient : null,
                     borderRadius: BorderRadius.only(
                       topLeft: const Radius.circular(20), topRight: const Radius.circular(20),
@@ -496,7 +451,20 @@ class _Bubble extends StatelessWidget {
                   child: message.isUser
                       ? Text(message.text, style: const TextStyle(
                           color: Colors.white, fontSize: 14.5, fontFamily: 'DM Sans', height: 1.55))
-                      : _buildAiText(message.text),
+                      : MarkdownBody(
+                          data: message.text,
+                          styleSheet: MarkdownStyleSheet(
+                            p: TextStyle(color: AppTheme.textPrimary(context), fontSize: 14, fontFamily: 'DM Sans', height: 1.55),
+                            strong: TextStyle(color: AppTheme.textPrimary(context), fontSize: 14, fontFamily: 'DM Sans', fontWeight: FontWeight.w700),
+                            h1: TextStyle(color: AppTheme.textPrimary(context), fontSize: 16, fontFamily: 'DM Sans', fontWeight: FontWeight.w800),
+                            h2: TextStyle(color: AppTheme.textPrimary(context), fontSize: 15, fontFamily: 'DM Sans', fontWeight: FontWeight.w700),
+                            h3: TextStyle(color: AppTheme.textPrimary(context), fontSize: 14, fontFamily: 'DM Sans', fontWeight: FontWeight.w700),
+                            listBullet: TextStyle(color: AppTheme.textPrimary(context), fontSize: 14, fontFamily: 'DM Sans'),
+                            code: const TextStyle(fontSize: 13, fontFamily: 'DM Sans', backgroundColor: Color(0xFFE8E6E0)),
+                            blockSpacing: 6,
+                          ),
+                          softLineBreak: true,
+                        ),
                 ),
               ),
             ),
@@ -540,8 +508,8 @@ class _TypingIndicatorState extends State<_TypingIndicator> with SingleTickerPro
           child: const Icon(LucideIcons.chefHat, color: Colors.white, size: 13)),
       Container(
         padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
-        decoration: const BoxDecoration(color: Color(0xFFF4F2EE),
-            borderRadius: BorderRadius.only(topLeft: Radius.circular(20), topRight: Radius.circular(20),
+        decoration: BoxDecoration(color: AppTheme.cardAltBg(context),
+            borderRadius: const BorderRadius.only(topLeft: Radius.circular(20), topRight: Radius.circular(20),
                 bottomLeft: Radius.circular(4), bottomRight: Radius.circular(20))),
         child: Row(mainAxisSize: MainAxisSize.min, children: [
           _PulseDot(ctrl: _ctrl, phase: 0.0), const SizedBox(width: 5),
@@ -587,24 +555,24 @@ class _InputBar extends StatelessWidget {
   @override
   Widget build(BuildContext context) => AnimatedContainer(
     duration: const Duration(milliseconds: 180), curve: Curves.easeOutCubic,
-    color: Colors.white,
+    color: AppTheme.cardBg(context),
     padding: EdgeInsets.fromLTRB(16, 10, 16, bottomPad + 10),
     child: Container(
       decoration: BoxDecoration(
-        color: const Color(0xFFF4F2EE),
+        color: AppTheme.cardAltBg(context),
         borderRadius: BorderRadius.circular(28),
-        border: Border.all(color: AppTheme.borderGray),
+        border: Border.all(color: AppTheme.border(context)),
       ),
       child: Row(children: [
         const SizedBox(width: 16),
         Expanded(child: TextField(
           controller: ctrl, focusNode: focus, onSubmitted: (_) => onSend(),
           maxLines: null, textCapitalization: TextCapitalization.sentences,
-          style: const TextStyle(fontSize: 14.5, fontFamily: 'DM Sans', color: AppTheme.darkText, height: 1.4),
-          decoration: const InputDecoration(
+          style: TextStyle(fontSize: 14.5, fontFamily: 'DM Sans', color: AppTheme.textPrimary(context), height: 1.4),
+          decoration: InputDecoration(
             hintText: 'Ask anything about cooking...',
-            hintStyle: TextStyle(color: AppTheme.mutedText, fontSize: 14.5, fontFamily: 'DM Sans'),
-            contentPadding: EdgeInsets.symmetric(vertical: 13),
+            hintStyle: TextStyle(color: AppTheme.textMuted(context), fontSize: 14.5, fontFamily: 'DM Sans'),
+            contentPadding: const EdgeInsets.symmetric(vertical: 13),
             border: InputBorder.none,
           ),
         )),

@@ -12,7 +12,20 @@
           "package_name": "com.plately.app"
         }
       },
-      "oauth_client": [],
+      "oauth_client": [
+        {
+          "client_id": "97643516725-k3g54dird84qm8tkqfkd68pa2qhh36g5.apps.googleusercontent.com",
+          "client_type": 1,
+          "android_info": {
+            "package_name": "com.plately.app",
+            "certificate_hash": "11b9f960b84080bab8dff0af293ec89949fabf6b"
+          }
+        },
+        {
+          "client_id": "97643516725-sgj5jvgp25l2ekclj2rg6hkfk0140i4f.apps.googleusercontent.com",
+          "client_type": 3
+        }
+      ],
       "api_key": [
         {
           "current_key": "AIzaSyATLhrfRuvUmXlTK1zFKeb_W4HbpVglOfA"
@@ -20,7 +33,12 @@
       ],
       "services": {
         "appinvite_service": {
-          "other_platform_oauth_client": []
+          "other_platform_oauth_client": [
+            {
+              "client_id": "97643516725-sgj5jvgp25l2ekclj2rg6hkfk0140i4f.apps.googleusercontent.com",
+              "client_type": 3
+            }
+          ]
         }
       }
     }

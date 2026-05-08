@@ -6,8 +6,8 @@ import '../widgets/tap_scale.dart';
 import '../widgets/google_g_logo.dart';
 import '../widgets/plately_logo.dart';
 import '../services/auth_service.dart';
-import '../main_shell.dart';
 import 'login_screen.dart';
+import 'onboarding_goals_screen.dart';
 
 class SignupScreen extends StatefulWidget {
   const SignupScreen({super.key});
@@ -16,11 +16,14 @@ class SignupScreen extends StatefulWidget {
 }
 
 class _SignupScreenState extends State<SignupScreen> {
-  final _nameCtrl  = TextEditingController();
-  final _emailCtrl = TextEditingController();
-  final _passCtrl  = TextEditingController();
-  bool _passVisible = false;
-  bool _agreed      = false;
+  final _nameCtrl    = TextEditingController();
+  final _emailCtrl   = TextEditingController();
+  final _passCtrl    = TextEditingController();
+  final _confirmCtrl = TextEditingController();
+  bool _passVisible    = false;
+  bool _confirmVisible = false;
+  bool _agreed         = false;
+  String? _confirmError;
   bool _loading     = false;
 
   // After successful signup, show the verify-email screen
@@ -29,7 +32,7 @@ class _SignupScreenState extends State<SignupScreen> {
 
   @override
   void dispose() {
-    _nameCtrl.dispose(); _emailCtrl.dispose(); _passCtrl.dispose();
+    _nameCtrl.dispose(); _emailCtrl.dispose(); _passCtrl.dispose(); _confirmCtrl.dispose();
     super.dispose();
   }
 
@@ -54,6 +57,11 @@ class _SignupScreenState extends State<SignupScreen> {
     if (name.isEmpty)                        { _showError('Enter your full name.'); return; }
     if (email.isEmpty || !RegExp(r'^[^@\s]+@[^@\s]+\.[^@\s]+$').hasMatch(email)) { _showError('Enter a valid email address.'); return; }
     if (pass.length < 6)                     { _showError('Password must be at least 6 characters.'); return; }
+    if (pass != _confirmCtrl.text)           {
+      setState(() => _confirmError = 'Passwords do not match');
+      _showError('Passwords do not match.');
+      return;
+    }
     if (!_agreed)                            { _showError('Please agree to the Terms of Service to continue.'); return; }
 
     setState(() => _loading = true);
@@ -80,8 +88,8 @@ class _SignupScreenState extends State<SignupScreen> {
     setState(() => _loading = false);
 
     if (result.success) {
-      // Google accounts are auto-verified — go straight to app
-      Navigator.pushReplacement(context, AppTheme.fadeScale(const MainShell()));
+      // Google accounts are auto-verified — go to onboarding to set goals
+      Navigator.pushReplacement(context, AppTheme.fadeScale(const OnboardingGoalsScreen()));
     } else {
       _showError(result.error ?? 'Google sign-up failed.');
     }
@@ -127,11 +135,33 @@ class _SignupScreenState extends State<SignupScreen> {
                   hint: 'Create a Plately password (min. 6 chars)',
                   icon: LucideIcons.lockKeyhole,
                   obscure: !_passVisible,
-                  suffix: TapScale(
-                    onTap: () => setState(() => _passVisible = !_passVisible),
-                    child: Icon(_passVisible ? LucideIcons.eyeOff : LucideIcons.eye,
-                        size: 18, color: AppTheme.mutedText),
+                  suffix: SizedBox(
+                    width: 48, height: 48,
+                    child: TapScale(
+                      onTap: () => setState(() => _passVisible = !_passVisible),
+                      child: Icon(_passVisible ? LucideIcons.eyeOff : LucideIcons.eye,
+                          size: 18, color: AppTheme.mutedText),
+                    ),
                   ),
+                ),
+                const SizedBox(height: 14),
+                _field(
+                  ctrl: _confirmCtrl,
+                  hint: 'Confirm password',
+                  icon: LucideIcons.lockKeyhole,
+                  obscure: !_confirmVisible,
+                  errorText: _confirmError,
+                  suffix: SizedBox(
+                    width: 48, height: 48,
+                    child: TapScale(
+                      onTap: () => setState(() => _confirmVisible = !_confirmVisible),
+                      child: Icon(_confirmVisible ? LucideIcons.eyeOff : LucideIcons.eye,
+                          size: 18, color: AppTheme.mutedText),
+                    ),
+                  ),
+                  onChanged: (_) {
+                    if (_confirmError != null) setState(() => _confirmError = null);
+                  },
                 ),
                 // Password info note
                 const SizedBox(height: 8),
@@ -288,27 +318,41 @@ class _SignupScreenState extends State<SignupScreen> {
     bool obscure = false,
     Widget? suffix,
     TextInputType keyboard = TextInputType.text,
-  }) => Container(
-    height: 56,
-    decoration: BoxDecoration(
-      color: Colors.white, borderRadius: BorderRadius.circular(16),
-      border: Border.all(color: AppTheme.borderGray),
-      boxShadow: const [BoxShadow(color: Color(0x06000000), blurRadius: 8, offset: Offset(0, 2))],
-    ),
-    child: TextField(
-      controller: ctrl, obscureText: obscure, keyboardType: keyboard,
-      style: const TextStyle(fontSize: 15, fontFamily: 'DM Sans', color: AppTheme.darkText),
-      decoration: InputDecoration(
-        hintText: hint,
-        hintStyle: const TextStyle(color: AppTheme.mutedText, fontSize: 14, fontFamily: 'DM Sans'),
-        prefixIcon: Icon(icon, size: 18, color: AppTheme.mutedText),
-        suffixIcon: suffix != null
-            ? Padding(padding: const EdgeInsets.only(right: 14), child: suffix)
-            : null,
-        contentPadding: const EdgeInsets.symmetric(vertical: 18),
-        border: InputBorder.none,
+    String? errorText,
+    ValueChanged<String>? onChanged,
+  }) => Column(
+    crossAxisAlignment: CrossAxisAlignment.start,
+    children: [
+      Container(
+        height: 56,
+        decoration: BoxDecoration(
+          color: Colors.white, borderRadius: BorderRadius.circular(16),
+          border: Border.all(color: errorText != null ? AppTheme.red : AppTheme.borderGray),
+          boxShadow: const [BoxShadow(color: Color(0x06000000), blurRadius: 8, offset: Offset(0, 2))],
+        ),
+        child: TextField(
+          controller: ctrl, obscureText: obscure, keyboardType: keyboard,
+          onChanged: onChanged,
+          style: const TextStyle(fontSize: 15, fontFamily: 'DM Sans', color: AppTheme.darkText),
+          decoration: InputDecoration(
+            hintText: hint,
+            hintStyle: const TextStyle(color: AppTheme.mutedText, fontSize: 14, fontFamily: 'DM Sans'),
+            prefixIcon: Icon(icon, size: 18, color: AppTheme.mutedText),
+            suffixIcon: suffix != null
+                ? Padding(padding: const EdgeInsets.only(right: 14), child: suffix)
+                : null,
+            contentPadding: const EdgeInsets.symmetric(vertical: 18),
+            border: InputBorder.none,
+          ),
+        ),
       ),
-    ),
+      if (errorText != null)
+        Padding(
+          padding: const EdgeInsets.only(top: 6, left: 4),
+          child: Text(errorText, style: const TextStyle(
+            color: AppTheme.red, fontSize: 12, fontFamily: 'DM Sans')),
+        ),
+    ],
   );
 }
 

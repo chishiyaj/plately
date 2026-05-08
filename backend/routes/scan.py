@@ -20,9 +20,9 @@ OPENROUTER_URL = "https://openrouter.ai/api/v1/chat/completions"
 
 # Model priority list — first available (non-429) is used
 MODELS = [
-    "google/gemma-3-12b-it:free",   # primary — reliably available
-    "google/gemma-3-27b-it:free",   # fallback
-    "google/gemma-4-31b-it:free",   # fallback (often rate-limited)
+    "google/gemma-3-27b-it:free",   # primary
+    "google/gemma-3-4b-it:free",    # fallback (smaller, usually available)
+    "meta-llama/llama-4-scout:free", # fallback
 ]
 
 
