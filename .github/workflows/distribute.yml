@@ -34,6 +34,8 @@ jobs:
         working-directory: frontend/android
         run: |
           echo "${{ secrets.KEYSTORE_BASE64 }}" | base64 --decode > upload-keystore.jks
+          # Also place in app/ subdir — Gradle resolves storeFile relative to app/build.gradle.kts
+          cp upload-keystore.jks app/upload-keystore.jks
 
       - name: Write key.properties
         working-directory: frontend/android
