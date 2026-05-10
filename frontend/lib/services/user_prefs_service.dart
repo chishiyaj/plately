@@ -124,6 +124,36 @@ class UserPrefsService {
 
   static const _kLastCookDate = 'last_cook_date';
 
+  /// Save today's date as the last cook date (called after finishing cooking).
+  static Future<void> saveLastCookDate() async {
+    final p = await _p();
+    await p.setString(_k(_kLastCookDate), _todayString());
+  }
+
+  /// Returns true if the streak is still valid (cooked today or yesterday).
+  static Future<bool> isStreakStillValid() async {
+    final p = await _p();
+    final raw = p.getString(_k(_kLastCookDate));
+    if (raw == null) return false;
+    try {
+      final lastCook = DateTime.parse(raw);
+      final today = DateTime.now();
+      final yesterday = today.subtract(const Duration(days: 1));
+      final lastDay = DateTime(lastCook.year, lastCook.month, lastCook.day);
+      final todayDay = DateTime(today.year, today.month, today.day);
+      final yesterdayDay = DateTime(yesterday.year, yesterday.month, yesterday.day);
+      return lastDay == todayDay || lastDay == yesterdayDay;
+    } catch (_) { return false; }
+  }
+
+  /// Resets streak to 0 if the user didn't cook yesterday or today.
+  static Future<void> resetStreakIfExpired() async {
+    final valid = await isStreakStillValid();
+    if (!valid) {
+      await (await _p()).setInt(_k(_kStreak), 0);
+    }
+  }
+
   /// Increments streak if user hasn't cooked today yet.
   /// Resets to 1 if last cook was not yesterday.
   static Future<void> incrementStreak() async {

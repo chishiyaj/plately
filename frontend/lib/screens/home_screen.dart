@@ -1,4 +1,4 @@
-import 'dart:async';
+﻿import 'dart:async';
 import 'dart:convert';
 import 'dart:math' as math;
 import 'package:flutter/material.dart';
@@ -50,12 +50,12 @@ class _HomeScreenState extends State<HomeScreen> {
   int _calConsumed = 0;
   int _proteinConsumed = 0;
   int _streak = 0;
-  DateTime _calendarMonth = DateTime(DateTime.now().year, DateTime.now().month);
-  DateTime? _selectedDay;
+  // Calendar state â€” _selectedDay defaults to today; sheet manages the picker
+  DateTime _selectedDay = DateTime(DateTime.now().year, DateTime.now().month, DateTime.now().day);
   Map<String, dynamic> _selectedDayData = {};
   bool _loadingDayData = false;
 
-  // ── Update checker ────────────────────────────────────────────────────────
+  // â”€â”€ Update checker â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
   UpdateInfo? _updateInfo;
   bool _updateDismissed = false;
 
@@ -91,6 +91,7 @@ class _HomeScreenState extends State<HomeScreen> {
   }
 
   Future<void> _loadPrefs() async {
+    await UserPrefsService.resetStreakIfExpired();
     final data = await UserPrefsService.load();
     final name = (data['name'] as String?) ?? 'User';
     if (mounted) {
@@ -114,7 +115,7 @@ class _HomeScreenState extends State<HomeScreen> {
     }
   }
 
-  // ── Streak milestone popups ───────────────────────────────────────────────
+  // â”€â”€ Streak milestone popups â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
   Future<void> _checkStreakMilestones(int streak) async {
     const milestones = [3, 7, 14, 30];
     if (!milestones.contains(streak)) return;
@@ -218,7 +219,7 @@ class _HomeScreenState extends State<HomeScreen> {
       );
       await Share.shareXFiles(
         [XFile.fromData(bytes, mimeType: 'image/png', name: 'plately_streak.png')],
-        text: '$streak days cooking with Plately — Pre-cook macro tracking hits different. #Plately #NoCap',
+        text: '$streak days cooking with Plately â€” Pre-cook macro tracking hits different. #Plately #NoCap',
       );
     } catch (_) {}
   }
@@ -254,25 +255,28 @@ class _HomeScreenState extends State<HomeScreen> {
 
   Future<void> _loadHistory() async {
     if (mounted) setState(() => _loadingHistory = true);
-    final history = await ApiService.getHistory();
-    if (mounted) {
-      setState(() {
-        _allHistory = history;
-        _recentHistory = history.take(2).toList();
-        _loadingHistory = false;
-      });
+    try {
+      final history = await ApiService.getHistory();
+      if (mounted) {
+        setState(() {
+          _allHistory = history;
+          _recentHistory = history.take(2).toList();
+          _loadingHistory = false;
+        });
+      }
+    } catch (_) {
+      if (mounted) setState(() { _loadingHistory = false; });
     }
   }
 
   Future<void> _selectDay(DateTime day) async {
-    final today = DateTime.now();
-    final todayDate = DateTime(today.year, today.month, today.day);
+    final today = DateTime(DateTime.now().year, DateTime.now().month, DateTime.now().day);
     setState(() {
       _selectedDay = day;
       _selectedDayData = {};
-      _loadingDayData = day != todayDate;
+      _loadingDayData = day != today;
     });
-    if (day == todayDate) return; // today uses local prefs, no API call needed
+    if (day == today) return;
     final uid = await _getUid();
     final dateStr = '${day.year}-${day.month.toString().padLeft(2,'0')}-${day.day.toString().padLeft(2,'0')}';
     final data = await ApiService.getDailyHistory(uid, dateStr);
@@ -345,7 +349,9 @@ class _HomeScreenState extends State<HomeScreen> {
         color: AppTheme.primaryDark,
         backgroundColor: AppTheme.cardBg(context),
         onRefresh: () async {
+          final today = DateTime(DateTime.now().year, DateTime.now().month, DateTime.now().day);
           await Future.wait([_loadPrefs(), _loadSuggested(), _loadHistory()]);
+          if (mounted) await _selectDay(today);
         },
         child: CustomScrollView(
           controller: _scrollCtrl,
@@ -356,8 +362,7 @@ class _HomeScreenState extends State<HomeScreen> {
             if (_updateInfo != null && !_updateDismissed)
               SliverToBoxAdapter(child: _buildUpdateBanner()),
             SliverToBoxAdapter(child: _buildHero()),
-            SliverToBoxAdapter(child: _buildCalendar()),
-            SliverToBoxAdapter(child: _buildMacroRings()),
+            SliverToBoxAdapter(child: _buildMacroCard()),
             SliverToBoxAdapter(child: _buildActionRow()),
             SliverToBoxAdapter(child: _buildSectionHeader(
               'Suggested For You',
@@ -376,7 +381,7 @@ class _HomeScreenState extends State<HomeScreen> {
     );
   }
 
-  // ── Update banner ─────────────────────────────────────────────────────────
+  // â”€â”€ Update banner â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
   Widget _buildUpdateBanner() {
     final info = _updateInfo!;
     return Container(
@@ -391,7 +396,7 @@ class _HomeScreenState extends State<HomeScreen> {
         const SizedBox(width: 10),
         Expanded(
           child: Text(
-            'New update just dropped — ${info.message}',
+            'New update just dropped â€” ${info.message}',
             style: const TextStyle(
               color: Colors.white, fontSize: 12,
               fontFamily: 'DM Sans', fontWeight: FontWeight.w500,
@@ -437,7 +442,7 @@ class _HomeScreenState extends State<HomeScreen> {
         child: CircularProgressIndicator(strokeWidth: 2, color: AppTheme.primaryDark)),
       SizedBox(width: 10),
       Expanded(child: Text(
-        'Waking up server… first load may take 30–60s',
+        'Waking up serverâ€¦ first load may take 30â€“60s',
         style: TextStyle(color: AppTheme.primaryDark, fontSize: 12,
             fontFamily: 'DM Sans', fontWeight: FontWeight.w500),
       )),
@@ -456,7 +461,7 @@ class _HomeScreenState extends State<HomeScreen> {
       Icon(LucideIcons.wifiOff, size: 14, color: Color(0xFF8B6914)),
       SizedBox(width: 10),
       Expanded(child: Text(
-        'No internet connection — showing cached data',
+        'No internet connection â€” showing cached data',
         style: TextStyle(color: Color(0xFF8B6914), fontSize: 12,
             fontFamily: 'DM Sans', fontWeight: FontWeight.w500),
       )),
@@ -471,7 +476,7 @@ class _HomeScreenState extends State<HomeScreen> {
     title: Padding(
       padding: const EdgeInsets.symmetric(horizontal: 20),
       child: Row(children: [
-        const PlatelyLogo(iconSize: 36, wordmarkSize: 18, theme: PlatelyLogoTheme.onLight),
+        PlatelyLogo(iconSize: 36, wordmarkSize: 18, theme: AppTheme.isDark(context) ? PlatelyLogoTheme.onDark : PlatelyLogoTheme.onLight),
         const Spacer(),
         TapScale(
           onTap: () => Navigator.push(context, AppTheme.slideUp(const PantryScreen())),
@@ -493,12 +498,12 @@ class _HomeScreenState extends State<HomeScreen> {
     return Padding(
       padding: const EdgeInsets.fromLTRB(20, 22, 20, 0),
       child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-        Text(_greeting, style: const TextStyle(
-          color: AppTheme.mutedText, fontSize: 14, fontFamily: 'DM Sans',
+        Text(_greeting, style: TextStyle(
+          color: AppTheme.textMuted(context), fontSize: 14, fontFamily: 'DM Sans',
         )),
         const SizedBox(height: 4),
-        Text(_headline, style: const TextStyle(
-          color: AppTheme.darkText, fontSize: 30,
+        Text(_headline, style: TextStyle(
+          color: AppTheme.textPrimary(context), fontSize: 30,
           fontFamily: 'DM Sans', fontWeight: FontWeight.w800, height: 1.12, letterSpacing: -0.5,
         )),
         if (_streak >= 2) ...[
@@ -547,7 +552,7 @@ class _HomeScreenState extends State<HomeScreen> {
                   fontFamily: 'DM Sans', fontWeight: FontWeight.w800,
                 )),
                 const SizedBox(height: 3),
-                Text('Scan or type — get recipes instantly', style: TextStyle(
+                Text('Scan or type â€” get recipes instantly', style: TextStyle(
                   color: Colors.white.withValues(alpha: 0.6), fontSize: 13, fontFamily: 'DM Sans',
                 )),
               ])),
@@ -570,244 +575,368 @@ class _HomeScreenState extends State<HomeScreen> {
     );
   }
 
-  // ── Macro history calendar ────────────────────────────────────────────────
-  Widget _buildCalendar() {
-    final now         = DateTime.now();
-    final today       = DateTime(now.year, now.month, now.day);
-    final firstDay    = DateTime(_calendarMonth.year, _calendarMonth.month, 1);
-    final lastDay     = DateTime(_calendarMonth.year, _calendarMonth.month + 1, 0);
-    final startOffset = (firstDay.weekday - 1) % 7;
-    final totalCells  = startOffset + lastDay.day;
-    final rows        = (totalCells / 7).ceil();
+  // â”€â”€ Unified macro + date card â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+  // Date label at top-center â€” tap opens calendar bottom sheet picker.
+  // Macro rings always show. Day detail appears below rings when day != today
+  // or when today has data.
+  Widget _buildMacroCard() {
+    final today = DateTime(DateTime.now().year, DateTime.now().month, DateTime.now().day);
+    final isToday = _selectedDay == today;
 
-    final historyDates = <DateTime>{};
-    for (final h in _allHistory) {
-      final ts = h['timestamp'] as String? ?? '';
-      if (ts.isEmpty) continue;
-      try {
-        final dt = DateTime.parse(ts);
-        historyDates.add(DateTime(dt.year, dt.month, dt.day));
-      } catch (_) {}
+    // Determine which macros to display
+    final int displayCal;
+    final int displayProtein;
+    final List<String> displayRecipes;
+
+    if (isToday) {
+      displayCal     = _calConsumed;
+      displayProtein = _proteinConsumed;
+      displayRecipes = _allHistory.where((h) {
+        try {
+          final dt = DateTime.parse(h['timestamp'] as String? ?? '');
+          return DateTime(dt.year, dt.month, dt.day) == today;
+        } catch (_) { return false; }
+      }).map((h) => h['ingredient_names'] as String? ?? '').where((s) => s.isNotEmpty).take(3).toList();
+    } else {
+      displayCal     = (_selectedDayData['total_calories'] as int?) ?? 0;
+      displayProtein = (_selectedDayData['total_protein']  as int?) ?? 0;
+      final raw = (_selectedDayData['recipes'] as List?)?.cast<String>() ?? [];
+      displayRecipes = raw.take(3).toList();
     }
 
-    final monthLabel = [
-      'January','February','March','April','May','June',
-      'July','August','September','October','November','December'
-    ][_calendarMonth.month - 1];
+    final calPct = (_calGoal > 0 ? displayCal / _calGoal : 0.0).clamp(0.0, 1.0);
+    final proPct = (_proteinGoal > 0 ? displayProtein / _proteinGoal : 0.0).clamp(0.0, 1.0);
+    final bothDone = calPct >= 1.0 && proPct >= 1.0;
+
+    // Date label text
+    final months = ['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'];
+    final days   = ['Mon','Tue','Wed','Thu','Fri','Sat','Sun'];
+    final dateLabel = isToday
+        ? 'Today, ${months[_selectedDay.month - 1]} ${_selectedDay.day}'
+        : '${days[_selectedDay.weekday - 1]}, ${months[_selectedDay.month - 1]} ${_selectedDay.day}';
 
     return Padding(
       padding: const EdgeInsets.fromLTRB(20, 16, 20, 0),
       child: Container(
-        padding: const EdgeInsets.fromLTRB(16, 14, 16, 14),
+        padding: const EdgeInsets.fromLTRB(18, 14, 18, 16),
         decoration: BoxDecoration(
           color: AppTheme.cardBg(context),
           borderRadius: BorderRadius.circular(22),
           border: Border.all(color: AppTheme.border(context)),
           boxShadow: const [BoxShadow(color: Color(0x06000000), blurRadius: 8, offset: Offset(0, 2))],
         ),
-        child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+        child: Column(children: [
+          // â”€â”€ Date label â€” tappable, opens calendar sheet â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+          TapScale(
+            onTap: _showCalendarSheet,
+            child: Container(
+              padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 7),
+              decoration: BoxDecoration(
+                color: AppTheme.primaryDark.withValues(alpha: 0.06),
+                borderRadius: BorderRadius.circular(20),
+                border: Border.all(color: AppTheme.primaryDark.withValues(alpha: 0.15)),
+              ),
+              child: Row(mainAxisSize: MainAxisSize.min, children: [
+                const Icon(LucideIcons.calendarDays, color: AppTheme.primaryDark, size: 13),
+                const SizedBox(width: 6),
+                Text(dateLabel, style: const TextStyle(
+                  color: AppTheme.primaryDark, fontSize: 13,
+                  fontFamily: 'DM Sans', fontWeight: FontWeight.w700,
+                )),
+                const SizedBox(width: 4),
+                const Icon(LucideIcons.chevronDown, color: AppTheme.primaryDark, size: 12),
+              ]),
+            ),
+          ),
+          const SizedBox(height: 16),
+          // â”€â”€ Macro rings row â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
           Row(children: [
-            const Icon(LucideIcons.calendarDays, color: AppTheme.primaryDark, size: 16),
-            const SizedBox(width: 8),
-            Text('$monthLabel ${_calendarMonth.year}',
-                style: const TextStyle(color: AppTheme.darkText, fontSize: 14,
-                    fontFamily: 'DM Sans', fontWeight: FontWeight.w800)),
-            const Spacer(),
-            TapScale(
-              onTap: () => setState(() {
-                _calendarMonth = DateTime(_calendarMonth.year, _calendarMonth.month - 1);
-                _selectedDay = null;
-              }),
-              child: Container(width: 28, height: 28,
-                decoration: BoxDecoration(color: AppTheme.cardAltBg(context),
-                    borderRadius: BorderRadius.circular(8), border: Border.all(color: AppTheme.border(context))),
-                child: const Icon(LucideIcons.chevronLeft, color: AppTheme.primaryDark, size: 14)),
+            SizedBox(
+              width: 72, height: 72,
+              child: Stack(children: [
+                CustomPaint(size: const Size(72, 72),
+                    painter: _RingPainter(progress: calPct.toDouble(), color: AppTheme.primaryDark, strokeWidth: 8)),
+                Padding(padding: const EdgeInsets.all(12),
+                  child: CustomPaint(size: const Size(48, 48),
+                      painter: _RingPainter(progress: proPct.toDouble(), color: AppTheme.green, strokeWidth: 7))),
+                if (bothDone)
+                  const Center(child: Icon(LucideIcons.check, color: AppTheme.green, size: 14)),
+              ]),
             ),
-            const SizedBox(width: 6),
-            TapScale(
-              onTap: () => setState(() {
-                _calendarMonth = DateTime(_calendarMonth.year, _calendarMonth.month + 1);
-                _selectedDay = null;
-              }),
-              child: Container(width: 28, height: 28,
-                decoration: BoxDecoration(color: AppTheme.cardAltBg(context),
-                    borderRadius: BorderRadius.circular(8), border: Border.all(color: AppTheme.border(context))),
-                child: const Icon(LucideIcons.chevronRight, color: AppTheme.primaryDark, size: 14)),
-            ),
-          ]),
-          const SizedBox(height: 10),
-          Row(children: ['M','T','W','T','F','S','S'].map((d) => Expanded(
-            child: Center(child: Text(d, style: const TextStyle(color: AppTheme.mutedText,
-                fontSize: 10, fontFamily: 'DM Sans', fontWeight: FontWeight.w700))),
-          )).toList()),
-          const SizedBox(height: 6),
-          ...List.generate(rows, (row) => Padding(
-            padding: const EdgeInsets.only(bottom: 4),
-            child: Row(children: List.generate(7, (col) {
-              final cellIdx = row * 7 + col;
-              final dayNum  = cellIdx - startOffset + 1;
-              if (dayNum < 1 || dayNum > lastDay.day) {
-                return const Expanded(child: SizedBox(height: 32));
-              }
-              final cellDate = DateTime(_calendarMonth.year, _calendarMonth.month, dayNum);
-              final isToday    = cellDate == today;
-              final isSelected = _selectedDay == cellDate;
-              final hasDot     = historyDates.contains(cellDate);
-              final isFuture   = cellDate.isAfter(today);
-              return Expanded(
-                child: TapScale(
-                  onTap: isFuture ? null : () {
-                    if (isSelected) {
-                      setState(() { _selectedDay = null; _selectedDayData = {}; });
-                    } else {
-                      _selectDay(cellDate);
-                    }
-                  },
-                  child: Container(
-                    height: 32,
-                    margin: const EdgeInsets.symmetric(horizontal: 1),
-                    decoration: BoxDecoration(
-                      color: isSelected
-                          ? AppTheme.primaryDark
-                          : isToday
-                              ? AppTheme.primaryDark.withValues(alpha: 0.1)
-                              : Colors.transparent,
-                      borderRadius: BorderRadius.circular(8),
-                      border: isToday && !isSelected
-                          ? Border.all(color: AppTheme.primaryDark.withValues(alpha: 0.35))
-                          : null,
-                    ),
-                    child: Stack(alignment: Alignment.center, children: [
-                      Text('$dayNum', style: TextStyle(
-                        fontFamily: 'DM Sans', fontSize: 12,
-                        fontWeight: isToday || isSelected ? FontWeight.w800 : FontWeight.w500,
-                        color: isSelected
-                            ? Colors.white
-                            : isFuture
-                                ? AppTheme.mutedText.withValues(alpha: 0.4)
-                                : AppTheme.darkText,
-                      )),
-                      if (hasDot && !isSelected)
-                        Positioned(
-                          bottom: 3,
-                          child: Container(width: 4, height: 4,
-                              decoration: const BoxDecoration(
-                                  color: AppTheme.primaryDark, shape: BoxShape.circle)),
-                        ),
-                    ]),
-                  ),
+            const SizedBox(width: 16),
+            Expanded(child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+              Text(isToday ? "Today's Macros" : 'Macros that day',
+                  style: TextStyle(color: AppTheme.textPrimary(context),
+                      fontSize: 13, fontFamily: 'DM Sans', fontWeight: FontWeight.w700)),
+              const SizedBox(height: 6),
+              Row(children: [
+                Container(width: 8, height: 8,
+                    decoration: const BoxDecoration(color: AppTheme.primaryDark, shape: BoxShape.circle)),
+                const SizedBox(width: 6),
+                Text('$displayCal / $_calGoal cal',
+                    style: TextStyle(color: AppTheme.textMuted(context), fontSize: 12, fontFamily: 'DM Sans')),
+              ]),
+              const SizedBox(height: 3),
+              Row(children: [
+                Container(width: 8, height: 8,
+                    decoration: const BoxDecoration(color: AppTheme.green, shape: BoxShape.circle)),
+                const SizedBox(width: 6),
+                Text('${displayProtein}g / ${_proteinGoal}g protein',
+                    style: TextStyle(color: AppTheme.textMuted(context), fontSize: 12, fontFamily: 'DM Sans')),
+              ]),
+            ])),
+            Column(children: [
+              Container(
+                width: 44, height: 44,
+                decoration: BoxDecoration(
+                  color: _streak > 0 ? AppTheme.yellow.withValues(alpha: 0.15) : AppTheme.borderGray.withValues(alpha: 0.4),
+                  shape: BoxShape.circle,
                 ),
-              );
-            })),
-          )),
-          if (_selectedDay != null) ...[
-            const SizedBox(height: 10),
-            _buildDayDetail(today),
-          ],
+                child: Icon(LucideIcons.flame,
+                    color: _streak > 0 ? AppTheme.orange : AppTheme.mutedText, size: 20),
+              ),
+              const SizedBox(height: 4),
+              Text('$_streak day${_streak != 1 ? 's' : ''}',
+                  style: TextStyle(
+                    color: _streak > 0 ? AppTheme.orange : AppTheme.mutedText,
+                    fontSize: 10, fontFamily: 'DM Sans', fontWeight: FontWeight.w700,
+                  )),
+            ]),
+          ]),
+          // â”€â”€ Day detail â€” loading / data / empty â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+          const SizedBox(height: 12),
+          if (_loadingDayData)
+            Container(
+              width: double.infinity,
+              padding: const EdgeInsets.all(10),
+              decoration: BoxDecoration(
+                color: AppTheme.cardAltBg(context),
+                borderRadius: BorderRadius.circular(12),
+                border: Border.all(color: AppTheme.border(context)),
+              ),
+              child: const Row(mainAxisAlignment: MainAxisAlignment.center, children: [
+                SizedBox(width: 13, height: 13,
+                    child: CircularProgressIndicator(strokeWidth: 2, color: AppTheme.primaryDark)),
+                SizedBox(width: 10),
+                Text('Loading...', style: TextStyle(color: AppTheme.mutedText,
+                    fontSize: 12, fontFamily: 'DM Sans')),
+              ]),
+            )
+          else if (displayCal > 0 || displayProtein > 0 || displayRecipes.isNotEmpty)
+            Container(
+              width: double.infinity,
+              padding: const EdgeInsets.all(10),
+              decoration: BoxDecoration(
+                color: AppTheme.cardAltBg(context),
+                borderRadius: BorderRadius.circular(12),
+                border: Border.all(color: AppTheme.border(context)),
+              ),
+              child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+                Row(children: [
+                  _macroChip(displayCal, 'kcal', AppTheme.primaryDark),
+                  const SizedBox(width: 8),
+                  _macroChip(displayProtein, 'g protein', AppTheme.green),
+                  if (isToday) ...[
+                    const Spacer(),
+                    Container(
+                      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
+                      decoration: BoxDecoration(
+                        color: AppTheme.primaryDark.withValues(alpha: 0.08),
+                        borderRadius: BorderRadius.circular(6),
+                      ),
+                      child: const Text('Today', style: TextStyle(color: AppTheme.primaryDark,
+                          fontSize: 10, fontFamily: 'DM Sans', fontWeight: FontWeight.w700)),
+                    ),
+                  ],
+                ]),
+                if (displayRecipes.isNotEmpty) ...[
+                  const SizedBox(height: 8),
+                  Wrap(spacing: 6, runSpacing: 4, children: displayRecipes.map((r) => Container(
+                    padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
+                    decoration: BoxDecoration(
+                      color: AppTheme.green.withValues(alpha: 0.1),
+                      borderRadius: BorderRadius.circular(6),
+                    ),
+                    child: Text(_trimIngredientNames(r), style: const TextStyle(
+                      color: AppTheme.primaryDark, fontSize: 11,
+                      fontFamily: 'DM Sans', fontWeight: FontWeight.w600,
+                    )),
+                  )).toList()),
+                ],
+              ]),
+            )
+          else
+            Container(
+              width: double.infinity,
+              padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 8),
+              decoration: BoxDecoration(
+                color: AppTheme.cardAltBg(context),
+                borderRadius: BorderRadius.circular(12),
+                border: Border.all(color: AppTheme.border(context)),
+              ),
+              child: Row(children: [
+                Icon(LucideIcons.moonStar, size: 13, color: AppTheme.textMuted(context)),
+                const SizedBox(width: 8),
+                Text(isToday ? 'Nothing logged yet today.' : 'No cooking logged this day.',
+                    style: TextStyle(color: AppTheme.textMuted(context),
+                        fontSize: 12, fontFamily: 'DM Sans')),
+              ]),
+            ),
         ]),
       ).animate().fadeIn(duration: 380.ms).slideY(begin: 0.05),
     );
   }
 
-  Widget _buildDayDetail(DateTime today) {
-    final isToday = _selectedDay == today;
+  // â”€â”€ Calendar bottom sheet â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+  void _showCalendarSheet() {
+    HapticFeedback.selectionClick();
+    // Sheet has its own month state so scrolling months doesn't affect main screen
+    DateTime sheetMonth = DateTime(_selectedDay.year, _selectedDay.month);
 
-    if (_loadingDayData) {
-      return Container(
-        width: double.infinity,
-        padding: const EdgeInsets.all(12),
-        decoration: BoxDecoration(
-          color: AppTheme.cardAltBg(context),
-          borderRadius: BorderRadius.circular(12),
-          border: Border.all(color: AppTheme.border(context)),
-        ),
-        child: const Row(mainAxisAlignment: MainAxisAlignment.center, children: [
-          SizedBox(width: 14, height: 14,
-            child: CircularProgressIndicator(strokeWidth: 2, color: AppTheme.primaryDark)),
-          SizedBox(width: 10),
-          Text('Loading...', style: TextStyle(color: AppTheme.mutedText,
-              fontSize: 12, fontFamily: 'DM Sans')),
-        ]),
-      );
-    }
+    showModalBottomSheet(
+      context: context,
+      backgroundColor: Colors.transparent,
+      isScrollControlled: true,
+      builder: (ctx) => StatefulBuilder(
+        builder: (ctx, setSt) {
+          final today = DateTime(DateTime.now().year, DateTime.now().month, DateTime.now().day);
+          final firstDay    = DateTime(sheetMonth.year, sheetMonth.month, 1);
+          final lastDay     = DateTime(sheetMonth.year, sheetMonth.month + 1, 0);
+          final startOffset = (firstDay.weekday - 1) % 7;
+          final rows        = ((startOffset + lastDay.day) / 7).ceil();
 
-    final int cal;
-    final int protein;
-    final List<String> recipes;
+          final historyDates = <DateTime>{};
+          for (final h in _allHistory) {
+            try {
+              final dt = DateTime.parse(h['timestamp'] as String? ?? '');
+              historyDates.add(DateTime(dt.year, dt.month, dt.day));
+            } catch (_) {}
+          }
 
-    if (isToday) {
-      cal     = _calConsumed;
-      protein = _proteinConsumed;
-      // Pull recipe names from today's history entries
-      final todayEntries = _allHistory.where((h) {
-        final ts = h['timestamp'] as String? ?? '';
-        try {
-          final dt = DateTime.parse(ts);
-          return DateTime(dt.year, dt.month, dt.day) == today;
-        } catch (_) { return false; }
-      }).toList();
-      recipes = todayEntries
-          .map((h) => h['ingredient_names'] as String? ?? '')
-          .where((s) => s.isNotEmpty)
-          .take(3)
-          .toList();
-    } else {
-      cal     = (_selectedDayData['total_calories'] as int?) ?? 0;
-      protein = (_selectedDayData['total_protein']  as int?) ?? 0;
-      final raw = (_selectedDayData['recipes'] as List?)?.cast<String>() ?? [];
-      recipes = raw.take(3).toList();
-    }
+          final months = ['January','February','March','April','May','June',
+              'July','August','September','October','November','December'];
 
-    final hasData = cal > 0 || protein > 0 || recipes.isNotEmpty;
-
-    return AnimatedContainer(
-      duration: const Duration(milliseconds: 200),
-      width: double.infinity,
-      padding: const EdgeInsets.all(12),
-      decoration: BoxDecoration(
-        color: AppTheme.cardAltBg(context),
-        borderRadius: BorderRadius.circular(12),
-        border: Border.all(color: AppTheme.border(context)),
-      ),
-      child: hasData
-          ? Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+          return Container(
+            decoration: BoxDecoration(
+              color: AppTheme.cardBg(context),
+              borderRadius: const BorderRadius.vertical(top: Radius.circular(24)),
+            ),
+            padding: const EdgeInsets.fromLTRB(20, 12, 20, 32),
+            child: Column(mainAxisSize: MainAxisSize.min, children: [
+              // drag handle
+              Center(child: Container(width: 40, height: 4,
+                  margin: const EdgeInsets.only(bottom: 16),
+                  decoration: BoxDecoration(color: AppTheme.border(context),
+                      borderRadius: BorderRadius.circular(2)))),
+              // month nav
               Row(children: [
-                _macroChip(cal, 'kcal', AppTheme.primaryDark),
-                const SizedBox(width: 8),
-                _macroChip(protein, 'g protein', AppTheme.green),
-                const Spacer(),
-                if (isToday)
-                  Container(
-                    padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
-                    decoration: BoxDecoration(
-                      color: AppTheme.primaryDark.withValues(alpha: 0.08),
-                      borderRadius: BorderRadius.circular(6),
-                    ),
-                    child: const Text('Today', style: TextStyle(color: AppTheme.primaryDark,
-                        fontSize: 10, fontFamily: 'DM Sans', fontWeight: FontWeight.w700)),
-                  ),
+                TapScale(
+                  onTap: () => setSt(() => sheetMonth = DateTime(sheetMonth.year, sheetMonth.month - 1)),
+                  child: Container(width: 32, height: 32,
+                    decoration: BoxDecoration(color: AppTheme.cardAltBg(context),
+                        borderRadius: BorderRadius.circular(10),
+                        border: Border.all(color: AppTheme.border(context))),
+                    child: const Icon(LucideIcons.chevronLeft, color: AppTheme.primaryDark, size: 15)),
+                ),
+                Expanded(child: Center(child: Text(
+                  '${months[sheetMonth.month - 1]} ${sheetMonth.year}',
+                  style: TextStyle(color: AppTheme.textPrimary(context),
+                      fontSize: 15, fontFamily: 'DM Sans', fontWeight: FontWeight.w800),
+                ))),
+                Builder(builder: (ctx2) {
+                  final currentMonth = DateTime(DateTime.now().year, DateTime.now().month);
+                  final isAtCurrentMonth = sheetMonth.year == currentMonth.year && sheetMonth.month == currentMonth.month;
+                  return TapScale(
+                    onTap: isAtCurrentMonth ? null : () => setSt(() => sheetMonth = DateTime(sheetMonth.year, sheetMonth.month + 1)),
+                    child: Container(width: 32, height: 32,
+                      decoration: BoxDecoration(color: AppTheme.cardAltBg(context),
+                          borderRadius: BorderRadius.circular(10),
+                          border: Border.all(color: AppTheme.border(context))),
+                      child: Icon(LucideIcons.chevronRight,
+                          color: isAtCurrentMonth ? AppTheme.border(context) : AppTheme.primaryDark, size: 15)),
+                  );
+                }),
               ]),
-              if (recipes.isNotEmpty) ...[
-                const SizedBox(height: 8),
-                Wrap(spacing: 6, runSpacing: 4, children: recipes.map((r) => Container(
-                  padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
+              const SizedBox(height: 14),
+              // weekday headers
+              Row(children: ['M','T','W','T','F','S','S'].map((d) => Expanded(
+                child: Center(child: Text(d, style: const TextStyle(color: AppTheme.mutedText,
+                    fontSize: 11, fontFamily: 'DM Sans', fontWeight: FontWeight.w700))),
+              )).toList()),
+              const SizedBox(height: 6),
+              // day grid
+              ...List.generate(rows, (row) => Padding(
+                padding: const EdgeInsets.only(bottom: 4),
+                child: Row(children: List.generate(7, (col) {
+                  final idx    = row * 7 + col;
+                  final dayNum = idx - startOffset + 1;
+                  if (dayNum < 1 || dayNum > lastDay.day) {
+                    return const Expanded(child: SizedBox(height: 36));
+                  }
+                  final cellDate  = DateTime(sheetMonth.year, sheetMonth.month, dayNum);
+                  final isToday2  = cellDate == today;
+                  final isSelected= cellDate == _selectedDay;
+                  final hasDot    = historyDates.contains(cellDate);
+                  final isFuture  = cellDate.isAfter(today);
+                  return Expanded(
+                    child: TapScale(
+                      onTap: isFuture ? null : () {
+                        Navigator.pop(ctx);
+                        _selectDay(cellDate);
+                      },
+                      child: Container(
+                        height: 36,
+                        margin: const EdgeInsets.symmetric(horizontal: 2),
+                        decoration: BoxDecoration(
+                          color: isSelected
+                              ? AppTheme.primaryDark
+                              : isToday2
+                                  ? AppTheme.primaryDark.withValues(alpha: 0.1)
+                                  : Colors.transparent,
+                          borderRadius: BorderRadius.circular(10),
+                          border: isToday2 && !isSelected
+                              ? Border.all(color: AppTheme.primaryDark.withValues(alpha: 0.35))
+                              : null,
+                        ),
+                        child: Stack(alignment: Alignment.center, children: [
+                          Text('$dayNum', style: TextStyle(
+                            fontFamily: 'DM Sans', fontSize: 13,
+                            fontWeight: isToday2 || isSelected ? FontWeight.w800 : FontWeight.w500,
+                            color: isSelected ? Colors.white
+                                : isFuture ? AppTheme.mutedText.withValues(alpha: 0.35)
+                                : AppTheme.textPrimary(context),
+                          )),
+                          if (hasDot && !isSelected)
+                            Positioned(bottom: 4,
+                              child: Container(width: 4, height: 4,
+                                  decoration: const BoxDecoration(
+                                      color: AppTheme.primaryDark, shape: BoxShape.circle))),
+                        ]),
+                      ),
+                    ),
+                  );
+                })),
+              )),
+              const SizedBox(height: 8),
+              // Today shortcut
+              TapScale(
+                onTap: () { Navigator.pop(ctx); _selectDay(today); },
+                child: Container(
+                  width: double.infinity,
+                  padding: const EdgeInsets.symmetric(vertical: 13),
                   decoration: BoxDecoration(
-                    color: AppTheme.green.withValues(alpha: 0.1),
-                    borderRadius: BorderRadius.circular(6),
+                    gradient: AppTheme.tealGradient,
+                    borderRadius: BorderRadius.circular(14),
                   ),
-                  child: Text(_trimIngredientNames(r), style: const TextStyle(
-                    color: AppTheme.primaryDark, fontSize: 11,
-                    fontFamily: 'DM Sans', fontWeight: FontWeight.w600,
-                  )),
-                )).toList()),
-              ],
-            ])
-          : const Row(children: [
-              Icon(LucideIcons.moonStar, size: 14, color: AppTheme.mutedText),
-              SizedBox(width: 8),
-              Text('No cooking logged this day.',
-                  style: TextStyle(color: AppTheme.mutedText, fontSize: 12, fontFamily: 'DM Sans')),
+                  child: const Center(child: Text('Jump to Today',
+                      style: TextStyle(color: Colors.white, fontSize: 14,
+                          fontFamily: 'DM Sans', fontWeight: FontWeight.w700))),
+                ),
+              ),
             ]),
+          );
+        },
+      ),
     );
   }
 
@@ -825,78 +954,6 @@ class _HomeScreenState extends State<HomeScreen> {
       )),
     ]),
   );
-
-  // ── Daily macro rings ─────────────────────────────────────────────────────
-  Widget _buildMacroRings() {
-    final calPct = (_calGoal > 0 ? _calConsumed / _calGoal : 0).clamp(0.0, 1.0);
-    final proPct = (_proteinGoal > 0 ? _proteinConsumed / _proteinGoal : 0).clamp(0.0, 1.0);
-    final bothDone = calPct >= 1.0 && proPct >= 1.0;
-
-    return Padding(
-      padding: const EdgeInsets.fromLTRB(20, 16, 20, 0),
-      child: Container(
-        padding: const EdgeInsets.all(18),
-        decoration: BoxDecoration(
-          color: AppTheme.cardBg(context),
-          borderRadius: BorderRadius.circular(22),
-          border: Border.all(color: AppTheme.border(context)),
-          boxShadow: const [BoxShadow(color: Color(0x06000000), blurRadius: 8, offset: Offset(0, 2))],
-        ),
-        child: Row(children: [
-          SizedBox(
-            width: 72, height: 72,
-            child: Stack(children: [
-              CustomPaint(size: const Size(72, 72),
-                  painter: _RingPainter(progress: calPct.toDouble(), color: AppTheme.primaryDark, strokeWidth: 8)),
-              Padding(padding: const EdgeInsets.all(12),
-                child: CustomPaint(size: const Size(48, 48),
-                    painter: _RingPainter(progress: proPct.toDouble(), color: AppTheme.green, strokeWidth: 7))),
-              if (bothDone)
-                const Center(child: Icon(LucideIcons.check, color: AppTheme.green, size: 14)),
-            ]),
-          ),
-          const SizedBox(width: 16),
-          Expanded(child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-            const Text("Today's Macros", style: TextStyle(color: AppTheme.darkText,
-                fontSize: 13, fontFamily: 'DM Sans', fontWeight: FontWeight.w700)),
-            const SizedBox(height: 6),
-            Row(children: [
-              Container(width: 8, height: 8,
-                  decoration: const BoxDecoration(color: AppTheme.primaryDark, shape: BoxShape.circle)),
-              const SizedBox(width: 6),
-              Text('$_calConsumed / $_calGoal cal',
-                  style: const TextStyle(color: AppTheme.mutedText, fontSize: 12, fontFamily: 'DM Sans')),
-            ]),
-            const SizedBox(height: 3),
-            Row(children: [
-              Container(width: 8, height: 8,
-                  decoration: const BoxDecoration(color: AppTheme.green, shape: BoxShape.circle)),
-              const SizedBox(width: 6),
-              Text('${_proteinConsumed}g / ${_proteinGoal}g protein',
-                  style: const TextStyle(color: AppTheme.mutedText, fontSize: 12, fontFamily: 'DM Sans')),
-            ]),
-          ])),
-          Column(children: [
-            Container(
-              width: 44, height: 44,
-              decoration: BoxDecoration(
-                color: _streak > 0 ? AppTheme.yellow.withValues(alpha: 0.15) : AppTheme.borderGray.withValues(alpha: 0.4),
-                shape: BoxShape.circle,
-              ),
-              child: Icon(LucideIcons.flame,
-                  color: _streak > 0 ? AppTheme.orange : AppTheme.mutedText, size: 20),
-            ),
-            const SizedBox(height: 4),
-            Text('$_streak day${_streak != 1 ? 's' : ''}',
-              style: TextStyle(
-                color: _streak > 0 ? AppTheme.orange : AppTheme.mutedText,
-                fontSize: 10, fontFamily: 'DM Sans', fontWeight: FontWeight.w700,
-              )),
-          ]),
-        ]),
-      ).animate().fadeIn(duration: 380.ms).slideY(begin: 0.06),
-    );
-  }
 
   Widget _buildActionRow() {
     const actions = [
@@ -952,8 +1009,8 @@ class _HomeScreenState extends State<HomeScreen> {
   Widget _buildSectionHeader(String title, {VoidCallback? onSeeAll}) => Padding(
     padding: const EdgeInsets.fromLTRB(20, 28, 20, 0),
     child: Row(mainAxisAlignment: MainAxisAlignment.spaceBetween, children: [
-      Text(title, style: const TextStyle(
-        color: AppTheme.darkText, fontSize: 17,
+      Text(title, style: TextStyle(
+        color: AppTheme.textPrimary(context), fontSize: 17,
         fontFamily: 'DM Sans', fontWeight: FontWeight.w800,
       )),
       if (onSeeAll != null)
@@ -1057,11 +1114,11 @@ class _HomeScreenState extends State<HomeScreen> {
             borderRadius: BorderRadius.circular(16),
             border: Border.all(color: AppTheme.border(context)),
           ),
-          child: const Row(children: [
-            Icon(LucideIcons.chefHat, color: AppTheme.mutedText, size: 20),
-            SizedBox(width: 12),
+          child: Row(children: [
+            Icon(LucideIcons.chefHat, color: AppTheme.textMuted(context), size: 20),
+            const SizedBox(width: 12),
             Text('No cooking sessions yet. Start cooking!',
-                style: TextStyle(color: AppTheme.mutedText, fontSize: 13, fontFamily: 'DM Sans')),
+                style: TextStyle(color: AppTheme.textMuted(context), fontSize: 13, fontFamily: 'DM Sans')),
           ]),
         ),
       );
@@ -1086,7 +1143,7 @@ class _HomeScreenState extends State<HomeScreen> {
 
   String _trimIngredientNames(String raw) {
     if (raw.length <= 40) return raw;
-    return '${raw.substring(0, 37)}…';
+    return '${raw.substring(0, 37)}â€¦';
   }
 
   String _formatTimestamp(String ts) {
@@ -1103,7 +1160,7 @@ class _HomeScreenState extends State<HomeScreen> {
   }
 }
 
-// ── Ring painter ──────────────────────────────────────────────────────────────
+// â”€â”€ Ring painter â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 class _RingPainter extends CustomPainter {
   final double progress;
   final Color color;

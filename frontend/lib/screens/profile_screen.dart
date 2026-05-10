@@ -128,10 +128,10 @@ class _ProfileScreenState extends State<ProfileScreen> {
           child: const Icon(LucideIcons.target, color: AppTheme.primaryDark, size: 18),
         ),
         const SizedBox(width: 12),
-        const Expanded(
+        Expanded(
           child: Text(
             'Set your personal goals for better recommendations',
-            style: TextStyle(color: AppTheme.darkText, fontSize: 12,
+            style: TextStyle(color: AppTheme.textPrimary(context), fontSize: 12,
                 fontFamily: 'DM Sans', fontWeight: FontWeight.w600),
           ),
         ),
@@ -174,7 +174,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
                 border: Border.all(color: AppTheme.border(context))),
             child: const Icon(LucideIcons.circleUser, color: AppTheme.primaryDark, size: 20)),
         const SizedBox(width: 12),
-        const Text('My Profile', style: TextStyle(color: AppTheme.darkText, fontSize: 18,
+        Text('My Profile', style: TextStyle(color: AppTheme.textPrimary(context), fontSize: 18,
             fontFamily: 'DM Sans', fontWeight: FontWeight.w800)),
         const Spacer(),
         TapScale(onTap: _showEditProfile,
@@ -250,10 +250,10 @@ class _ProfileScreenState extends State<ProfileScreen> {
         child: Column(children: [
           Icon(icon, color: AppTheme.primaryDark, size: 18),
           const SizedBox(height: 6),
-          Text(value, style: const TextStyle(color: AppTheme.darkText,
+          Text(value, style: TextStyle(color: AppTheme.textPrimary(context),
               fontSize: 16, fontFamily: 'DM Sans', fontWeight: FontWeight.w800)),
           const SizedBox(height: 2),
-          Text(label, style: const TextStyle(color: AppTheme.mutedText,
+          Text(label, style: TextStyle(color: AppTheme.textMuted(context),
               fontSize: 10, fontFamily: 'DM Sans', fontWeight: FontWeight.w500)),
         ]),
       ),
@@ -278,7 +278,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
         Row(children: [
           const Icon(LucideIcons.target, color: AppTheme.primaryDark, size: 18),
           const SizedBox(width: 8),
-          const Text('Daily Goals', style: TextStyle(color: AppTheme.darkText,
+          Text('Daily Goals', style: TextStyle(color: AppTheme.textPrimary(context),
               fontSize: 15, fontFamily: 'DM Sans', fontWeight: FontWeight.w700)),
           const Spacer(),
           TapScale(
@@ -335,10 +335,10 @@ class _ProfileScreenState extends State<ProfileScreen> {
     final progress = goal > 0 ? (consumed / goal).clamp(0.0, 1.0) : 0.0;
     return Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
       Row(children: [
-        Text(label, style: const TextStyle(color: AppTheme.darkText,
-            fontSize: 12, fontFamily: 'DM Sans', fontWeight: FontWeight.w600)),
+        Text(label, style: TextStyle(color: AppTheme.textPrimary(context),
+          fontSize: 12, fontFamily: 'DM Sans', fontWeight: FontWeight.w600)),
         const Spacer(),
-        Text('$consumed / $goal $unit', style: const TextStyle(color: AppTheme.mutedText,
+        Text('$consumed / $goal $unit', style: TextStyle(color: AppTheme.textMuted(context),
             fontSize: 11, fontFamily: 'DM Sans')),
       ]),
       const SizedBox(height: 6),
@@ -373,10 +373,10 @@ class _ProfileScreenState extends State<ProfileScreen> {
         border: Border.all(color: AppTheme.border(context)),
       ),
       child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-        const Row(children: [
-          Icon(LucideIcons.leafyGreen, color: AppTheme.primaryDark, size: 18),
-          SizedBox(width: 8),
-          Text('Dietary Preferences', style: TextStyle(color: AppTheme.darkText,
+        Row(children: [
+          const Icon(LucideIcons.leafyGreen, color: AppTheme.primaryDark, size: 18),
+          const SizedBox(width: 8),
+          Text('Dietary Preferences', style: TextStyle(color: AppTheme.textPrimary(context),
               fontSize: 15, fontFamily: 'DM Sans', fontWeight: FontWeight.w700)),
         ]),
         const SizedBox(height: 14),
@@ -393,12 +393,12 @@ class _ProfileScreenState extends State<ProfileScreen> {
                   await UserPrefsService.savePrefHiPro(!on);
                   setState(() => _data['pref_hipro'] = !on);
                 case 'Gluten-Free':
-                  // pref_gluten=false means gluten-free is ON
-                  await UserPrefsService.savePrefGluten(on); // toggling: if currently on (gluten-free), turn off → set true
-                  setState(() => _data['pref_gluten'] = on);
+                  // pref_gluten=false means gluten-free is ON — so we save !on to toggle correctly
+                  await UserPrefsService.savePrefGluten(!on);
+                  setState(() => _data['pref_gluten'] = !on);
                 case 'Dairy-Free':
-                  await UserPrefsService.savePrefDairy(on);
-                  setState(() => _data['pref_dairy'] = on);
+                  await UserPrefsService.savePrefDairy(!on);
+                  setState(() => _data['pref_dairy'] = !on);
               }
             },
             child: Container(
@@ -409,7 +409,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
                 border: Border.all(color: on ? AppTheme.primaryDark : AppTheme.border(context)),
               ),
               child: Text(opt, style: TextStyle(
-                color: on ? Colors.white : AppTheme.darkText,
+                color: on ? Colors.white : AppTheme.textPrimary(context),
                 fontSize: 12, fontFamily: 'DM Sans', fontWeight: FontWeight.w600)),
             ),
           );
@@ -496,7 +496,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
           ),
           const SizedBox(width: 14),
           Expanded(child: Text(label, style: TextStyle(
-              color: danger ? const Color(0xFFD14444) : AppTheme.darkText,
+              color: danger ? const Color(0xFFD14444) : AppTheme.textPrimary(context),
               fontSize: 14, fontFamily: 'DM Sans', fontWeight: FontWeight.w600))),
           trailing ?? const Icon(LucideIcons.chevronRight, color: AppTheme.mutedText, size: 16),
         ]),
@@ -523,10 +523,10 @@ class _ProfileScreenState extends State<ProfileScreen> {
               child: const Icon(LucideIcons.sunMoon, color: AppTheme.primaryDark, size: 17),
             ),
             const SizedBox(width: 14),
-            const Expanded(
+            Expanded(
               child: Text('Display', style: TextStyle(
-                  color: AppTheme.darkText, fontSize: 14,
-                  fontFamily: 'DM Sans', fontWeight: FontWeight.w600)),
+                  color: AppTheme.textPrimary(context),
+                  fontSize: 14, fontFamily: 'DM Sans', fontWeight: FontWeight.w600)),
             ),
             _themeSegment(label: 'Light', value: ThemeMode.light, current: mode),
             const SizedBox(width: 6),
@@ -624,7 +624,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
                   ),
                   child: const Icon(LucideIcons.shieldCheck, color: AppTheme.primaryDark, size: 18)),
                 const SizedBox(width: 12),
-                const Text('Privacy Policy', style: TextStyle(color: AppTheme.darkText,
+                Text('Privacy Policy', style: TextStyle(color: AppTheme.textPrimary(context),
                     fontSize: 17, fontFamily: 'DM Sans', fontWeight: FontWeight.w800)),
                 const Spacer(),
                 TapScale(onTap: () => Navigator.pop(context),
@@ -709,7 +709,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
                   decoration: BoxDecoration(color: AppTheme.border(context),
                       borderRadius: BorderRadius.circular(2))),
               const SizedBox(height: 18),
-              const Text('Change Password', style: TextStyle(color: AppTheme.darkText,
+              Text('Change Password', style: TextStyle(color: AppTheme.textPrimary(context),
                   fontSize: 17, fontFamily: 'DM Sans', fontWeight: FontWeight.w800)),
               const SizedBox(height: 20),
               _pwField(ctrl: currCtrl, label: 'Current Password'),
@@ -780,7 +780,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
     TextField(
       controller: ctrl,
       obscureText: true,
-      style: const TextStyle(fontFamily: 'DM Sans', color: AppTheme.darkText, fontSize: 14),
+      style: TextStyle(fontFamily: 'DM Sans', color: AppTheme.textPrimary(context), fontSize: 14),
       decoration: InputDecoration(
         labelText: label,
         labelStyle: const TextStyle(fontFamily: 'DM Sans', color: AppTheme.mutedText, fontSize: 13),
@@ -818,12 +818,12 @@ class _ProfileScreenState extends State<ProfileScreen> {
                   decoration: BoxDecoration(color: AppTheme.border(context),
                       borderRadius: BorderRadius.circular(2))),
               const SizedBox(height: 18),
-              const Text('Edit Profile', style: TextStyle(color: AppTheme.darkText,
+              Text('Edit Profile', style: TextStyle(color: AppTheme.textPrimary(context),
                   fontSize: 17, fontFamily: 'DM Sans', fontWeight: FontWeight.w800)),
               const SizedBox(height: 20),
               TextField(
                 controller: nameCtrl,
-                style: const TextStyle(fontFamily: 'DM Sans', color: AppTheme.darkText, fontSize: 14),
+                style: TextStyle(fontFamily: 'DM Sans', color: AppTheme.textPrimary(context), fontSize: 14),
                 decoration: InputDecoration(
                   labelText: 'Display Name',
                   labelStyle: const TextStyle(fontFamily: 'DM Sans', color: AppTheme.mutedText, fontSize: 13),
@@ -911,11 +911,11 @@ class _PolicySection extends StatelessWidget {
       Row(children: [
         Icon(icon, color: AppTheme.primaryDark, size: 16),
         const SizedBox(width: 8),
-        Text(title, style: const TextStyle(color: AppTheme.darkText,
+        Text(title, style: TextStyle(color: AppTheme.textPrimary(context),
             fontSize: 14, fontFamily: 'DM Sans', fontWeight: FontWeight.w700)),
       ]),
       const SizedBox(height: 6),
-      Text(body, style: const TextStyle(color: AppTheme.mutedText,
+      Text(body, style: TextStyle(color: AppTheme.textMuted(context),
           fontSize: 13, fontFamily: 'DM Sans', height: 1.6)),
     ]);
   }

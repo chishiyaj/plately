@@ -221,11 +221,11 @@ class _RecipeResultsScreenState extends State<RecipeResultsScreen> {
         ),
         child: TextField(
           controller: _searchCtrl,
-          style: const TextStyle(fontFamily: 'DM Sans', fontSize: 14, color: AppTheme.darkText),
+          style: TextStyle(fontFamily: 'DM Sans', fontSize: 14, color: AppTheme.textPrimary(context)),
           decoration: InputDecoration(
             hintText: 'Search recipes…',
-            hintStyle: const TextStyle(fontFamily: 'DM Sans', fontSize: 14, color: AppTheme.mutedText),
-            prefixIcon: const Icon(LucideIcons.search, size: 16, color: AppTheme.mutedText),
+            hintStyle: TextStyle(fontFamily: 'DM Sans', fontSize: 14, color: AppTheme.textMuted(context)),
+            prefixIcon: Icon(LucideIcons.search, size: 16, color: AppTheme.textMuted(context)),
             suffixIcon: _searchQuery.isNotEmpty
                 ? IconButton(
                     icon: const Icon(LucideIcons.x, size: 16, color: AppTheme.mutedText),
@@ -258,14 +258,14 @@ class _RecipeResultsScreenState extends State<RecipeResultsScreen> {
     final hasIngredients = widget.ingredients.isNotEmpty;
     return Column(children: [
       if (hasIngredients)
-        const Padding(
-          padding: EdgeInsets.fromLTRB(20, 12, 20, 4),
+        Padding(
+          padding: const EdgeInsets.fromLTRB(20, 12, 20, 4),
           child: Row(children: [
-            SizedBox(width: 14, height: 14,
+            const SizedBox(width: 14, height: 14,
               child: CircularProgressIndicator(strokeWidth: 2, color: AppTheme.primaryDark)),
-            SizedBox(width: 10),
+            const SizedBox(width: 10),
             Text('AI is generating personalised recipes…',
-              style: TextStyle(color: AppTheme.mutedText, fontSize: 12,
+              style: TextStyle(color: AppTheme.textMuted(context), fontSize: 12,
                   fontFamily: 'DM Sans', fontWeight: FontWeight.w500)),
           ]),
         ),
@@ -304,13 +304,13 @@ class _RecipeResultsScreenState extends State<RecipeResultsScreen> {
         const SizedBox(height: 20),
         Center(child: Text(
           isBusy ? 'AI is busy right now' : 'Could not load recipes',
-          style: const TextStyle(fontFamily: 'DM Sans', fontWeight: FontWeight.w700,
-              fontSize: 17, color: AppTheme.darkText))),
+          style: TextStyle(fontFamily: 'DM Sans', fontWeight: FontWeight.w700,
+              fontSize: 17, color: AppTheme.textPrimary(context)))),
         const SizedBox(height: 8),
         Center(child: Text(
           isBusy ? 'Showing saved recipes instead — try again in a moment.' : msg,
           textAlign: TextAlign.center,
-          style: const TextStyle(fontFamily: 'DM Sans', fontSize: 13, color: AppTheme.mutedText))),
+          style: TextStyle(fontFamily: 'DM Sans', fontSize: 13, color: AppTheme.textMuted(context)))),
         const SizedBox(height: 28),
         Center(child: TapScale(
           onTap: _loadRecipes,
@@ -338,13 +338,13 @@ class _RecipeResultsScreenState extends State<RecipeResultsScreen> {
         const SizedBox(height: 48),
         const Center(child: Icon(LucideIcons.wifiOff, size: 52, color: AppTheme.mutedText)),
         const SizedBox(height: 20),
-        const Center(child: Text('No internet connection',
+        Center(child: Text('No internet connection',
             style: TextStyle(fontFamily: 'DM Sans', fontWeight: FontWeight.w700,
-                fontSize: 17, color: AppTheme.darkText))),
+                fontSize: 17, color: AppTheme.textPrimary(context)))),
         const SizedBox(height: 8),
-        const Center(child: Text('Connect once to load recipes — they\'ll be saved for offline use.',
+        Center(child: Text('Connect once to load recipes — they\'ll be saved for offline use.',
             textAlign: TextAlign.center,
-            style: TextStyle(fontFamily: 'DM Sans', fontSize: 13, color: AppTheme.mutedText))),
+            style: TextStyle(fontFamily: 'DM Sans', fontSize: 13, color: AppTheme.textMuted(context)))),
         const SizedBox(height: 28),
         Center(child: TapScale(
           onTap: _loadRecipes,
@@ -368,11 +368,11 @@ class _RecipeResultsScreenState extends State<RecipeResultsScreen> {
       const Icon(LucideIcons.searchX, size: 48, color: AppTheme.mutedText),
       const SizedBox(height: 16),
       Text('No recipes match "$_searchQuery"',
-          style: const TextStyle(fontFamily: 'DM Sans',
-              fontWeight: FontWeight.w700, fontSize: 16, color: AppTheme.darkText)),
+          style: TextStyle(fontFamily: 'DM Sans',
+              fontWeight: FontWeight.w700, fontSize: 16, color: AppTheme.textPrimary(context))),
       const SizedBox(height: 6),
-      const Text('Try a different name',
-          style: TextStyle(fontFamily: 'DM Sans', fontSize: 13, color: AppTheme.mutedText)),
+      Text('Try a different name',
+          style: TextStyle(fontFamily: 'DM Sans', fontSize: 13, color: AppTheme.textMuted(context))),
       const SizedBox(height: 20),
       TapScale(
         onTap: () => _searchCtrl.clear(),
@@ -391,11 +391,11 @@ class _RecipeResultsScreenState extends State<RecipeResultsScreen> {
     return Center(child: Column(mainAxisSize: MainAxisSize.min, children: [
       const Icon(LucideIcons.chefHat, size: 48, color: AppTheme.mutedText),
       const SizedBox(height: 16),
-      const Text('No recipes found', style: TextStyle(fontFamily: 'DM Sans',
-          fontWeight: FontWeight.w700, fontSize: 16, color: AppTheme.darkText)),
+      Text('No recipes found', style: TextStyle(fontFamily: 'DM Sans',
+          fontWeight: FontWeight.w700, fontSize: 16, color: AppTheme.textPrimary(context))),
       const SizedBox(height: 6),
       Text(_activeFilter == 'All' ? 'Try different ingredients' : 'No $_activeFilter recipes yet',
-          style: const TextStyle(fontFamily: 'DM Sans', fontSize: 13, color: AppTheme.mutedText)),
+          style: TextStyle(fontFamily: 'DM Sans', fontSize: 13, color: AppTheme.textMuted(context))),
     ]));
   }
 
@@ -487,7 +487,7 @@ class _RecipeResultsScreenState extends State<RecipeResultsScreen> {
             decoration: BoxDecoration(
                 color: AppTheme.cardBg(context), shape: BoxShape.circle,
                 border: Border.all(color: AppTheme.border(context))),
-            child: const Icon(LucideIcons.arrowLeft, size: 18, color: AppTheme.darkText),
+            child: const Icon(LucideIcons.arrowLeft, size: 18, color: AppTheme.primaryDark),
           ),
         ),
         const SizedBox(width: 12),
@@ -495,15 +495,15 @@ class _RecipeResultsScreenState extends State<RecipeResultsScreen> {
           child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
             Text(
               widget.ingredients.isEmpty ? 'Browse Recipes' : 'Your Recipes',
-              style: const TextStyle(
-                color: AppTheme.darkText, fontSize: 20,
+              style: TextStyle(
+                color: AppTheme.textPrimary(context), fontSize: 20,
                 fontFamily: 'DM Sans', fontWeight: FontWeight.w800,
               ),
             ),
             if (widget.ingredients.isNotEmpty)
               Text(
                 widget.ingredients.join(', '),
-                style: const TextStyle(color: AppTheme.mutedText, fontSize: 12, fontFamily: 'DM Sans'),
+                style: TextStyle(color: AppTheme.textMuted(context), fontSize: 12, fontFamily: 'DM Sans'),
                 maxLines: 1, overflow: TextOverflow.ellipsis,
               ),
           ]),
@@ -536,7 +536,7 @@ class _RecipeResultsScreenState extends State<RecipeResultsScreen> {
               ),
               child: Text(f,
                 style: TextStyle(
-                  color: active ? Colors.white : AppTheme.mutedText,
+                  color: active ? Colors.white : AppTheme.textMuted(context),
                   fontSize: 12, fontFamily: 'DM Sans', fontWeight: FontWeight.w600,
                 )),
             ),

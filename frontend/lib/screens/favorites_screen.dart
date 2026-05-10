@@ -84,8 +84,8 @@ class _FavoritesScreenState extends State<FavoritesScreen> {
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                const Text('Favorites',
-                    style: TextStyle(color: AppTheme.darkText, fontSize: 24,
+                Text('Favorites',
+                    style: TextStyle(color: AppTheme.textPrimary(context), fontSize: 24,
                         fontFamily: 'DM Sans', fontWeight: FontWeight.w800)),
                 Text(_loading ? 'Loading...' : '${_favorites.length} saved recipes',
                     style: const TextStyle(color: AppTheme.mutedText, fontSize: 13, fontFamily: 'DM Sans')),
@@ -163,7 +163,7 @@ class _FavoritesScreenState extends State<FavoritesScreen> {
               child: Center(
                 child: Text(f,
                     style: TextStyle(
-                      color: sel ? Colors.white : AppTheme.darkText,
+                      color: sel ? Colors.white : AppTheme.textPrimary(context),
                       fontSize: 12, fontFamily: 'DM Sans', fontWeight: FontWeight.w600,
                     )),
               ),
@@ -208,15 +208,15 @@ class _FavoritesScreenState extends State<FavoritesScreen> {
               child: const Icon(LucideIcons.heart, size: 36, color: AppTheme.purple),
             ),
             const SizedBox(height: 18),
-            const Text('No favourites yet',
-                style: TextStyle(color: AppTheme.darkText, fontSize: 16,
+            Text('No favourites yet',
+                style: TextStyle(color: AppTheme.textPrimary(context), fontSize: 16,
                     fontFamily: 'DM Sans', fontWeight: FontWeight.w700)),
             const SizedBox(height: 8),
-            const Padding(
-              padding: EdgeInsets.symmetric(horizontal: 40),
+            Padding(
+              padding: const EdgeInsets.symmetric(horizontal: 40),
               child: Text('Save recipes you love — tap the ♥ on any recipe.',
                   textAlign: TextAlign.center,
-                  style: TextStyle(color: AppTheme.mutedText, fontSize: 13,
+                  style: TextStyle(color: AppTheme.textMuted(context), fontSize: 13,
                       fontFamily: 'DM Sans', height: 1.5)),
             ),
           ],
@@ -237,12 +237,12 @@ class _FavoritesScreenState extends State<FavoritesScreen> {
               child: const Icon(LucideIcons.searchX, size: 36, color: AppTheme.mutedText),
             ),
             const SizedBox(height: 16),
-            const Text('No recipes found',
-                style: TextStyle(color: AppTheme.darkText, fontSize: 16,
+            Text('No recipes found',
+                style: TextStyle(color: AppTheme.textPrimary(context), fontSize: 16,
                     fontFamily: 'DM Sans', fontWeight: FontWeight.w600)),
             const SizedBox(height: 6),
-            const Text('Try a different search or filter',
-                style: TextStyle(color: AppTheme.mutedText, fontSize: 13, fontFamily: 'DM Sans')),
+            Text('Try a different search or filter',
+                style: TextStyle(color: AppTheme.textMuted(context), fontSize: 13, fontFamily: 'DM Sans')),
           ],
         ).animate().fadeIn(duration: 300.ms),
       );

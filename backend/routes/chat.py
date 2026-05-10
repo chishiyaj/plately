@@ -95,24 +95,56 @@ def _set_cached(message: str, reply: str) -> None:
 
 
 def _build_messages(message: str, history: list) -> list:
-    """Build OpenRouter messages array with system prompt + optional history."""
-    msgs = [{"role": "user", "content": f"{SYSTEM_PROMPT}\n\nUser question: {message}"}]
+    """Build OpenRouter messages array with system prompt + optional history.
 
+    Gemma constraint: no two consecutive messages with the same role.
+    Strategy: merge system prompt into the FIRST user message so we never
+    have a bare system-role entry, then interleave history strictly alternating
+    user/assistant. If history order is broken, drop the offending entry.
+    """
     if not history:
-        return msgs
+        # Single-turn: system + question merged into one user message
+        return [{"role": "user", "content": f"{SYSTEM_PROMPT}\n\nUser question: {message}"}]
 
-    # history format: [{role: 'user'|'assistant', content: str}, ...]
     # Trim to last MAX_HISTORY messages
     trimmed = history[-MAX_HISTORY:]
 
-    # Build: system context + history + current message
-    msgs = [{"role": "user", "content": SYSTEM_PROMPT}]
+    # Filter to only valid roles and remove consecutive duplicates
+    valid = []
     for h in trimmed:
         role    = h.get("role", "user")
-        content = str(h.get("content", ""))[:500]
-        if role in ("user", "assistant") and content:
-            msgs.append({"role": role, "content": content})
-    msgs.append({"role": "user", "content": message})
+        content = str(h.get("content", ""))[:500].strip()
+        if role not in ("user", "assistant") or not content:
+            continue
+        # Drop if same role as last entry (Gemma rejects consecutive same-role)
+        if valid and valid[-1]["role"] == role:
+            continue
+        valid.append({"role": role, "content": content})
+
+    # Build final array: system merged into first message, then history, then current
+    msgs = []
+    if valid and valid[0]["role"] == "user":
+        # Merge system prompt into the first historical user message
+        msgs.append({"role": "user", "content": f"{SYSTEM_PROMPT}\n\n{valid[0]['content']}"})
+        rest = valid[1:]
+    else:
+        # History starts with assistant — prepend a synthetic user+system turn
+        msgs.append({"role": "user", "content": SYSTEM_PROMPT})
+        rest = valid
+
+    for h in rest:
+        # Ensure no consecutive same-role after prepend
+        if msgs and msgs[-1]["role"] == h["role"]:
+            continue
+        msgs.append(h)
+
+    # Append current user message — ensure it doesn't follow another user msg
+    if msgs and msgs[-1]["role"] == "user":
+        # Merge into last user message rather than create consecutive user entries
+        msgs[-1]["content"] = f"{msgs[-1]['content']}\n\n{message}"
+    else:
+        msgs.append({"role": "user", "content": message})
+
     return msgs
 
 
@@ -145,12 +177,13 @@ def _ask_ai(message: str, history: list) -> str:
         json={
             "model": MODEL,
             "messages": _build_messages(message, history),
-            "max_tokens": 450,
+            "max_tokens": 600,
         },
         timeout=20,
     )
     resp.raise_for_status()
     reply = resp.json()["choices"][0]["message"]["content"].strip()
+    logger.info("Raw OpenRouter chat response (first 200 chars): %s", reply[:200])
     # Strip only code fences and HTML — keep ** and bullet markdown (rendered by MarkdownBody)
     reply = reply.replace("```", "").replace("<br>", "\n").strip()
 

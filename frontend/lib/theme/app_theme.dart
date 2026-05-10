@@ -215,11 +215,12 @@ class AppTheme {
   static ThemeData get darkTheme => ThemeData(
     useMaterial3: true,
     brightness: Brightness.dark,
-    colorScheme: ColorScheme.fromSeed(
-      seedColor: primaryDark,
-      brightness: Brightness.dark,
+    colorScheme: const ColorScheme.dark(
+      primary: primaryDark,
+      secondary: green,
       surface: darkCard,
       onSurface: darkTextPrimary,
+      outline: darkBorder,
     ),
     scaffoldBackgroundColor: darkBg,
     fontFamily: 'DM Sans',
@@ -232,9 +233,9 @@ class AppTheme {
     ),
     inputDecorationTheme: InputDecorationTheme(
       filled: true,
-      fillColor: darkCardAlt,
-      labelStyle: const TextStyle(color: darkTextMuted),
-      hintStyle: const TextStyle(color: darkTextMuted),
+      fillColor: const Color(0xFF1C2B2B),
+      labelStyle: const TextStyle(color: darkTextMuted, fontFamily: 'DM Sans'),
+      hintStyle: const TextStyle(color: darkTextMuted, fontFamily: 'DM Sans'),
       border: OutlineInputBorder(
         borderRadius: BorderRadius.circular(12),
         borderSide: const BorderSide(color: darkBorder),
@@ -245,7 +246,7 @@ class AppTheme {
       ),
       focusedBorder: OutlineInputBorder(
         borderRadius: BorderRadius.circular(12),
-        borderSide: const BorderSide(color: primaryDark, width: 1.5),
+        borderSide: const BorderSide(color: green, width: 1.5),
       ),
     ),
     switchTheme: SwitchThemeData(

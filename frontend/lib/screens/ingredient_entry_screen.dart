@@ -240,7 +240,7 @@ class _IngredientEntryScreenState extends State<IngredientEntryScreen>
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      backgroundColor: _isDark ? Colors.black : AppTheme.creamBg,
+      backgroundColor: _isDark ? Colors.black : AppTheme.scaffoldBg(context),
       body: Stack(children: [
         // Camera layer — shows live feed OR frozen captured image
         if (_camReady && _cam != null)
@@ -434,8 +434,9 @@ class _IngredientEntryScreenState extends State<IngredientEntryScreen>
       GestureDetector(
         onTap: () => setState(() {
           _capturedPath = null;
-          _ingredients = [];
           _scanError = null;
+          _scanFailed = false;
+          // _ingredients intentionally NOT cleared — user keeps manually added items
         }),
         child: Padding(
           padding: const EdgeInsets.only(bottom: 8),
@@ -551,11 +552,12 @@ class _IngredientEntryScreenState extends State<IngredientEntryScreen>
               decoration: BoxDecoration(color: AppTheme.scanGreen.withValues(alpha: 0.4), shape: BoxShape.circle),
               child: const Icon(LucideIcons.leafyGreen, color: AppTheme.primaryDark, size: 26)),
             const SizedBox(height: 14),
-            const Text('No ingredients yet', style: TextStyle(color: AppTheme.darkText,
+            Text('No ingredients yet', style: TextStyle(
+                color: AppTheme.textPrimary(context),
                 fontSize: 15, fontFamily: 'DM Sans', fontWeight: FontWeight.w700)),
             const SizedBox(height: 4),
-            const Text('Type above or switch to Camera',
-                style: TextStyle(color: AppTheme.mutedText, fontSize: 13, fontFamily: 'DM Sans')),
+            Text('Type above or switch to Camera',
+                style: TextStyle(color: AppTheme.textMuted(context), fontSize: 13, fontFamily: 'DM Sans')),
           ])).animate().fadeIn(duration: 400.ms),
         ),
       const SizedBox(height: 16),

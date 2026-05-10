@@ -650,12 +650,12 @@ class _PantryScreenState extends State<PantryScreen> {
         child: const Icon(LucideIcons.refrigerator, size: 30, color: AppTheme.primaryDark),
       ),
       const SizedBox(height: 16),
-      const Text('Your fridge is empty',
-          style: TextStyle(color: AppTheme.darkText, fontSize: 16,
+      Text('Your fridge is empty',
+          style: TextStyle(color: AppTheme.textPrimary(context), fontSize: 16,
               fontFamily: 'DM Sans', fontWeight: FontWeight.w700)),
       const SizedBox(height: 6),
-      const Text('Add ingredients you have at home',
-          style: TextStyle(color: AppTheme.mutedText, fontSize: 13, fontFamily: 'DM Sans')),
+      Text('Add ingredients you have at home',
+          style: TextStyle(color: AppTheme.textMuted(context), fontSize: 13, fontFamily: 'DM Sans')),
     ]).animate().fadeIn(duration: 300.ms),
   );
 }

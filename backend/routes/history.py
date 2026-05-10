@@ -11,10 +11,10 @@ logger = logging.getLogger(__name__)
 def get_history():
     try:
         user_id = request.args.get('user_id', 'default')
-        rows = query(f"""
-            SELECT * FROM history WHERE user_id = {ph}
-            ORDER BY timestamp DESC LIMIT 50
-        """, (user_id,))
+        rows = query(
+            f"SELECT * FROM history WHERE user_id = {ph} ORDER BY timestamp DESC LIMIT 50",
+            (user_id,)
+        )
         return jsonify({"status": "ok", "data": rows}), 200
     except Exception:
         logger.exception("get_history error")
@@ -25,7 +25,7 @@ def get_history():
 def get_daily_history():
     try:
         user_id = request.args.get('user_id', 'default')
-        date    = request.args.get('date', '')      # expects YYYY-MM-DD
+        date    = request.args.get('date', '')   # expects YYYY-MM-DD
         if not date:
             return jsonify({"status": "error", "message": "date param required"}), 400
 
@@ -118,51 +118,12 @@ def get_history_stats():
         return jsonify({"status": "error", "message": "Internal error."}), 500
 
 
-@bp.route('/api/history/daily', methods=['GET'])
-def get_daily_history():
-    try:
-        user_id = request.args.get('user_id', 'default')
-        date_str = request.args.get('date', '')  # YYYY-MM-DD
-        if not date_str:
-            return jsonify({"status": "error", "message": "date required"}), 400
-
-        from database import USE_PG
-        if USE_PG:
-            rows = query(
-                f"SELECT ingredient_names, calories_logged, protein_logged "
-                f"FROM history WHERE user_id = {ph} AND DATE(timestamp) = {ph}::date",
-                (user_id, date_str)
-            )
-        else:
-            rows = query(
-                f"SELECT ingredient_names, calories_logged, protein_logged "
-                f"FROM history WHERE user_id = {ph} AND DATE(timestamp) = {ph}",
-                (user_id, date_str)
-            )
-
-        if not rows:
-            return jsonify({"status": "ok", "data": {
-                "total_calories": 0, "total_protein": 0, "recipes": [], "meal_count": 0
-            }}), 200
-
-        total_cal     = sum((r.get('calories_logged') or 0) for r in rows)
-        total_protein = sum((r.get('protein_logged') or 0) for r in rows)
-        recipe_names  = [r['ingredient_names'] for r in rows if r.get('ingredient_names')]
-        return jsonify({"status": "ok", "data": {
-            "total_calories": total_cal,
-            "total_protein":  total_protein,
-            "recipes":        recipe_names,
-            "meal_count":     len(rows),
-        }}), 200
-    except Exception:
-        logger.exception("get_daily_history error")
-        return jsonify({"status": "error", "message": "Internal error."}), 500
-
-
 @bp.route('/api/history/<int:history_id>', methods=['DELETE'])
 def delete_history_entry(history_id):
     try:
-        user_id = request.args.get('user_id', 'default')
+        user_id = (request.args.get('user_id') or '').strip()
+        if not user_id or user_id == 'default':
+            return jsonify({"status": "error", "message": "user_id required"}), 400
         execute(
             f"DELETE FROM history WHERE id = {ph} AND user_id = {ph}",
             (history_id, user_id)
@@ -176,7 +137,9 @@ def delete_history_entry(history_id):
 @bp.route('/api/history', methods=['DELETE'])
 def clear_history():
     try:
-        user_id = request.args.get('user_id', 'default')
+        user_id = (request.args.get('user_id') or '').strip()
+        if not user_id or user_id == 'default':
+            return jsonify({"status": "error", "message": "user_id required"}), 400
         execute(f"DELETE FROM history WHERE user_id = {ph}", (user_id,))
         return jsonify({"status": "ok", "data": {"cleared": True}}), 200
     except Exception:

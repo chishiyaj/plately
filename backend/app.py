@@ -83,9 +83,7 @@ def create_app() -> Flask:
 
     # ── CORS ──────────────────────────────────────────────────────────────────
     # Dev: open. Prod: lock to your actual domain.
-    allowed_origins = os.getenv("ALLOWED_ORIGINS", "*" if IS_DEV else "")
-    if not IS_DEV and not allowed_origins:
-        logger.warning("ALLOWED_ORIGINS not set — CORS will block all cross-origin requests")
+    allowed_origins = os.getenv("ALLOWED_ORIGINS", "*")
     CORS(app, resources={r"/api/*": {"origins": allowed_origins}})
 
     # ── Rate limiter init ─────────────────────────────────────────────────────

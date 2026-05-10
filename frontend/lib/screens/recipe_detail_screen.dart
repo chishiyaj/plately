@@ -479,7 +479,7 @@ class _RecipeDetailScreenState extends State<RecipeDetailScreen> with TickerProv
               ),
               const SizedBox(width: 12),
               Expanded(child: Text(ing.name, style: TextStyle(
-                color: _checked.contains(i) ? AppTheme.mutedText : AppTheme.darkText,
+                color: _checked.contains(i) ? AppTheme.textMuted(context) : AppTheme.textPrimary(context),
                 fontSize: 14, fontFamily: 'DM Sans', fontWeight: FontWeight.w500,
                 decoration: _checked.contains(i) ? TextDecoration.lineThrough : null,
               ))),
@@ -554,7 +554,7 @@ class _RecipeDetailScreenState extends State<RecipeDetailScreen> with TickerProv
               ),
               const SizedBox(width: 12),
               Expanded(child: Text(steps[i], style: TextStyle(
-                  color: done ? AppTheme.greenDark : AppTheme.darkText,
+                  color: done ? AppTheme.greenDark : AppTheme.textPrimary(context),
                   fontSize: 14, fontFamily: 'DM Sans', height: 1.5))),
               if (timerSecs != null) ...[
                 const SizedBox(width: 8),
@@ -615,11 +615,11 @@ class _RecipeDetailScreenState extends State<RecipeDetailScreen> with TickerProv
       child: Column(children: [
         // ── Header + serving scaler ────────────────────────────────────────
         Row(children: [
-          const Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+          Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
             Text('Nutrition Facts', style: TextStyle(
-                color: AppTheme.darkText, fontSize: 14, fontFamily: 'DM Sans', fontWeight: FontWeight.w700)),
+                color: AppTheme.textPrimary(context), fontSize: 14, fontFamily: 'DM Sans', fontWeight: FontWeight.w700)),
             Text('Tap to adjust servings', style: TextStyle(
-                color: AppTheme.mutedText, fontSize: 11, fontFamily: 'DM Sans')),
+                color: AppTheme.textMuted(context), fontSize: 11, fontFamily: 'DM Sans')),
           ]),
           const Spacer(),
           // Serving size picker chips
@@ -635,10 +635,10 @@ class _RecipeDetailScreenState extends State<RecipeDetailScreen> with TickerProv
                 decoration: BoxDecoration(
                   color: selected ? AppTheme.primaryDark : AppTheme.cardAltBg(context),
                   borderRadius: BorderRadius.circular(8),
-                  border: Border.all(color: selected ? AppTheme.primaryDark : AppTheme.borderGray),
+                  border: Border.all(color: selected ? AppTheme.primaryDark : AppTheme.border(context)),
                 ),
                 child: Text(label, style: TextStyle(
-                  color: selected ? Colors.white : AppTheme.mutedText,
+                  color: selected ? Colors.white : AppTheme.textMuted(context),
                   fontSize: 11, fontFamily: 'DM Sans', fontWeight: FontWeight.w700,
                 )),
               ),
@@ -742,6 +742,7 @@ class _RecipeDetailScreenState extends State<RecipeDetailScreen> with TickerProv
       UserPrefsService.saveProteinConsumed(proteinNow + scaledPro),
       UserPrefsService.incrementRecipeCount(),
       UserPrefsService.incrementStreak(),
+      UserPrefsService.saveLastCookDate(),
       NotificationService.notifyCookingDone(
         r.name,
         cal:      scaledCal,
@@ -778,7 +779,8 @@ class _RecipeDetailScreenState extends State<RecipeDetailScreen> with TickerProv
     await Future.delayed(const Duration(milliseconds: 700));
     if (!mounted) return;
     _showShareSheet(cal: scaledCal, protein: scaledPro, streak: currentStreak);
-
+    await Future.delayed(const Duration(milliseconds: 200));
+    if (!mounted) return;
     Navigator.pop(context);
   }
 
@@ -807,7 +809,7 @@ class _RecipeDetailScreenState extends State<RecipeDetailScreen> with TickerProv
           decoration: BoxDecoration(
             color: AppTheme.cardBg(context),
             borderRadius: BorderRadius.circular(16),
-            border: Border.all(color: AppTheme.borderGray),
+            border: Border.all(color: AppTheme.border(context)),
             boxShadow: const [BoxShadow(color: Color(0x0A000000), blurRadius: 8, offset: Offset(0, 3))],
           ),
           child: const Icon(LucideIcons.share2, color: AppTheme.primaryDark, size: 20),
@@ -1021,8 +1023,8 @@ class _ShareBottomSheetState extends State<_ShareBottomSheet> {
             ),
           ),
           const SizedBox(height: 20),
-          const Text('Share your W', style: TextStyle(
-            color: AppTheme.darkText, fontSize: 18,
+          Text('Share your W', style: TextStyle(
+            color: AppTheme.textPrimary(context), fontSize: 18,
             fontFamily: 'DM Sans', fontWeight: FontWeight.w800,
           )),
           const SizedBox(height: 4),

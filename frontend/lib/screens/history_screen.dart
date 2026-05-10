@@ -58,14 +58,14 @@ class _HistoryScreenState extends State<HistoryScreen> {
       builder: (dCtx) => AlertDialog(
         backgroundColor: AppTheme.cardBg(dCtx),
         shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
-        title: const Text('Clear All History', style: TextStyle(fontFamily: 'DM Sans',
-            fontWeight: FontWeight.w800, color: AppTheme.darkText)),
-        content: const Text('This will permanently delete all your cooking history.',
-            style: TextStyle(fontFamily: 'DM Sans', color: AppTheme.mutedText)),
+        title: Text('Clear All History', style: TextStyle(fontFamily: 'DM Sans',
+            fontWeight: FontWeight.w800, color: AppTheme.textPrimary(dCtx))),
+        content: Text('This will permanently delete all your cooking history.',
+            style: TextStyle(fontFamily: 'DM Sans', color: AppTheme.textMuted(dCtx))),
         actions: [
-          TextButton(onPressed: () => Navigator.pop(context, false),
-              child: const Text('Cancel', style: TextStyle(fontFamily: 'DM Sans', color: AppTheme.mutedText))),
-          TextButton(onPressed: () => Navigator.pop(context, true),
+          TextButton(onPressed: () => Navigator.pop(dCtx, false),
+              child: Text('Cancel', style: TextStyle(fontFamily: 'DM Sans', color: AppTheme.textMuted(dCtx)))),
+          TextButton(onPressed: () => Navigator.pop(dCtx, true),
               child: const Text('Clear All', style: TextStyle(fontFamily: 'DM Sans',
                   color: AppTheme.red, fontWeight: FontWeight.w700))),
         ],
@@ -171,7 +171,7 @@ class _HistoryScreenState extends State<HistoryScreen> {
               border: Border.all(color: AppTheme.border(context))),
           child: const Icon(LucideIcons.calendarDays, color: AppTheme.primaryDark, size: 18)),
       const SizedBox(width: 12),
-      const Text('Your Activity', style: TextStyle(color: AppTheme.darkText, fontSize: 18,
+      Text('Your Activity', style: TextStyle(color: AppTheme.textPrimary(context), fontSize: 18,
           fontFamily: 'DM Sans', fontWeight: FontWeight.w800)),
       const Spacer(),
       if (_history.isNotEmpty)
@@ -275,12 +275,12 @@ class _HistoryScreenState extends State<HistoryScreen> {
             Padding(
               padding: const EdgeInsets.only(bottom: 10),
               child: Row(children: [
-                Text(entry.key, style: const TextStyle(color: AppTheme.darkText, fontSize: 13,
+                Text(entry.key, style: TextStyle(color: AppTheme.textPrimary(context), fontSize: 13,
                     fontFamily: 'DM Sans', fontWeight: FontWeight.w800)),
                 const SizedBox(width: 10),
-                Expanded(child: Container(height: 1, color: AppTheme.borderGray)),
+                Expanded(child: Container(height: 1, color: AppTheme.border(context))),
                 const SizedBox(width: 8),
-                Text('${entry.value.length}', style: const TextStyle(color: AppTheme.mutedText,
+                Text('${entry.value.length}', style: TextStyle(color: AppTheme.textMuted(context),
                     fontSize: 11, fontFamily: 'DM Sans')),
               ]),
             ),
@@ -359,7 +359,7 @@ class _HistoryScreenState extends State<HistoryScreen> {
         Row(children: [
           const Icon(LucideIcons.chartBar, color: AppTheme.primaryDark, size: 18),
           const SizedBox(width: 8),
-          const Text('7-Day Overview', style: TextStyle(color: AppTheme.darkText,
+          Text('7-Day Overview', style: TextStyle(color: AppTheme.textPrimary(context),
               fontSize: 15, fontFamily: 'DM Sans', fontWeight: FontWeight.w800)),
           const Spacer(),
           Container(
@@ -502,10 +502,10 @@ class _SummaryItem extends StatelessWidget {
   const _SummaryItem({required this.label, required this.value});
   @override
   Widget build(BuildContext context) => Expanded(child: Column(children: [
-    Text(value, style: const TextStyle(color: AppTheme.darkText, fontSize: 15,
+    Text(value, style: TextStyle(color: AppTheme.textPrimary(context), fontSize: 15,
         fontFamily: 'DM Sans', fontWeight: FontWeight.w800)),
     const SizedBox(height: 2),
-    Text(label, style: const TextStyle(color: AppTheme.mutedText, fontSize: 10, fontFamily: 'DM Sans')),
+    Text(label, style: TextStyle(color: AppTheme.textMuted(context), fontSize: 10, fontFamily: 'DM Sans')),
   ]));
 }
 
@@ -513,7 +513,7 @@ class _SummaryDivider extends StatelessWidget {
   @override
   Widget build(BuildContext context) => Container(
       width: 1, height: 32, margin: const EdgeInsets.symmetric(horizontal: 8),
-      color: AppTheme.borderGray);
+      color: AppTheme.border(context));
 }
 
 class _StatCol extends StatelessWidget {
@@ -565,15 +565,15 @@ class _HistoryRow extends StatelessWidget {
         Expanded(child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
           Text(
             ingredients.isNotEmpty ? ingredients : 'Cooking session',
-            style: const TextStyle(color: AppTheme.darkText, fontSize: 13,
+            style: TextStyle(color: AppTheme.textPrimary(context), fontSize: 13,
                 fontFamily: 'DM Sans', fontWeight: FontWeight.w600),
             maxLines: 1, overflow: TextOverflow.ellipsis,
           ),
           const SizedBox(height: 3),
           Row(children: [
-            const Icon(LucideIcons.clock3, size: 11, color: AppTheme.mutedText),
+            Icon(LucideIcons.clock3, size: 11, color: AppTheme.textMuted(context)),
             const SizedBox(width: 4),
-            Text(time, style: const TextStyle(color: AppTheme.mutedText, fontSize: 11, fontFamily: 'DM Sans')),
+            Text(time, style: TextStyle(color: AppTheme.textMuted(context), fontSize: 11, fontFamily: 'DM Sans')),
           ]),
         ])),
         const SizedBox(width: 8),

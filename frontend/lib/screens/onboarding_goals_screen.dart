@@ -25,9 +25,6 @@ class _OnboardingGoalsScreenState extends State<OnboardingGoalsScreen> {
   int _calGoal     = 2200;
   int _proteinGoal = 120;
 
-  // Whether the screen is used as post-login onboarding vs edit from profile
-  bool get _isOnboarding => !Navigator.of(context).canPop();
-
   @override
   void initState() {
     super.initState();
@@ -182,8 +179,8 @@ class _OnboardingGoalsScreenState extends State<OnboardingGoalsScreen> {
         Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
           Text(
             canPop ? 'Edit Goals' : 'Set Your Goals',
-            style: const TextStyle(
-              color: AppTheme.darkText, fontSize: 18,
+            style: TextStyle(
+              color: AppTheme.textPrimary(context), fontSize: 18,
               fontFamily: 'DM Sans', fontWeight: FontWeight.w800,
             ),
           ),
@@ -217,8 +214,8 @@ class _OnboardingGoalsScreenState extends State<OnboardingGoalsScreen> {
 
   Widget _sectionLabel(String label) => Text(
     label,
-    style: const TextStyle(
-      color: AppTheme.darkText, fontSize: 13,
+    style: TextStyle(
+      color: AppTheme.textPrimary(context), fontSize: 13,
       fontFamily: 'DM Sans', fontWeight: FontWeight.w700,
     ),
   );
@@ -253,7 +250,7 @@ class _OnboardingGoalsScreenState extends State<OnboardingGoalsScreen> {
                     color: active ? Colors.white : AppTheme.primaryDark),
                 const SizedBox(height: 6),
                 Text(label, style: TextStyle(
-                  color: active ? Colors.white : AppTheme.darkText,
+                  color: active ? Colors.white : AppTheme.textPrimary(context),
                   fontSize: 11, fontFamily: 'DM Sans', fontWeight: FontWeight.w700,
                 )),
               ]),
@@ -294,8 +291,8 @@ class _OnboardingGoalsScreenState extends State<OnboardingGoalsScreen> {
   }) => TextField(
     controller: ctrl,
     keyboardType: const TextInputType.numberWithOptions(decimal: true),
-    style: const TextStyle(
-      fontFamily: 'DM Sans', color: AppTheme.darkText, fontSize: 14),
+    style: TextStyle(
+      fontFamily: 'DM Sans', color: AppTheme.textPrimary(context), fontSize: 14),
     decoration: InputDecoration(
       labelText: label,
       hintText: hint,
@@ -347,7 +344,7 @@ class _OnboardingGoalsScreenState extends State<OnboardingGoalsScreen> {
         ),
         child: Center(
           child: Text(label, style: TextStyle(
-            color: active ? Colors.white : AppTheme.darkText,
+            color: active ? Colors.white : AppTheme.textPrimary(context),
             fontSize: 13, fontFamily: 'DM Sans', fontWeight: FontWeight.w600,
           )),
         ),
@@ -438,8 +435,8 @@ class _OnboardingGoalsScreenState extends State<OnboardingGoalsScreen> {
       child: Icon(icon, color: color, size: 17),
     ),
     const SizedBox(width: 12),
-    Expanded(child: Text(label, style: const TextStyle(
-      color: AppTheme.darkText, fontSize: 14,
+    Expanded(child: Text(label, style: TextStyle(
+      color: AppTheme.textPrimary(context), fontSize: 14,
       fontFamily: 'DM Sans', fontWeight: FontWeight.w600,
     ))),
     Text('$value $unit', style: TextStyle(
@@ -485,8 +482,8 @@ class _OnboardingGoalsScreenState extends State<OnboardingGoalsScreen> {
                 decoration: BoxDecoration(color: AppTheme.border(context),
                     borderRadius: BorderRadius.circular(2))),
             const SizedBox(height: 16),
-            Text(title, style: const TextStyle(
-              color: AppTheme.darkText, fontSize: 17,
+            Text(title, style: TextStyle(
+              color: AppTheme.textPrimary(context), fontSize: 17,
               fontFamily: 'DM Sans', fontWeight: FontWeight.w800,
             )),
             const SizedBox(height: 18),
@@ -494,8 +491,8 @@ class _OnboardingGoalsScreenState extends State<OnboardingGoalsScreen> {
               controller: ctrl,
               autofocus: true,
               keyboardType: TextInputType.number,
-              style: const TextStyle(
-                  fontFamily: 'DM Sans', color: AppTheme.darkText,
+              style: TextStyle(
+                  fontFamily: 'DM Sans', color: AppTheme.textPrimary(context),
                   fontSize: 18, fontWeight: FontWeight.w700),
               decoration: InputDecoration(
                 suffixText: unit,

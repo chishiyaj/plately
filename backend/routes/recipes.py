@@ -266,6 +266,16 @@ def get_recipes():
         prefs       = data.get("prefs") or {}
         if not isinstance(prefs, dict):
             prefs = {}
+        # Field-level validation — clamp numeric goals, coerce booleans
+        cal_goal     = prefs.get("cal_goal", 2200)
+        protein_goal = prefs.get("protein_goal", 120)
+        if not isinstance(cal_goal, (int, float)) or cal_goal < 500 or cal_goal > 10000:
+            prefs["cal_goal"] = 2200
+        if not isinstance(protein_goal, (int, float)) or protein_goal < 20 or protein_goal > 500:
+            prefs["protein_goal"] = 120
+        for k in ("pref_veg", "pref_gluten", "pref_dairy", "pref_hipro"):
+            if k in prefs and not isinstance(prefs[k], bool):
+                prefs[k] = bool(prefs.get(k, False))
         page        = max(1, int(data.get("page", 1)))
         per_page    = min(50, max(1, int(data.get("per_page", 50))))
         offset      = (page - 1) * per_page

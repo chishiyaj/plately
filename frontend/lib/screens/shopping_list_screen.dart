@@ -52,26 +52,29 @@ class _ShoppingListScreenState extends State<ShoppingListScreen> {
   Future<void> _shopeeSearch(String item) async {
     final encoded = Uri.encodeComponent(item);
     final url = Uri.parse('https://shopee.ph/search?keyword=$encoded');
-    final messenger = ScaffoldMessenger.of(context);
     if (await canLaunchUrl(url)) {
       await launchUrl(url, mode: LaunchMode.externalApplication);
-    } else {
-      // Shopee not installed — copy item to clipboard as fallback
-      final lines = _items.values
-          .where((i) => !_checked.contains(i.name.toLowerCase()))
-          .map((i) => '- ${i.name} — ${i.amounts.first.split(' (').first}')
-          .join('\n');
-      await Clipboard.setData(ClipboardData(text: 'Shopping List\n\n$lines'));
-      messenger.showSnackBar(SnackBar(
-        content: const Text('Shopee not available — shopping list copied to clipboard!',
-            style: TextStyle(fontFamily: 'DM Sans')),
-        backgroundColor: AppTheme.primaryDark,
-        behavior: SnackBarBehavior.floating,
-        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
-        margin: const EdgeInsets.fromLTRB(16, 0, 16, 80),
-        duration: const Duration(seconds: 3),
-      ));
+      return;
     }
+    // Fallback: open in browser
+    final webUrl = Uri.parse('https://shopee.ph/search?keyword=$encoded');
+    if (await canLaunchUrl(webUrl)) {
+      await launchUrl(webUrl, mode: LaunchMode.inAppBrowserView);
+      return;
+    }
+    // Last resort: copy only THIS item name to clipboard
+    if (!mounted) return;
+    final messenger = ScaffoldMessenger.of(context);
+    await Clipboard.setData(ClipboardData(text: item));
+    messenger.showSnackBar(SnackBar(
+      content: Text('Copied "$item" to clipboard',
+          style: const TextStyle(fontFamily: 'DM Sans')),
+      backgroundColor: AppTheme.primaryDark,
+      behavior: SnackBarBehavior.floating,
+      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+      margin: const EdgeInsets.fromLTRB(16, 0, 16, 80),
+      duration: const Duration(seconds: 2),
+    ));
   }
 
   void _copyAll() {

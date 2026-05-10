@@ -255,14 +255,14 @@ class _Header extends StatelessWidget {
       ),
       const SizedBox(width: 10),
       Expanded(child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-        const Text('Ask Plately', style: TextStyle(
-          color: AppTheme.darkText, fontSize: 15, fontFamily: 'DM Sans', fontWeight: FontWeight.w800)),
+        Text('Ask Plately', style: TextStyle(
+          color: AppTheme.textPrimary(context), fontSize: 15, fontFamily: 'DM Sans', fontWeight: FontWeight.w800)),
         AnimatedSwitcher(
           duration: const Duration(milliseconds: 200),
           child: Text(
             key: ValueKey(title),
             title == 'New chat' ? 'AI cooking & nutrition assistant' : title,
-            style: const TextStyle(color: AppTheme.mutedText, fontSize: 11, fontFamily: 'DM Sans'),
+            style: TextStyle(color: AppTheme.textMuted(context), fontSize: 11, fontFamily: 'DM Sans'),
             maxLines: 1, overflow: TextOverflow.ellipsis,
           ),
         ),
@@ -330,8 +330,8 @@ class _WelcomeView extends StatelessWidget {
         child: const Icon(LucideIcons.chefHat, color: Colors.white, size: 34),
       ).animate().scale(begin: const Offset(0.7, 0.7), duration: 500.ms, curve: Curves.easeOutBack).fadeIn(duration: 400.ms),
       const SizedBox(height: 20),
-      const Text('Hi, I\'m Plately', style: TextStyle(
-        color: AppTheme.darkText, fontSize: 26, fontFamily: 'DM Sans', fontWeight: FontWeight.w800, letterSpacing: -0.5,
+      Text('Hi, I\'m Plately', style: TextStyle(
+        color: AppTheme.textPrimary(context), fontSize: 26, fontFamily: 'DM Sans', fontWeight: FontWeight.w800, letterSpacing: -0.5,
       )).animate().fadeIn(duration: 400.ms, delay: 80.ms).slideY(begin: 0.08),
       const SizedBox(height: 8),
       Text('Ask me anything about cooking, nutrition,\nor what to make with your ingredients.',
@@ -339,8 +339,8 @@ class _WelcomeView extends StatelessWidget {
         style: TextStyle(color: AppTheme.mutedText.withValues(alpha: 0.8), fontSize: 14, fontFamily: 'DM Sans', height: 1.55),
       ).animate().fadeIn(duration: 400.ms, delay: 140.ms),
       const SizedBox(height: 36),
-      const Align(alignment: Alignment.centerLeft, child: Text('Try asking',
-          style: TextStyle(color: AppTheme.darkText, fontSize: 13, fontFamily: 'DM Sans', fontWeight: FontWeight.w700))),
+      Align(alignment: Alignment.centerLeft, child: Text('Try asking',
+          style: TextStyle(color: AppTheme.textPrimary(context), fontSize: 13, fontFamily: 'DM Sans', fontWeight: FontWeight.w700))),
       const SizedBox(height: 12),
       GridView.builder(
         shrinkWrap: true, physics: const NeverScrollableScrollPhysics(),
