@@ -629,6 +629,8 @@ class _IngredientEntryScreenState extends State<IngredientEntryScreen>
             prefixIcon: Icon(LucideIcons.plus, size: 16, color: dark ? Colors.white38 : AppTheme.textMuted(context)),
             contentPadding: const EdgeInsets.symmetric(vertical: 16),
             border: InputBorder.none,
+            enabledBorder: InputBorder.none,
+            focusedBorder: InputBorder.none,
           ),
         ),
       ),

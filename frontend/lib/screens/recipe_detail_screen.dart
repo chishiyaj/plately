@@ -38,10 +38,14 @@ class _RecipeDetailScreenState extends State<RecipeDetailScreen> with TickerProv
   double _servings = 1.0;
   static const _servingOptions = [0.5, 1.0, 1.5, 2.0, 3.0];
 
-  // Step timers: stepIndex → seconds remaining (-1 = not running, 0 = done)
-  final Map<int, int> _timerSeconds = {};
+  // Step timers: stepIndex → deadline DateTime (null = not running)
+  final Map<int, DateTime> _timerDeadlines = {};
   final Map<int, Timer?> _timers = {};
+  final Map<int, int> _timerSeconds = {}; // display cache, updated each tick
   final _screenshotCtrl = ScreenshotController();
+
+  // Step completion: tap a step row to mark it done (separate from timer done)
+  final Set<int> _completedSteps = {};
 
   // The active recipe — either the passed-in one or the fully-fetched version
   Recipe get r => _fetchedRecipe ?? widget.recipe;
@@ -93,6 +97,7 @@ class _RecipeDetailScreenState extends State<RecipeDetailScreen> with TickerProv
     if (mounted) setState(() => _isFavorited = saved);
   }
 
+  // Favorite: optimistic update first, revert on failure
   Future<void> _toggleFavorite() async {
     if (r.id < 0) {
       ScaffoldMessenger.of(context).showSnackBar(SnackBar(
@@ -105,6 +110,9 @@ class _RecipeDetailScreenState extends State<RecipeDetailScreen> with TickerProv
       ));
       return;
     }
+    // Optimistic update — feels instant
+    final optimistic = !_isFavorited;
+    setState(() => _isFavorited = optimistic);
     final newState = await ApiService.toggleFavorite(r.id);
     if (mounted) setState(() => _isFavorited = newState);
   }
@@ -113,6 +121,7 @@ class _RecipeDetailScreenState extends State<RecipeDetailScreen> with TickerProv
   void dispose() {
     _heroCtrl.dispose();
     for (final t in _timers.values) { t?.cancel(); }
+    _timerDeadlines.clear();
     super.dispose();
   }
 
@@ -130,22 +139,27 @@ class _RecipeDetailScreenState extends State<RecipeDetailScreen> with TickerProv
 
   void _startTimer(int stepIdx, int totalSeconds) {
     _timers[stepIdx]?.cancel();
+    final deadline = DateTime.now().add(Duration(seconds: totalSeconds));
+    _timerDeadlines[stepIdx] = deadline;
     setState(() => _timerSeconds[stepIdx] = totalSeconds);
     _timers[stepIdx] = Timer.periodic(const Duration(seconds: 1), (t) {
-      final current = _timerSeconds[stepIdx] ?? 0;
-      if (current <= 0) {
+      if (!mounted) { t.cancel(); return; }
+      final remaining = deadline.difference(DateTime.now()).inSeconds;
+      if (remaining <= 0) {
         t.cancel();
+        _timerDeadlines.remove(stepIdx);
         HapticFeedback.heavyImpact();
         setState(() => _timerSeconds[stepIdx] = 0);
         NotificationService.notifyCookingDone('Timer done — Step ${stepIdx + 1}');
       } else {
-        setState(() => _timerSeconds[stepIdx] = current - 1);
+        setState(() => _timerSeconds[stepIdx] = remaining);
       }
     });
   }
 
   void _stopTimer(int stepIdx) {
     _timers[stepIdx]?.cancel();
+    _timerDeadlines.remove(stepIdx);
     setState(() => _timerSeconds.remove(stepIdx));
   }
 
@@ -406,7 +420,7 @@ class _RecipeDetailScreenState extends State<RecipeDetailScreen> with TickerProv
                 ]),
               ),
             ),
-          // Favorite button
+          // Favorite button — only icon color changes, not container bg
           Positioned(
             top: 48, right: 16,
             child: TapScale(
@@ -414,11 +428,14 @@ class _RecipeDetailScreenState extends State<RecipeDetailScreen> with TickerProv
               child: Container(
                 width: 38, height: 38,
                 decoration: BoxDecoration(
-                  color: _isFavorited ? AppTheme.red.withValues(alpha: 0.9) : Colors.black45,
+                  color: Colors.black45,
                   borderRadius: BorderRadius.circular(12),
                 ),
-                child: Icon(LucideIcons.heart,
-                    color: _isFavorited ? Colors.white : Colors.white60, size: 18),
+                child: Icon(
+                  _isFavorited ? LucideIcons.heart : LucideIcons.heart,
+                  color: _isFavorited ? AppTheme.red : Colors.white60,
+                  size: 18,
+                ),
               ),
             ),
           ),
@@ -432,7 +449,7 @@ class _RecipeDetailScreenState extends State<RecipeDetailScreen> with TickerProv
       margin: const EdgeInsets.fromLTRB(20, 14, 20, 0),
       height: 44,
       decoration: BoxDecoration(
-          color: AppTheme.lightGray.withValues(alpha: 0.5),
+          color: AppTheme.cardAltBg(context),
           borderRadius: BorderRadius.circular(14)),
       child: Row(children: [
         _Tab(label: 'Ingredients', selected: _showIngredients,  onTap: () => setState(() => _showIngredients = true)),
@@ -444,54 +461,68 @@ class _RecipeDetailScreenState extends State<RecipeDetailScreen> with TickerProv
   Widget _buildIngredients() {
     final ings = r.ingredients;
     if (ings.isEmpty) {
-      return const Padding(
-        padding: EdgeInsets.symmetric(vertical: 32),
+      return Padding(
+        padding: const EdgeInsets.symmetric(vertical: 32),
         child: Center(child: Text('No ingredient details available.',
-            style: TextStyle(fontFamily: 'DM Sans', color: AppTheme.mutedText))),
+            style: TextStyle(fontFamily: 'DM Sans', color: AppTheme.textMuted(context)))),
       );
     }
     return Column(
-      children: List.generate(ings.length, (i) {
-        final ing = ings[i];
-        // Scale ingredient amount by serving multiplier
-        final scaledAmount = _scaleAmount(ing.amount, _servings);
-        return TapScale(
-          onTap: () => setState(() => _checked.contains(i) ? _checked.remove(i) : _checked.add(i)),
-          child: Container(
-            margin: const EdgeInsets.only(bottom: 8),
-            padding: const EdgeInsets.all(14),
-            decoration: BoxDecoration(
-              color: AppTheme.cardBg(context), borderRadius: BorderRadius.circular(14),
-              boxShadow: const [BoxShadow(color: Color(0x06000000), blurRadius: 8, offset: Offset(0, 2))],
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        // Helper label — clarifies tap behaviour and pre-calc macros
+        Padding(
+          padding: const EdgeInsets.only(bottom: 10),
+          child: Text(
+            'Tap to check off — macros are pre-calculated for the full recipe.',
+            style: TextStyle(
+              color: AppTheme.textMuted(context),
+              fontSize: 12,
+              fontFamily: 'DM Sans',
             ),
-            child: Row(children: [
-              AnimatedContainer(
-                duration: 200.ms,
-                width: 22, height: 22,
-                decoration: BoxDecoration(
-                  color: _checked.contains(i) ? AppTheme.green : Colors.transparent,
-                  borderRadius: BorderRadius.circular(6),
-                  border: Border.all(
-                      color: _checked.contains(i) ? AppTheme.green : AppTheme.borderGray, width: 1.5),
-                ),
-                child: _checked.contains(i)
-                    ? const Icon(LucideIcons.check, color: Colors.white, size: 13) : null,
+          ),
+        ),
+        ...List.generate(ings.length, (i) {
+          final ing = ings[i];
+          final scaledAmount = _scaleAmount(ing.amount, _servings);
+          return TapScale(
+            onTap: () => setState(() => _checked.contains(i) ? _checked.remove(i) : _checked.add(i)),
+            child: Container(
+              margin: const EdgeInsets.only(bottom: 8),
+              padding: const EdgeInsets.all(14),
+              decoration: BoxDecoration(
+                color: AppTheme.cardBg(context), borderRadius: BorderRadius.circular(14),
+                boxShadow: const [BoxShadow(color: Color(0x06000000), blurRadius: 8, offset: Offset(0, 2))],
               ),
-              const SizedBox(width: 12),
-              Expanded(child: Text(ing.name, style: TextStyle(
-                color: _checked.contains(i) ? AppTheme.textMuted(context) : AppTheme.textPrimary(context),
-                fontSize: 14, fontFamily: 'DM Sans', fontWeight: FontWeight.w500,
-                decoration: _checked.contains(i) ? TextDecoration.lineThrough : null,
-              ))),
-              Text(scaledAmount, style: TextStyle(
-                color: _servings != 1.0 ? AppTheme.primaryDark : AppTheme.mutedText,
-                fontSize: 13, fontFamily: 'DM Sans',
-                fontWeight: _servings != 1.0 ? FontWeight.w700 : FontWeight.w500,
-              )),
-            ]),
-          ).animate(delay: (i * 40).ms).fadeIn(duration: 300.ms).slideX(begin: 0.04),
-        );
-      }),
+              child: Row(children: [
+                AnimatedContainer(
+                  duration: 200.ms,
+                  width: 22, height: 22,
+                  decoration: BoxDecoration(
+                    color: _checked.contains(i) ? AppTheme.green : Colors.transparent,
+                    borderRadius: BorderRadius.circular(6),
+                    border: Border.all(
+                        color: _checked.contains(i) ? AppTheme.green : AppTheme.border(context), width: 1.5),
+                  ),
+                  child: _checked.contains(i)
+                      ? const Icon(LucideIcons.check, color: Colors.white, size: 13) : null,
+                ),
+                const SizedBox(width: 12),
+                Expanded(child: Text(ing.name, style: TextStyle(
+                  color: _checked.contains(i) ? AppTheme.textMuted(context) : AppTheme.textPrimary(context),
+                  fontSize: 14, fontFamily: 'DM Sans', fontWeight: FontWeight.w500,
+                  decoration: _checked.contains(i) ? TextDecoration.lineThrough : null,
+                ))),
+                Text(scaledAmount, style: TextStyle(
+                  color: _servings != 1.0 ? AppTheme.primaryDark : AppTheme.textMuted(context),
+                  fontSize: 13, fontFamily: 'DM Sans',
+                  fontWeight: _servings != 1.0 ? FontWeight.w700 : FontWeight.w500,
+                )),
+              ]),
+            ).animate(delay: (i * 40).ms).fadeIn(duration: 300.ms).slideX(begin: 0.04),
+          );
+        }),
+      ],
     );
   }
 
@@ -526,74 +557,82 @@ class _RecipeDetailScreenState extends State<RecipeDetailScreen> with TickerProv
     return Column(
       children: List.generate(steps.length, (i) {
         final timerSecs = _extractSeconds(steps[i]);
-        final running = _timerSeconds.containsKey(i);
-        final remaining = _timerSeconds[i] ?? 0;
-        final done = running && remaining == 0;
-        return Container(
-          margin: const EdgeInsets.only(bottom: 12),
-          padding: const EdgeInsets.all(16),
-          decoration: BoxDecoration(
-            color: done ? AppTheme.green.withValues(alpha: 0.08) : AppTheme.cardBg(context),
-            borderRadius: BorderRadius.circular(16),
-            border: Border.all(color: done ? AppTheme.green.withValues(alpha: 0.4) : Colors.transparent),
-            boxShadow: const [BoxShadow(color: Color(0x06000000), blurRadius: 8, offset: Offset(0, 2))],
-          ),
-          child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-            Row(crossAxisAlignment: CrossAxisAlignment.start, children: [
-              Container(
-                width: 28, height: 28,
-                decoration: BoxDecoration(
-                  gradient: done ? null : AppTheme.tealGradient,
-                  color: done ? AppTheme.green : null,
-                  shape: BoxShape.circle,
+        final timerRunning = _timerSeconds.containsKey(i);
+        final timerRemaining = _timerSeconds[i] ?? 0;
+        final timerDone = timerRunning && timerRemaining == 0;
+        final manualDone = _completedSteps.contains(i);
+        final done = timerDone || manualDone;
+
+        return TapScale(
+          onTap: () => setState(() =>
+              manualDone ? _completedSteps.remove(i) : _completedSteps.add(i)),
+          child: Container(
+            margin: const EdgeInsets.only(bottom: 12),
+            padding: const EdgeInsets.all(16),
+            decoration: BoxDecoration(
+              color: done ? AppTheme.green.withValues(alpha: 0.08) : AppTheme.cardBg(context),
+              borderRadius: BorderRadius.circular(16),
+              border: Border.all(color: done ? AppTheme.green.withValues(alpha: 0.4) : Colors.transparent),
+              boxShadow: const [BoxShadow(color: Color(0x06000000), blurRadius: 8, offset: Offset(0, 2))],
+            ),
+            child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+              Row(crossAxisAlignment: CrossAxisAlignment.start, children: [
+                Container(
+                  width: 28, height: 28,
+                  decoration: BoxDecoration(
+                    gradient: done ? null : AppTheme.tealGradient,
+                    color: done ? AppTheme.green : null,
+                    shape: BoxShape.circle,
+                  ),
+                  child: Center(child: done
+                    ? const Icon(LucideIcons.check, color: Colors.white, size: 14)
+                    : Text('${i + 1}', style: const TextStyle(
+                        color: Colors.white, fontSize: 12, fontFamily: 'DM Sans', fontWeight: FontWeight.w700))),
                 ),
-                child: Center(child: done
-                  ? const Icon(LucideIcons.check, color: Colors.white, size: 14)
-                  : Text('${i + 1}', style: const TextStyle(
-                      color: Colors.white, fontSize: 12, fontFamily: 'DM Sans', fontWeight: FontWeight.w700))),
-              ),
-              const SizedBox(width: 12),
-              Expanded(child: Text(steps[i], style: TextStyle(
-                  color: done ? AppTheme.greenDark : AppTheme.textPrimary(context),
-                  fontSize: 14, fontFamily: 'DM Sans', height: 1.5))),
-              if (timerSecs != null) ...[
-                const SizedBox(width: 8),
-                TapScale(
-                  onTap: () {
-                    if (running) { _stopTimer(i); } else { _startTimer(i, timerSecs); }
-                  },
-                  child: AnimatedContainer(
-                    duration: const Duration(milliseconds: 200),
-                    padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
-                    decoration: BoxDecoration(
-                      color: running
-                          ? (done ? AppTheme.green : AppTheme.orange.withValues(alpha: 0.15))
-                          : AppTheme.primaryDark.withValues(alpha: 0.08),
-                      borderRadius: BorderRadius.circular(10),
-                      border: Border.all(
-                        color: running ? (done ? AppTheme.green : AppTheme.orange) : AppTheme.primaryDark.withValues(alpha: 0.2),
-                      ),
-                    ),
-                    child: Row(mainAxisSize: MainAxisSize.min, children: [
-                      Icon(
-                        done ? LucideIcons.checkCheck : (running ? LucideIcons.pause : LucideIcons.timer),
-                        size: 13,
-                        color: done ? Colors.white : (running ? AppTheme.orange : AppTheme.primaryDark),
-                      ),
-                      const SizedBox(width: 5),
-                      Text(
-                        done ? 'Done!' : (running ? _fmtTimer(remaining) : _fmtTimer(timerSecs)),
-                        style: TextStyle(
-                          color: done ? Colors.white : (running ? AppTheme.orange : AppTheme.primaryDark),
-                          fontSize: 11, fontFamily: 'DM Sans', fontWeight: FontWeight.w700,
+                const SizedBox(width: 12),
+                Expanded(child: Text(steps[i], style: TextStyle(
+                    color: done ? AppTheme.greenDark : AppTheme.textPrimary(context),
+                    fontSize: 14, fontFamily: 'DM Sans', height: 1.5,
+                    decoration: manualDone ? TextDecoration.lineThrough : null))),
+                if (timerSecs != null) ...[
+                  const SizedBox(width: 8),
+                  TapScale(
+                    onTap: () {
+                      if (timerRunning) { _stopTimer(i); } else { _startTimer(i, timerSecs); }
+                    },
+                    child: AnimatedContainer(
+                      duration: const Duration(milliseconds: 200),
+                      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+                      decoration: BoxDecoration(
+                        color: timerRunning
+                            ? (timerDone ? AppTheme.green : AppTheme.orange.withValues(alpha: 0.15))
+                            : AppTheme.primaryDark.withValues(alpha: 0.08),
+                        borderRadius: BorderRadius.circular(10),
+                        border: Border.all(
+                          color: timerRunning ? (timerDone ? AppTheme.green : AppTheme.orange) : AppTheme.primaryDark.withValues(alpha: 0.2),
                         ),
                       ),
-                    ]),
+                      child: Row(mainAxisSize: MainAxisSize.min, children: [
+                        Icon(
+                          timerDone ? LucideIcons.checkCheck : (timerRunning ? LucideIcons.pause : LucideIcons.timer),
+                          size: 13,
+                          color: timerDone ? Colors.white : (timerRunning ? AppTheme.orange : AppTheme.primaryDark),
+                        ),
+                        const SizedBox(width: 5),
+                        Text(
+                          timerDone ? 'Done!' : (timerRunning ? _fmtTimer(timerRemaining) : _fmtTimer(timerSecs)),
+                          style: TextStyle(
+                            color: timerDone ? Colors.white : (timerRunning ? AppTheme.orange : AppTheme.primaryDark),
+                            fontSize: 11, fontFamily: 'DM Sans', fontWeight: FontWeight.w700,
+                          ),
+                        ),
+                      ]),
+                    ),
                   ),
-                ),
-              ],
+                ],
+              ]),
             ]),
-          ]),
+          ),
         ).animate(delay: (i * 50).ms).fadeIn(duration: 300.ms).slideX(begin: 0.04);
       }),
     );
@@ -776,7 +815,7 @@ class _RecipeDetailScreenState extends State<RecipeDetailScreen> with TickerProv
 
     // Show share sheet after snackbar has a moment to appear
     final currentStreak = await UserPrefsService.getStreak();
-    await Future.delayed(const Duration(milliseconds: 700));
+    await Future.delayed(const Duration(milliseconds: 1200));
     if (!mounted) return;
     _showShareSheet(cal: scaledCal, protein: scaledPro, streak: currentStreak);
     await Future.delayed(const Duration(milliseconds: 200));
@@ -868,7 +907,7 @@ class _Tab extends StatelessWidget {
           boxShadow: selected ? const [BoxShadow(color: Color(0x12000000), blurRadius: 6)] : [],
         ),
         child: Center(child: Text(label, style: TextStyle(
-          color: selected ? AppTheme.primaryDark : AppTheme.mutedText,
+          color: selected ? AppTheme.primaryDark : AppTheme.textMuted(context),
           fontSize: 13, fontFamily: 'DM Sans',
           fontWeight: selected ? FontWeight.w700 : FontWeight.w500,
         ))),

@@ -336,7 +336,7 @@ class _WelcomeView extends StatelessWidget {
       const SizedBox(height: 8),
       Text('Ask me anything about cooking, nutrition,\nor what to make with your ingredients.',
         textAlign: TextAlign.center,
-        style: TextStyle(color: AppTheme.mutedText.withValues(alpha: 0.8), fontSize: 14, fontFamily: 'DM Sans', height: 1.55),
+        style: TextStyle(color: AppTheme.textMuted(context).withValues(alpha: 0.8), fontSize: 14, fontFamily: 'DM Sans', height: 1.55),
       ).animate().fadeIn(duration: 400.ms, delay: 140.ms),
       const SizedBox(height: 36),
       Align(alignment: Alignment.centerLeft, child: Text('Try asking',
@@ -473,7 +473,8 @@ class _Bubble extends StatelessWidget {
                             h2: TextStyle(color: AppTheme.textPrimary(context), fontSize: 15, fontFamily: 'DM Sans', fontWeight: FontWeight.w700),
                             h3: TextStyle(color: AppTheme.textPrimary(context), fontSize: 14, fontFamily: 'DM Sans', fontWeight: FontWeight.w700),
                             listBullet: TextStyle(color: AppTheme.textPrimary(context), fontSize: 14, fontFamily: 'DM Sans'),
-                            code: const TextStyle(fontSize: 13, fontFamily: 'DM Sans', backgroundColor: Color(0xFFE8E6E0)),
+                            code: TextStyle(fontSize: 13, fontFamily: 'DM Sans',
+                                backgroundColor: AppTheme.cardAltBg(context)),
                             blockSpacing: 6,
                           ),
                           softLineBreak: true,
@@ -595,14 +596,14 @@ class _InputBar extends StatelessWidget {
           width: 42, height: 42, margin: const EdgeInsets.all(4),
           decoration: BoxDecoration(
             gradient: hasText && !loading ? AppTheme.tealGradient : null,
-            color: hasText && !loading ? null : AppTheme.lightGray.withValues(alpha: 0.5),
+            color: hasText && !loading ? null : AppTheme.iconColor(context).withValues(alpha: 0.12),
             shape: BoxShape.circle,
           ),
           child: TapScale(
             onTap: hasText && !loading ? onSend : null,
             child: Center(child: loading
                 ? SizedBox(width: 18, height: 18, child: CircularProgressIndicator(strokeWidth: 2, color: Colors.white.withValues(alpha: 0.7)))
-                : Icon(LucideIcons.arrowUp, size: 18, color: hasText ? Colors.white : AppTheme.mutedText.withValues(alpha: 0.5))),
+                : Icon(LucideIcons.arrowUp, size: 18, color: hasText ? Colors.white : AppTheme.textMuted(context))),
           ),
         ),
       ]),

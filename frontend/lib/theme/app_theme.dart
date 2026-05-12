@@ -57,6 +57,58 @@ class AppTheme {
   static Color iconColor(BuildContext context) =>
       isDark(context) ? darkTextPrimary : primaryDark;
 
+  // ── Shared input decoration helper ────────────────────────────────────────
+  // Use this everywhere instead of raw InputDecoration to guarantee consistent
+  // borders and colors in both light and dark mode across all screens.
+  static InputDecoration inputDecoration({
+    required BuildContext context,
+    String? label,
+    String? hint,
+    Widget? prefixIcon,
+    Widget? suffixIcon,
+    String? suffixText,
+    TextStyle? suffixStyle,
+    EdgeInsetsGeometry contentPadding =
+        const EdgeInsets.symmetric(horizontal: 14, vertical: 14),
+  }) {
+    return InputDecoration(
+      labelText: label,
+      hintText: hint,
+      suffixText: suffixText,
+      suffixStyle: suffixStyle ??
+          TextStyle(fontFamily: 'DM Sans', color: textMuted(context)),
+      prefixIcon: prefixIcon,
+      suffixIcon: suffixIcon,
+      labelStyle:
+          TextStyle(color: textMuted(context), fontFamily: 'DM Sans', fontSize: 13),
+      hintStyle:
+          TextStyle(color: textMuted(context), fontFamily: 'DM Sans', fontSize: 14),
+      filled: true,
+      fillColor: cardBg(context),
+      contentPadding: contentPadding,
+      border: OutlineInputBorder(
+        borderRadius: BorderRadius.circular(12),
+        borderSide: BorderSide(color: border(context)),
+      ),
+      enabledBorder: OutlineInputBorder(
+        borderRadius: BorderRadius.circular(12),
+        borderSide: BorderSide(color: border(context)),
+      ),
+      focusedBorder: OutlineInputBorder(
+        borderRadius: BorderRadius.circular(12),
+        borderSide: const BorderSide(color: primaryDark, width: 1.5),
+      ),
+      errorBorder: OutlineInputBorder(
+        borderRadius: BorderRadius.circular(12),
+        borderSide: const BorderSide(color: red),
+      ),
+      focusedErrorBorder: OutlineInputBorder(
+        borderRadius: BorderRadius.circular(12),
+        borderSide: const BorderSide(color: red, width: 1.5),
+      ),
+    );
+  }
+
   // ── Dynamic text styles (use these in screens — they respect dark mode) ──
   static TextStyle headingLargeStyle(BuildContext context) => TextStyle(
     color: textPrimary(context), fontSize: 24,
@@ -83,11 +135,10 @@ class AppTheme {
     fontFamily: 'DM Sans', fontWeight: FontWeight.w500,
   );
 
-  // ── Static text styles (light-mode only — use on dark backgrounds, teal cards)
+  // ── Static text styles (light-mode only — use on dark backgrounds / teal cards)
   static const TextStyle logoStyle = TextStyle(
     color: primaryDark, fontSize: 24, fontFamily: 'Nunito', fontWeight: FontWeight.w800,
   );
-  // Keep these for backward compat — screens should migrate to dynamic versions above
   static const TextStyle headingLarge = TextStyle(
     color: darkText, fontSize: 24, fontFamily: 'DM Sans', fontWeight: FontWeight.w800,
   );

@@ -181,8 +181,18 @@ def _ask_ai(message: str, history: list) -> str:
         },
         timeout=20,
     )
-    resp.raise_for_status()
-    reply = resp.json()["choices"][0]["message"]["content"].strip()
+    logger.info("OpenRouter status: %d", resp.status_code)
+    if resp.status_code != 200:
+        # Log the full error body so Railway logs show what went wrong
+        logger.error("OpenRouter error body: %s", resp.text[:500])
+        resp.raise_for_status()
+    resp_json = resp.json()
+    # Guard against unexpected response shapes
+    choices = resp_json.get("choices")
+    if not choices:
+        logger.error("OpenRouter returned no choices: %s", str(resp_json)[:300])
+        raise ValueError(f"OpenRouter returned empty choices: {str(resp_json)[:200]}")
+    reply = choices[0]["message"]["content"].strip()
     logger.info("Raw OpenRouter chat response (first 200 chars): %s", reply[:200])
     # Strip only code fences and HTML — keep ** and bullet markdown (rendered by MarkdownBody)
     reply = reply.replace("```", "").replace("<br>", "\n").strip()
@@ -233,8 +243,17 @@ def chat():
         logger.warning("OpenRouter timeout")
         return jsonify({"status": "error", "message": "AI timed out. Try again."}), 504
     except requests.exceptions.HTTPError as e:
-        logger.error("OpenRouter HTTP error: %s", e)
-        return jsonify({"status": "error", "message": "AI service error."}), 502
-    except Exception:
+        # Surface the actual HTTP status + body for easier diagnosis
+        body = ""
+        try:
+            body = e.response.text[:200] if e.response is not None else ""
+        except Exception:
+            pass
+        logger.error("OpenRouter HTTP error: %s — body: %s", e, body)
+        return jsonify({"status": "error", "message": f"AI service error ({e.response.status_code if e.response else 'unknown'}). {body}"}), 502
+    except ValueError as e:
+        logger.error("OpenRouter response parse error: %s", e)
+        return jsonify({"status": "error", "message": f"AI response error: {e}"}), 502
+    except Exception as e:
         logger.exception("Unexpected chat error")
-        return jsonify({"status": "error", "message": "Internal error."}), 500
+        return jsonify({"status": "error", "message": f"Internal error: {type(e).__name__}: {str(e)[:120]}"}), 500

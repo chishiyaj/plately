@@ -29,7 +29,10 @@ class PlatelyLogo extends StatelessWidget {
         SizedBox(
           width: iconSize,
           height: iconSize,
-          child: CustomPaint(painter: _RingMarkPainter(size: iconSize)),
+          child: CustomPaint(
+              painter: _RingMarkPainter(
+                  size: iconSize,
+                  showBackground: isOnDark)),
         ),
         if (showWordmark) ...[
           SizedBox(width: iconSize * 0.22),
@@ -67,7 +70,8 @@ class PlatelyLogo extends StatelessWidget {
 
 class _RingMarkPainter extends CustomPainter {
   final double size;
-  const _RingMarkPainter({required this.size});
+  final bool showBackground;
+  const _RingMarkPainter({required this.size, this.showBackground = true});
 
   @override
   void paint(Canvas canvas, Size sz) {
@@ -75,39 +79,46 @@ class _RingMarkPainter extends CustomPainter {
     final cy = sz.height / 2;
     final r = sz.width / 2;
 
-    // ── Background tile ──────────────────────────────────────────────────
-    final bgPaint = Paint()
-      ..shader = const LinearGradient(
-        begin: Alignment.topLeft,
-        end: Alignment.bottomRight,
-        colors: [Color(0xFF031212), Color(0xFF043B3C)],
-      ).createShader(Rect.fromLTWH(0, 0, sz.width, sz.height));
+    // ── Background tile (only on dark backgrounds) ───────────────────────
+    if (showBackground) {
+      final bgPaint = Paint()
+        ..shader = const LinearGradient(
+          begin: Alignment.topLeft,
+          end: Alignment.bottomRight,
+          colors: [Color(0xFF031212), Color(0xFF043B3C)],
+        ).createShader(Rect.fromLTWH(0, 0, sz.width, sz.height));
 
-    final rrect = RRect.fromRectAndRadius(
-      Rect.fromLTWH(0, 0, sz.width, sz.height),
-      Radius.circular(r * 0.28),
-    );
-    canvas.drawRRect(rrect, bgPaint);
+      final rrect = RRect.fromRectAndRadius(
+        Rect.fromLTWH(0, 0, sz.width, sz.height),
+        Radius.circular(r * 0.28),
+      );
+      canvas.drawRRect(rrect, bgPaint);
+    }
 
     // ── Outer track ring ─────────────────────────────────────────────────
     final trackR = r * 0.72;
+    // On light bg: use a teal-tinted track; on dark bg: white ghost track
+    final trackColor = showBackground
+        ? Colors.white.withValues(alpha: 0.10)
+        : const Color(0xFF043B3C).withValues(alpha: 0.12);
     final trackPaint = Paint()
-      ..color = Colors.white.withValues(alpha: 0.10)
+      ..color = trackColor
       ..style = PaintingStyle.stroke
       ..strokeWidth = size * 0.07
       ..strokeCap = StrokeCap.round;
     canvas.drawCircle(Offset(cx, cy), trackR, trackPaint);
 
-    // ── White arc — short segment (top-right quarter, ~25%) ──────────────
-    final whiteArcPaint = Paint()
-      ..color = Colors.white.withValues(alpha: 0.80)
+    final arcRect = Rect.fromCircle(center: Offset(cx, cy), radius: trackR);
+
+    // ── White/teal arc — short segment (top-right quarter, ~25%) ─────────
+    final accentArcPaint = Paint()
+      ..color = showBackground
+          ? Colors.white.withValues(alpha: 0.80)
+          : const Color(0xFF043B3C).withValues(alpha: 0.55)
       ..style = PaintingStyle.stroke
       ..strokeWidth = size * 0.07
       ..strokeCap = StrokeCap.round;
-
-    final arcRect = Rect.fromCircle(center: Offset(cx, cy), radius: trackR);
-    // top = -π/2, white covers top-right ~25%
-    canvas.drawArc(arcRect, -math.pi / 2, math.pi * 0.5, false, whiteArcPaint);
+    canvas.drawArc(arcRect, -math.pi / 2, math.pi * 0.5, false, accentArcPaint);
 
     // ── Green arc — majority ~75% ─────────────────────────────────────────
     final greenArcPaint = Paint()
@@ -119,18 +130,15 @@ class _RingMarkPainter extends CustomPainter {
       ..style = PaintingStyle.stroke
       ..strokeWidth = size * 0.07
       ..strokeCap = StrokeCap.round;
-
-    // green starts where white ends (top-right) and sweeps the remaining 75%
     canvas.drawArc(arcRect, -math.pi / 2 + math.pi * 0.5, math.pi * 1.5, false, greenArcPaint);
 
-    // ── Centre white dot ──────────────────────────────────────────────────
+    // ── Centre dot ────────────────────────────────────────────────────────
     canvas.drawCircle(
       Offset(cx, cy),
       size * 0.115,
-      Paint()..color = Colors.white,
+      Paint()
+        ..color = showBackground ? Colors.white : const Color(0xFF043B3C),
     );
-
-    // ── Centre green dot ─────────────────────────────────────────────────
     canvas.drawCircle(
       Offset(cx, cy),
       size * 0.055,
@@ -139,5 +147,6 @@ class _RingMarkPainter extends CustomPainter {
   }
 
   @override
-  bool shouldRepaint(_RingMarkPainter old) => old.size != size;
+  bool shouldRepaint(_RingMarkPainter old) =>
+      old.size != size || old.showBackground != showBackground;
 }

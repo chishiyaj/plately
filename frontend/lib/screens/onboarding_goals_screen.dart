@@ -4,6 +4,7 @@ import 'package:flutter_animate/flutter_animate.dart';
 import '../theme/app_theme.dart';
 import '../services/user_prefs_service.dart';
 import '../services/api_service.dart';
+import '../main_shell.dart';
 import '../widgets/tap_scale.dart';
 
 class OnboardingGoalsScreen extends StatefulWidget {
@@ -108,8 +109,16 @@ class _OnboardingGoalsScreenState extends State<OnboardingGoalsScreen> {
     if (height != null) await UserPrefsService.saveHeight(height);
     await UserPrefsService.saveSex(_sex);
     await UserPrefsService.setOnboardingDone();
-    if (mounted) {
+    if (!mounted) return;
+    // P0 FIX: pop() leads to black screen when this is the root screen.
+    // Use pushAndRemoveUntil to always land on MainShell.
+    if (Navigator.of(context).canPop()) {
       Navigator.of(context).pop();
+    } else {
+      Navigator.of(context).pushAndRemoveUntil(
+        AppTheme.fadeScale(const MainShell()),
+        (route) => false,
+      );
     }
   }
 
@@ -185,10 +194,11 @@ class _OnboardingGoalsScreenState extends State<OnboardingGoalsScreen> {
             ),
           ),
           if (!canPop)
-            const Text(
+            Text(
               'Personalize your nutrition targets',
               style: TextStyle(
-                color: AppTheme.mutedText, fontSize: 12,
+                color: AppTheme.textMuted(context),
+                fontSize: 12,
                 fontFamily: 'DM Sans',
               ),
             ),
@@ -198,13 +208,19 @@ class _OnboardingGoalsScreenState extends State<OnboardingGoalsScreen> {
           TapScale(
             onTap: () async {
               await UserPrefsService.setOnboardingDone();
-              if (mounted) Navigator.of(context).pop();
+              if (!mounted) return;
+              Navigator.of(context).pushAndRemoveUntil(
+                AppTheme.fadeScale(const MainShell()),
+                (route) => false,
+              );
             },
-            child: const Text(
+            child: Text(
               'Skip',
               style: TextStyle(
-                color: AppTheme.mutedText, fontSize: 13,
-                fontFamily: 'DM Sans', fontWeight: FontWeight.w600,
+                color: AppTheme.textMuted(context),
+                fontSize: 13,
+                fontFamily: 'DM Sans',
+                fontWeight: FontWeight.w600,
               ),
             ),
           ),
@@ -296,10 +312,10 @@ class _OnboardingGoalsScreenState extends State<OnboardingGoalsScreen> {
     decoration: InputDecoration(
       labelText: label,
       hintText: hint,
-      labelStyle: const TextStyle(
-          fontFamily: 'DM Sans', color: AppTheme.mutedText, fontSize: 13),
-      hintStyle: const TextStyle(
-          fontFamily: 'DM Sans', color: AppTheme.mutedText, fontSize: 13),
+      labelStyle: TextStyle(
+          fontFamily: 'DM Sans', color: AppTheme.textMuted(context), fontSize: 13),
+      hintStyle: TextStyle(
+          fontFamily: 'DM Sans', color: AppTheme.textMuted(context), fontSize: 13),
       filled: true,
       fillColor: AppTheme.cardAltBg(context),
       border: OutlineInputBorder(

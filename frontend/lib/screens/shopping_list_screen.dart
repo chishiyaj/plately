@@ -18,10 +18,14 @@ class ShoppingListScreen extends StatefulWidget {
 class _ShoppingListScreenState extends State<ShoppingListScreen> {
   late Map<String, _ShopItem> _items;
   bool _loading = true;
+  bool _pantryIsEmpty = true;  // track whether pantry actually has items
   final Set<String> _checked = {};
 
   @override
-  void initState() { super.initState(); _build(); }
+  void initState() {
+    super.initState();
+    _build();
+  }
 
   Future<void> _build() async {
     final stocked = (await getAlwaysStocked()).map((s) => s.toLowerCase()).toSet();
@@ -30,23 +34,30 @@ class _ShoppingListScreenState extends State<ShoppingListScreen> {
     for (final r in widget.recipes) {
       for (final ing in r.ingredients) {
         final key = ing.name.toLowerCase();
-        if (stocked.contains(key)) continue;
-        if (merged.containsKey(key)) {
-          merged[key] = _ShopItem(
-            name: ing.name,
-            amounts: [...merged[key]!.amounts, '${ing.amount} (${r.name})'],
-            inPantry: pantry.contains(key),
-          );
-        } else {
-          merged[key] = _ShopItem(
-            name: ing.name,
-            amounts: ['${ing.amount} (${r.name})'],
-            inPantry: pantry.contains(key),
-          );
+        if (!stocked.contains(key)) {
+          if (merged.containsKey(key)) {
+            merged[key] = _ShopItem(
+              name: ing.name,
+              amounts: [...merged[key]!.amounts, '${ing.amount} (${r.name})'],
+              inPantry: pantry.contains(key),
+            );
+          } else {
+            merged[key] = _ShopItem(
+              name: ing.name,
+              amounts: ['${ing.amount} (${r.name})'],
+              inPantry: pantry.contains(key),
+            );
+          }
         }
       }
     }
-    if (mounted) setState(() { _items = merged; _loading = false; });
+    if (mounted) {
+      setState(() {
+        _items = merged;
+        _pantryIsEmpty = pantry.isEmpty;
+        _loading = false;
+      });
+    }
   }
 
   Future<void> _shopeeSearch(String item) async {
@@ -161,9 +172,16 @@ class _ShoppingListScreenState extends State<ShoppingListScreen> {
 
   Widget _body(BuildContext context) {
     if (_items.isEmpty) {
-      return Center(child: Text('All ingredients are already in your pantry!',
-        style: TextStyle(color: AppTheme.textMuted(context), fontSize: 14, fontFamily: 'DM Sans'),
-        textAlign: TextAlign.center));
+      // Only say "all in pantry" if the pantry is actually non-empty
+      final msg = _pantryIsEmpty
+          ? 'No ingredients to buy — the recipes may not have ingredient details yet.'
+          : 'All ingredients are already in your pantry!';
+      return Center(child: Padding(
+        padding: const EdgeInsets.all(32),
+        child: Text(msg,
+          style: TextStyle(color: AppTheme.textMuted(context), fontSize: 14, fontFamily: 'DM Sans'),
+          textAlign: TextAlign.center),
+      ));
     }
 
     final needToBuy  = _items.values.where((i) => !i.inPantry).toList();

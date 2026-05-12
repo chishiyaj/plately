@@ -228,7 +228,7 @@ class _RecipeResultsScreenState extends State<RecipeResultsScreen> {
             prefixIcon: Icon(LucideIcons.search, size: 16, color: AppTheme.textMuted(context)),
             suffixIcon: _searchQuery.isNotEmpty
                 ? IconButton(
-                    icon: const Icon(LucideIcons.x, size: 16, color: AppTheme.mutedText),
+                    icon: Icon(LucideIcons.x, size: 16, color: AppTheme.textMuted(context)),
                     onPressed: () { _searchCtrl.clear(); },
                   )
                 : null,
@@ -271,8 +271,8 @@ class _RecipeResultsScreenState extends State<RecipeResultsScreen> {
         ),
       Expanded(
         child: Shimmer.fromColors(
-          baseColor: const Color(0xFFE0DDD8),
-          highlightColor: const Color(0xFFF5F3EF),
+          baseColor: AppTheme.isDark(context) ? AppTheme.darkCardAlt : const Color(0xFFE0DDD8),
+          highlightColor: AppTheme.isDark(context) ? AppTheme.darkCard : const Color(0xFFF5F3EF),
           child: GridView.builder(
             padding: const EdgeInsets.fromLTRB(20, 16, 20, 110),
             gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(

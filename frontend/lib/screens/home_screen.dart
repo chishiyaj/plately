@@ -145,7 +145,7 @@ class _HomeScreenState extends State<HomeScreen> {
         backgroundColor: Colors.transparent,
         child: Container(
           decoration: BoxDecoration(
-            color: AppTheme.scaffoldBg(context),
+            color: AppTheme.cardBg(ctx),
             borderRadius: BorderRadius.circular(24),
           ),
           padding: const EdgeInsets.all(28),
@@ -161,13 +161,13 @@ class _HomeScreenState extends State<HomeScreen> {
                 child: const Icon(LucideIcons.flame, color: AppTheme.orange, size: 32),
               ),
               const SizedBox(height: 16),
-              Text(data['title']!, style: const TextStyle(
-                color: AppTheme.darkText, fontSize: 20,
+              Text(data['title']!, style: TextStyle(
+                color: AppTheme.textPrimary(ctx), fontSize: 20,
                 fontFamily: 'DM Sans', fontWeight: FontWeight.w800,
               ), textAlign: TextAlign.center),
               const SizedBox(height: 8),
               Text('$streak days cooking with Plately',
-                style: const TextStyle(color: AppTheme.mutedText, fontSize: 14, fontFamily: 'DM Sans'),
+                style: TextStyle(color: AppTheme.textMuted(ctx), fontSize: 14, fontFamily: 'DM Sans'),
                 textAlign: TextAlign.center),
               const SizedBox(height: 24),
               SizedBox(
@@ -191,8 +191,8 @@ class _HomeScreenState extends State<HomeScreen> {
               const SizedBox(height: 10),
               TextButton(
                 onPressed: () => Navigator.pop(ctx),
-                child: const Text('Keep cooking', style: TextStyle(
-                  color: AppTheme.mutedText, fontFamily: 'DM Sans')),
+                child: Text('Keep cooking', style: TextStyle(
+                  color: AppTheme.textMuted(ctx), fontFamily: 'DM Sans')),
               ),
             ],
           ),

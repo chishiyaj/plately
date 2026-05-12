@@ -23,8 +23,8 @@ class _LoginScreenState extends State<LoginScreen> {
   final _passCtrl   = TextEditingController();
   final _emailFocus = FocusNode();
   final _passFocus  = FocusNode();
-  bool _passVisible = false;
-  bool _loading     = false;
+  bool _passVisible  = false;
+  bool _loading      = false;
   bool _emailFocused = false;
   bool _passFocused  = false;
 
@@ -76,7 +76,6 @@ class _LoginScreenState extends State<LoginScreen> {
     }
   }
 
-  // Shared post-login navigation: check if goals are set first
   Future<void> _navigateAfterLogin() async {
     final prefs   = await UserPrefsService.load();
     final calGoal = (prefs['cal_goal'] as int?) ?? 2200;
@@ -105,64 +104,69 @@ class _LoginScreenState extends State<LoginScreen> {
       context: context,
       isScrollControlled: true,
       backgroundColor: Colors.transparent,
-      builder: (_) => StatefulBuilder(
+      builder: (sheetCtx) => StatefulBuilder(
         builder: (ctx, setS) => Padding(
           padding: EdgeInsets.only(bottom: MediaQuery.of(ctx).viewInsets.bottom),
           child: Container(
             padding: const EdgeInsets.fromLTRB(28, 16, 28, 40),
-            decoration: const BoxDecoration(
-              color: Colors.white,
-              borderRadius: BorderRadius.vertical(top: Radius.circular(28)),
+            decoration: BoxDecoration(
+              color: AppTheme.cardBg(ctx),
+              borderRadius: const BorderRadius.vertical(top: Radius.circular(28)),
             ),
             child: Column(mainAxisSize: MainAxisSize.min, crossAxisAlignment: CrossAxisAlignment.start, children: [
               Center(child: Container(width: 40, height: 4,
-                decoration: BoxDecoration(color: AppTheme.lightGray, borderRadius: BorderRadius.circular(2)))),
+                decoration: BoxDecoration(color: AppTheme.border(ctx), borderRadius: BorderRadius.circular(2)))),
               const SizedBox(height: 24),
               if (sent) ...[
                 Center(child: Column(children: [
                   Container(
                     width: 72, height: 72,
-                    decoration: BoxDecoration(
-                      color: AppTheme.green.withValues(alpha: 0.1),
-                      shape: BoxShape.circle,
-                    ),
+                    decoration: BoxDecoration(color: AppTheme.green.withValues(alpha: 0.1), shape: BoxShape.circle),
                     child: const Icon(LucideIcons.mailCheck, color: AppTheme.green, size: 32),
                   ),
                   const SizedBox(height: 18),
-                  const Text('Check your inbox', style: TextStyle(
-                    color: AppTheme.darkText, fontSize: 20,
+                  Text('Check your inbox', style: TextStyle(
+                    color: AppTheme.textPrimary(ctx), fontSize: 20,
                     fontFamily: 'DM Sans', fontWeight: FontWeight.w800,
                   )),
                   const SizedBox(height: 8),
-                  Text(
-                    'We sent a reset link to\n${ctrl.text.trim()}',
+                  Text('We sent a reset link to\n${ctrl.text.trim()}',
                     textAlign: TextAlign.center,
-                    style: const TextStyle(color: AppTheme.mutedText, fontSize: 14, fontFamily: 'DM Sans', height: 1.5),
+                    style: TextStyle(color: AppTheme.textMuted(ctx), fontSize: 14, fontFamily: 'DM Sans', height: 1.5),
+                  ),
+                  const SizedBox(height: 10),
+                  Container(
+                    padding: const EdgeInsets.all(12),
+                    decoration: BoxDecoration(
+                      color: AppTheme.primaryDark.withValues(alpha: 0.07),
+                      borderRadius: BorderRadius.circular(12),
+                    ),
+                    child: Text(
+                      'This resets your Plately password only — your Google account is not affected.',
+                      textAlign: TextAlign.center,
+                      style: TextStyle(color: AppTheme.textMuted(ctx), fontSize: 12, fontFamily: 'DM Sans', height: 1.4),
+                    ),
                   ),
                   const SizedBox(height: 28),
                   TapScale(
                     onTap: () => Navigator.pop(ctx),
                     child: Container(
                       width: double.infinity, height: 54,
-                      decoration: BoxDecoration(
-                        gradient: AppTheme.tealGradient,
-                        borderRadius: BorderRadius.circular(16),
-                      ),
+                      decoration: BoxDecoration(gradient: AppTheme.tealGradient, borderRadius: BorderRadius.circular(16)),
                       child: const Center(child: Text('Done', style: TextStyle(
-                        color: Colors.white, fontSize: 16,
-                        fontFamily: 'DM Sans', fontWeight: FontWeight.w700,
+                        color: Colors.white, fontSize: 16, fontFamily: 'DM Sans', fontWeight: FontWeight.w700,
                       ))),
                     ),
                   ),
                 ])),
               ] else ...[
-                const Text('Reset password', style: TextStyle(
-                  color: AppTheme.darkText, fontSize: 22,
+                Text('Reset password', style: TextStyle(
+                  color: AppTheme.textPrimary(ctx), fontSize: 22,
                   fontFamily: 'DM Sans', fontWeight: FontWeight.w800,
                 )),
                 const SizedBox(height: 6),
-                const Text("Enter your email — we'll send a reset link instantly.", style: TextStyle(
-                  color: AppTheme.mutedText, fontSize: 14, fontFamily: 'DM Sans',
+                Text("Enter your email — we'll send a reset link instantly.", style: TextStyle(
+                  color: AppTheme.textMuted(ctx), fontSize: 14, fontFamily: 'DM Sans',
                 )),
                 const SizedBox(height: 24),
                 _AuthField(
@@ -182,11 +186,10 @@ class _LoginScreenState extends State<LoginScreen> {
                       ));
                       return;
                     }
-                    // Capture messenger before async gap to avoid use_build_context_synchronously
                     final messenger = ScaffoldMessenger.of(context);
                     try {
                       await AuthService.sendPasswordReset(ctrl.text.trim());
-                      if (ctx.mounted) { setS(() => sent = true); }
+                      if (ctx.mounted) setS(() => sent = true);
                     } catch (e) {
                       if (ctx.mounted) {
                         messenger.showSnackBar(SnackBar(
@@ -207,8 +210,7 @@ class _LoginScreenState extends State<LoginScreen> {
                       boxShadow: const [BoxShadow(color: Color(0x33043B3C), blurRadius: 14, offset: Offset(0, 4))],
                     ),
                     child: const Center(child: Text('Send Reset Link', style: TextStyle(
-                      color: Colors.white, fontSize: 16,
-                      fontFamily: 'DM Sans', fontWeight: FontWeight.w700,
+                      color: Colors.white, fontSize: 16, fontFamily: 'DM Sans', fontWeight: FontWeight.w700,
                     ))),
                   ),
                 ),
@@ -223,159 +225,140 @@ class _LoginScreenState extends State<LoginScreen> {
   @override
   Widget build(BuildContext context) {
     final size = MediaQuery.of(context).size;
+    final dark = AppTheme.isDark(context);
     return Scaffold(
-      backgroundColor: AppTheme.creamBg,
+      // FIX: scaffold bg adapts to dark mode
+      backgroundColor: AppTheme.scaffoldBg(context),
       resizeToAvoidBottomInset: true,
       body: SingleChildScrollView(
         child: Column(children: [
-          // ── TOP BRAND PANEL ───────────────────────────────────────────────
           _BrandPanel(height: size.height * 0.30),
-          // ── FORM CARD ─────────────────────────────────────────────────────
           Padding(
             padding: const EdgeInsets.fromLTRB(24, 0, 24, 32),
             child: Transform.translate(
               offset: const Offset(0, -28),
               child: Container(
                 decoration: BoxDecoration(
-                  color: Colors.white,
+                  color: AppTheme.cardBg(context),
                   borderRadius: BorderRadius.circular(28),
-                  boxShadow: const [
-                    BoxShadow(color: Color(0x12000000), blurRadius: 32, offset: Offset(0, 8)),
-                  ],
+                  boxShadow: const [BoxShadow(color: Color(0x12000000), blurRadius: 32, offset: Offset(0, 8))],
                 ),
                 padding: const EdgeInsets.fromLTRB(24, 30, 24, 28),
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    // Title
-                    const Text('Welcome back', style: TextStyle(
-                      color: AppTheme.darkText, fontSize: 26,
-                      fontFamily: 'DM Sans', fontWeight: FontWeight.w800,
-                      letterSpacing: -0.5,
-                    )).animate().fadeIn(duration: 400.ms, delay: 200.ms).slideY(begin: 0.06),
-                    const SizedBox(height: 4),
-                    const Text('Sign in to continue cooking smarter.', style: TextStyle(
-                      color: AppTheme.mutedText, fontSize: 14, fontFamily: 'DM Sans',
-                    )).animate().fadeIn(duration: 400.ms, delay: 260.ms),
-                    const SizedBox(height: 28),
-                    // Email
-                    _AuthField(
-                      ctrl: _emailCtrl, hint: 'Email address',
-                      icon: LucideIcons.mail, keyboard: TextInputType.emailAddress,
-                      focused: _emailFocused, focusNode: _emailFocus,
-                      onTap: () => _emailFocus.requestFocus(),
-                    ).animate().fadeIn(duration: 400.ms, delay: 300.ms).slideY(begin: 0.05),
-                    const SizedBox(height: 12),
-                    // Password
-                    _AuthField(
-                      ctrl: _passCtrl, hint: 'Password',
-                      icon: LucideIcons.lockKeyhole,
-                      focused: _passFocused, focusNode: _passFocus,
-                      obscure: !_passVisible,
-                      onTap: () => _passFocus.requestFocus(),
-                      suffix: SizedBox(
-                        width: 48, height: 48,
-                        child: TapScale(
-                          onTap: () => setState(() => _passVisible = !_passVisible),
-                          child: Padding(
-                            padding: const EdgeInsets.only(right: 16),
-                            child: Icon(
-                              _passVisible ? LucideIcons.eyeOff : LucideIcons.eye,
-                              size: 18, color: AppTheme.mutedText,
-                            ),
-                          ),
-                        ),
-                      ),
-                    ).animate().fadeIn(duration: 400.ms, delay: 350.ms).slideY(begin: 0.05),
-                    const SizedBox(height: 12),
-                    // Forgot
-                    Align(
-                      alignment: Alignment.centerRight,
+                child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+                  Text('Welcome back', style: TextStyle(
+                    color: AppTheme.textPrimary(context), fontSize: 26,
+                    fontFamily: 'DM Sans', fontWeight: FontWeight.w800, letterSpacing: -0.5,
+                  )).animate().fadeIn(duration: 400.ms, delay: 200.ms).slideY(begin: 0.06),
+                  const SizedBox(height: 4),
+                  Text('Sign in to continue cooking smarter.', style: TextStyle(
+                    color: AppTheme.textMuted(context), fontSize: 14, fontFamily: 'DM Sans',
+                  )).animate().fadeIn(duration: 400.ms, delay: 260.ms),
+                  const SizedBox(height: 28),
+                  _AuthField(
+                    ctrl: _emailCtrl, hint: 'Email address',
+                    icon: LucideIcons.mail, keyboard: TextInputType.emailAddress,
+                    focused: _emailFocused, focusNode: _emailFocus,
+                    onTap: () => _emailFocus.requestFocus(),
+                  ).animate().fadeIn(duration: 400.ms, delay: 300.ms).slideY(begin: 0.05),
+                  const SizedBox(height: 12),
+                  _AuthField(
+                    ctrl: _passCtrl, hint: 'Password',
+                    icon: LucideIcons.lockKeyhole,
+                    focused: _passFocused, focusNode: _passFocus,
+                    obscure: !_passVisible,
+                    onTap: () => _passFocus.requestFocus(),
+                    suffix: SizedBox(
+                      width: 48, height: 48,
                       child: TapScale(
-                        onTap: _forgotPassword,
+                        onTap: () => setState(() => _passVisible = !_passVisible),
                         child: Padding(
-                          padding: const EdgeInsets.symmetric(vertical: 4),
-                          child: Text('Forgot password?', style: TextStyle(
-                            color: AppTheme.primaryDark.withValues(alpha: 0.8),
-                            fontSize: 13, fontFamily: 'DM Sans', fontWeight: FontWeight.w600,
-                          )),
+                          padding: const EdgeInsets.only(right: 16),
+                          child: Icon(_passVisible ? LucideIcons.eyeOff : LucideIcons.eye,
+                              size: 18, color: AppTheme.mutedText),
                         ),
                       ),
-                    ).animate().fadeIn(duration: 300.ms, delay: 390.ms),
-                    const SizedBox(height: 22),
-                    // Sign in
-                    TapScale(
-                      onTap: _login,
-                      child: AnimatedContainer(
-                        duration: const Duration(milliseconds: 250),
-                        width: double.infinity, height: 54,
-                        decoration: BoxDecoration(
-                          gradient: AppTheme.tealGradient,
-                          borderRadius: BorderRadius.circular(16),
-                          boxShadow: const [BoxShadow(
-                            color: Color(0x50043B3C), blurRadius: 18, offset: Offset(0, 6),
-                          )],
-                        ),
-                        child: Center(child: _loading
-                          ? const SizedBox(width: 22, height: 22,
-                              child: CircularProgressIndicator(color: Colors.white, strokeWidth: 2.5))
-                          : const Text('Sign In', style: TextStyle(
-                              color: Colors.white, fontSize: 15,
-                              fontFamily: 'DM Sans', fontWeight: FontWeight.w800,
-                              letterSpacing: 0.2,
-                            )),
-                        ),
-                      ),
-                    ).animate().fadeIn(duration: 400.ms, delay: 420.ms),
-                    const SizedBox(height: 22),
-                    // Divider
-                    const Row(children: [
-                      Expanded(child: Divider(color: AppTheme.borderGray, thickness: 1)),
-                      Padding(
-                        padding: EdgeInsets.symmetric(horizontal: 14),
-                        child: Text('or', style: TextStyle(
-                          color: AppTheme.mutedText, fontSize: 12, fontFamily: 'DM Sans',
+                    ),
+                  ).animate().fadeIn(duration: 400.ms, delay: 350.ms).slideY(begin: 0.05),
+                  const SizedBox(height: 12),
+                  Align(
+                    alignment: Alignment.centerRight,
+                    child: TapScale(
+                      onTap: _forgotPassword,
+                      child: Padding(
+                        padding: const EdgeInsets.symmetric(vertical: 4),
+                        child: Text('Forgot password?', style: TextStyle(
+                          color: AppTheme.primaryDark.withValues(alpha: 0.8),
+                          fontSize: 13, fontFamily: 'DM Sans', fontWeight: FontWeight.w600,
                         )),
                       ),
-                      Expanded(child: Divider(color: AppTheme.borderGray, thickness: 1)),
-                    ]).animate().fadeIn(duration: 300.ms, delay: 460.ms),
-                    const SizedBox(height: 18),
-                    // Google
-                    TapScale(
-                      onTap: _googleLogin,
-                      child: Container(
-                        width: double.infinity, height: 52,
-                        decoration: BoxDecoration(
-                          color: const Color(0xFFF8F8F8),
-                          borderRadius: BorderRadius.circular(16),
-                          border: Border.all(color: AppTheme.borderGray),
-                        ),
-                        child: const Row(mainAxisAlignment: MainAxisAlignment.center, children: [
-                          GoogleGLogo(),
-                          SizedBox(width: 10),
-                          Text('Continue with Google', style: TextStyle(
-                            color: AppTheme.darkText, fontSize: 14,
-                            fontFamily: 'DM Sans', fontWeight: FontWeight.w600,
-                          )),
-                        ]),
+                    ),
+                  ).animate().fadeIn(duration: 300.ms, delay: 390.ms),
+                  const SizedBox(height: 22),
+                  TapScale(
+                    onTap: _login,
+                    child: AnimatedContainer(
+                      duration: const Duration(milliseconds: 250),
+                      width: double.infinity, height: 54,
+                      decoration: BoxDecoration(
+                        gradient: AppTheme.tealGradient,
+                        borderRadius: BorderRadius.circular(16),
+                        boxShadow: const [BoxShadow(color: Color(0x50043B3C), blurRadius: 18, offset: Offset(0, 6))],
                       ),
-                    ).animate().fadeIn(duration: 300.ms, delay: 490.ms),
-                    const SizedBox(height: 24),
-                    // Sign up link
-                    Row(mainAxisAlignment: MainAxisAlignment.center, children: [
-                      const Text("Don't have an account? ", style: TextStyle(
-                        color: AppTheme.mutedText, fontSize: 14, fontFamily: 'DM Sans',
+                      child: Center(child: _loading
+                        ? const SizedBox(width: 22, height: 22,
+                            child: CircularProgressIndicator(color: Colors.white, strokeWidth: 2.5))
+                        : const Text('Sign In', style: TextStyle(
+                            color: Colors.white, fontSize: 15,
+                            fontFamily: 'DM Sans', fontWeight: FontWeight.w800, letterSpacing: 0.2,
+                          )),
+                      ),
+                    ),
+                  ).animate().fadeIn(duration: 400.ms, delay: 420.ms),
+                  const SizedBox(height: 22),
+                  Row(children: [
+                    Expanded(child: Divider(color: AppTheme.border(context), thickness: 1)),
+                    Padding(
+                      padding: const EdgeInsets.symmetric(horizontal: 14),
+                      child: Text('or', style: TextStyle(
+                        color: AppTheme.textMuted(context), fontSize: 12, fontFamily: 'DM Sans',
                       )),
-                      TapScale(
-                        onTap: () => Navigator.pushReplacement(context, AppTheme.slideRight(const SignupScreen())),
-                        child: const Text('Sign up', style: TextStyle(
-                          color: AppTheme.primaryDark, fontSize: 14,
-                          fontFamily: 'DM Sans', fontWeight: FontWeight.w800,
-                        )),
+                    ),
+                    Expanded(child: Divider(color: AppTheme.border(context), thickness: 1)),
+                  ]).animate().fadeIn(duration: 300.ms, delay: 460.ms),
+                  const SizedBox(height: 18),
+                  TapScale(
+                    onTap: _googleLogin,
+                    child: Container(
+                      width: double.infinity, height: 52,
+                      decoration: BoxDecoration(
+                        color: dark ? AppTheme.darkCardAlt : const Color(0xFFF8F8F8),
+                        borderRadius: BorderRadius.circular(16),
+                        border: Border.all(color: AppTheme.border(context)),
                       ),
-                    ]).animate().fadeIn(duration: 300.ms, delay: 520.ms),
-                  ],
-                ),
+                      child: Row(mainAxisAlignment: MainAxisAlignment.center, children: [
+                        const GoogleGLogo(),
+                        const SizedBox(width: 10),
+                        Text('Continue with Google', style: TextStyle(
+                          color: AppTheme.textPrimary(context), fontSize: 14,
+                          fontFamily: 'DM Sans', fontWeight: FontWeight.w600,
+                        )),
+                      ]),
+                    ),
+                  ).animate().fadeIn(duration: 300.ms, delay: 490.ms),
+                  const SizedBox(height: 24),
+                  Row(mainAxisAlignment: MainAxisAlignment.center, children: [
+                    Text("Don't have an account? ", style: TextStyle(
+                      color: AppTheme.textMuted(context), fontSize: 14, fontFamily: 'DM Sans',
+                    )),
+                    TapScale(
+                      onTap: () => Navigator.pushReplacement(context, AppTheme.slideRight(const SignupScreen())),
+                      child: const Text('Sign up', style: TextStyle(
+                        color: AppTheme.primaryDark, fontSize: 14,
+                        fontFamily: 'DM Sans', fontWeight: FontWeight.w800,
+                      )),
+                    ),
+                  ]).animate().fadeIn(duration: 300.ms, delay: 520.ms),
+                ]),
               ),
             ),
           ),
@@ -393,8 +376,7 @@ class _BrandPanel extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return Container(
-      width: double.infinity,
-      height: height,
+      width: double.infinity, height: height,
       decoration: const BoxDecoration(
         gradient: LinearGradient(
           begin: Alignment.topLeft, end: Alignment.bottomRight,
@@ -410,19 +392,13 @@ class _BrandPanel extends StatelessWidget {
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
               const PlatelyLogo(
-                theme: PlatelyLogoTheme.onDark,
-                iconSize: 44,
-                wordmarkSize: 22,
+                theme: PlatelyLogoTheme.onDark, iconSize: 44, wordmarkSize: 22,
               ).animate().fadeIn(duration: 500.ms, delay: 50.ms).slideX(begin: -0.05),
               const SizedBox(height: 14),
-              Text(
-                'Eat smarter.\nCook faster.',
+              Text('Eat smarter.\nCook faster.',
                 style: TextStyle(
                   color: Colors.white.withValues(alpha: 0.45),
-                  fontSize: 15,
-                  fontFamily: 'DM Sans',
-                  fontWeight: FontWeight.w400,
-                  height: 1.5,
+                  fontSize: 15, fontFamily: 'DM Sans', fontWeight: FontWeight.w400, height: 1.5,
                 ),
               ).animate().fadeIn(duration: 500.ms, delay: 150.ms),
             ],
@@ -433,7 +409,8 @@ class _BrandPanel extends StatelessWidget {
   }
 }
 
-// ── AUTH FIELD ──────────────────────────────────────────────────────────────────
+// ── AUTH FIELD — dark-mode-aware ──────────────────────────────────────────────
+// Single implementation. Adapts fill color, text color, border color to theme.
 class _AuthField extends StatelessWidget {
   final TextEditingController ctrl;
   final String hint;
@@ -447,36 +424,51 @@ class _AuthField extends StatelessWidget {
   const _AuthField({
     required this.ctrl, required this.hint, required this.icon,
     required this.focused, required this.onTap,
-    this.obscure = false, this.suffix, this.keyboard = TextInputType.text, this.focusNode,
+    this.obscure = false, this.suffix,
+    this.keyboard = TextInputType.text, this.focusNode,
   });
 
   @override
-  Widget build(BuildContext context) => AnimatedContainer(
-    duration: const Duration(milliseconds: 200),
-    height: 54,
-    decoration: BoxDecoration(
-      color: focused ? Colors.white : const Color(0xFFF9F8F6),
-      borderRadius: BorderRadius.circular(14),
-      border: Border.all(
-        color: focused ? AppTheme.primaryDark : AppTheme.borderGray,
-        width: focused ? 1.8 : 1.0,
+  Widget build(BuildContext context) {
+    final dark = AppTheme.isDark(context);
+    return AnimatedContainer(
+      duration: const Duration(milliseconds: 200),
+      height: 54,
+      decoration: BoxDecoration(
+        color: focused
+            ? AppTheme.cardBg(context)
+            : dark ? AppTheme.darkCardAlt : const Color(0xFFF9F8F6),
+        borderRadius: BorderRadius.circular(14),
+        border: Border.all(
+          color: focused ? AppTheme.primaryDark : AppTheme.border(context),
+          width: focused ? 1.8 : 1.0,
+        ),
+        boxShadow: focused
+            ? const [BoxShadow(color: Color(0x14043B3C), blurRadius: 12, offset: Offset(0, 3))]
+            : [],
       ),
-      boxShadow: focused
-          ? const [BoxShadow(color: Color(0x14043B3C), blurRadius: 12, offset: Offset(0, 3))]
-          : [],
-    ),
-    child: TextField(
-      controller: ctrl, obscureText: obscure,
-      keyboardType: keyboard, focusNode: focusNode,
-      style: const TextStyle(fontSize: 14, fontFamily: 'DM Sans', color: AppTheme.darkText, fontWeight: FontWeight.w500),
-      decoration: InputDecoration(
-        hintText: hint,
-        hintStyle: const TextStyle(color: AppTheme.mutedText, fontSize: 14, fontFamily: 'DM Sans', fontWeight: FontWeight.w400),
-        prefixIcon: Icon(icon, size: 17, color: focused ? AppTheme.primaryDark : const Color(0xFFAAAAAA)),
-        suffixIcon: suffix,
-        contentPadding: const EdgeInsets.symmetric(vertical: 17),
-        border: InputBorder.none,
+      child: TextField(
+        controller: ctrl, obscureText: obscure,
+        keyboardType: keyboard, focusNode: focusNode,
+        style: TextStyle(
+          fontSize: 14, fontFamily: 'DM Sans',
+          color: AppTheme.textPrimary(context),
+          fontWeight: FontWeight.w500,
+        ),
+        decoration: InputDecoration(
+          hintText: hint,
+          hintStyle: TextStyle(
+            color: AppTheme.textMuted(context),
+            fontSize: 14, fontFamily: 'DM Sans', fontWeight: FontWeight.w400,
+          ),
+          prefixIcon: Icon(icon, size: 17,
+              color: focused ? AppTheme.primaryDark : AppTheme.textMuted(context)),
+          suffixIcon: suffix,
+          contentPadding: const EdgeInsets.symmetric(vertical: 17),
+          border: InputBorder.none,
+          filled: false,
+        ),
       ),
-    ),
-  );
+    );
+  }
 }

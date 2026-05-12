@@ -382,81 +382,74 @@ class _PantryScreenState extends State<PantryScreen> {
       border: Border.all(color: AppTheme.border(context)),
       boxShadow: const [BoxShadow(color: Color(0x08000000), blurRadius: 8, offset: Offset(0, 2))],
     ),
-    child: Column(children: [
-      Padding(
-        padding: const EdgeInsets.fromLTRB(16, 4, 16, 0),
-        child: Row(children: [
-          Icon(LucideIcons.search, color: AppTheme.textMuted(context), size: 16),
-          const SizedBox(width: 10),
-          Expanded(child: TextField(
-            controller: _nameCtrl,
-            focusNode: _nameFocus,
-            style: TextStyle(fontFamily: 'DM Sans', fontSize: 14, color: AppTheme.textPrimary(context)),
-            decoration: InputDecoration(
-              hintText: 'What\'s in your fridge?',
-              hintStyle: TextStyle(fontFamily: 'DM Sans', color: AppTheme.textMuted(context), fontSize: 14),
-              border: InputBorder.none,
-              contentPadding: const EdgeInsets.symmetric(vertical: 16),
-            ),
-            textCapitalization: TextCapitalization.none,
-            onSubmitted: _add,
-          )),
-        ]),
+    padding: const EdgeInsets.fromLTRB(16, 12, 16, 12),
+    child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+      // Name field — uses shared inputDecoration helper for light/dark consistency
+      TextField(
+        controller: _nameCtrl,
+        focusNode: _nameFocus,
+        style: TextStyle(fontFamily: 'DM Sans', fontSize: 14, color: AppTheme.textPrimary(context)),
+        decoration: AppTheme.inputDecoration(
+          context: context,
+          hint: 'What\'s in your fridge?',
+          prefixIcon: Icon(LucideIcons.search, size: 16, color: AppTheme.textMuted(context)),
+          contentPadding: const EdgeInsets.symmetric(horizontal: 14, vertical: 13),
+        ),
+        textCapitalization: TextCapitalization.none,
+        onSubmitted: _add,
       ),
-      Container(height: 1, color: AppTheme.border(context)),
-      Padding(
-        padding: const EdgeInsets.fromLTRB(16, 8, 10, 10),
-        child: Row(children: [
-          _miniStepBtn(context, LucideIcons.minus, () {
-            final v = double.tryParse(_qtyCtrl.text) ?? 1;
-            if (v > 1) setState(() => _qtyCtrl.text = (v - 1).toInt().toString());
-          }),
-          const SizedBox(width: 6),
-          SizedBox(width: 32, child: TextField(
-            controller: _qtyCtrl,
-            textAlign: TextAlign.center,
-            keyboardType: TextInputType.number,
-            style: TextStyle(fontFamily: 'DM Sans', fontSize: 13,
-                fontWeight: FontWeight.w700, color: AppTheme.textPrimary(context)),
-            decoration: const InputDecoration(border: InputBorder.none, contentPadding: EdgeInsets.zero),
+      const SizedBox(height: 10),
+      // Qty + unit + add row
+      Row(children: [
+        _miniStepBtn(context, LucideIcons.minus, () {
+          final v = double.tryParse(_qtyCtrl.text) ?? 1;
+          if (v > 1) setState(() => _qtyCtrl.text = (v - 1).toInt().toString());
+        }),
+        const SizedBox(width: 6),
+        SizedBox(width: 32, child: TextField(
+          controller: _qtyCtrl,
+          textAlign: TextAlign.center,
+          keyboardType: TextInputType.number,
+          style: TextStyle(fontFamily: 'DM Sans', fontSize: 13,
+              fontWeight: FontWeight.w700, color: AppTheme.textPrimary(context)),
+          decoration: const InputDecoration(border: InputBorder.none, contentPadding: EdgeInsets.zero),
+        )),
+        const SizedBox(width: 6),
+        _miniStepBtn(context, LucideIcons.plus, () {
+          final v = double.tryParse(_qtyCtrl.text) ?? 1;
+          setState(() => _qtyCtrl.text = (v + 1).toInt().toString());
+        }),
+        const SizedBox(width: 10),
+        Container(
+          height: 36,
+          padding: const EdgeInsets.symmetric(horizontal: 10),
+          decoration: BoxDecoration(
+            color: AppTheme.cardAltBg(context),
+            borderRadius: BorderRadius.circular(8),
+            border: Border.all(color: AppTheme.border(context)),
+          ),
+          child: DropdownButtonHideUnderline(child: DropdownButton<String>(
+            value: _unit,
+            isDense: true,
+            dropdownColor: AppTheme.cardBg(context),
+            style: TextStyle(fontFamily: 'DM Sans', fontSize: 12, color: AppTheme.textPrimary(context)),
+            items: _units.map((u) => DropdownMenuItem(
+              value: u, child: Text(u.isEmpty ? 'none' : u),
+            )).toList(),
+            onChanged: (v) => setState(() => _unit = v!),
           )),
-          const SizedBox(width: 6),
-          _miniStepBtn(context, LucideIcons.plus, () {
-            final v = double.tryParse(_qtyCtrl.text) ?? 1;
-            setState(() => _qtyCtrl.text = (v + 1).toInt().toString());
-          }),
-          const SizedBox(width: 10),
-          Container(
-            height: 30,
-            padding: const EdgeInsets.symmetric(horizontal: 10),
-            decoration: BoxDecoration(
-              color: AppTheme.cardAltBg(context),
-              borderRadius: BorderRadius.circular(8),
-              border: Border.all(color: AppTheme.border(context)),
-            ),
-            child: DropdownButtonHideUnderline(child: DropdownButton<String>(
-              value: _unit,
-              isDense: true,
-              dropdownColor: AppTheme.cardBg(context),
-              style: TextStyle(fontFamily: 'DM Sans', fontSize: 12, color: AppTheme.textPrimary(context)),
-              items: _units.map((u) => DropdownMenuItem(
-                value: u, child: Text(u.isEmpty ? 'none' : u),
-              )).toList(),
-              onChanged: (v) => setState(() => _unit = v!),
-            )),
+        ),
+        const Spacer(),
+        TapScale(
+          onTap: () => _add(_nameCtrl.text),
+          child: Container(
+            padding: const EdgeInsets.symmetric(horizontal: 18, vertical: 10),
+            decoration: BoxDecoration(gradient: AppTheme.tealGradient, borderRadius: BorderRadius.circular(11)),
+            child: const Text('Add', style: TextStyle(color: Colors.white,
+                fontSize: 13, fontFamily: 'DM Sans', fontWeight: FontWeight.w700)),
           ),
-          const Spacer(),
-          TapScale(
-            onTap: () => _add(_nameCtrl.text),
-            child: Container(
-              padding: const EdgeInsets.symmetric(horizontal: 18, vertical: 9),
-              decoration: BoxDecoration(gradient: AppTheme.tealGradient, borderRadius: BorderRadius.circular(11)),
-              child: const Text('Add', style: TextStyle(color: Colors.white,
-                  fontSize: 13, fontFamily: 'DM Sans', fontWeight: FontWeight.w700)),
-            ),
-          ),
-        ]),
-      ),
+        ),
+      ]),
     ]),
   ).animate().fadeIn(duration: 300.ms).slideY(begin: 0.04);
 
