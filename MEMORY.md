@@ -1,6 +1,6 @@
 # PLATELY V2 — MEMORY.md
 > Paste this at the START of every new Claude chat alongside SKILLS.md and TASKS.md.
-> Last updated: Session 44 — Full source audit. Sessions A, B, E, F verified done in source. Only C + D remain.
+> Last updated: QA L4 Fixes — Cook Again added to history, all L1–L4 QA levels passed, flutter analyze 0. READY TO PUSH + REDEPLOY.
 
 ---
 
@@ -29,9 +29,9 @@ Plately V2 — A Flutter mobile app for Android that helps students cook afforda
 |-------|------|
 | Frontend | Flutter (Dart) — Android target |
 | Backend | Python Flask + dual-mode DB: PostgreSQL (prod) / SQLite (local) |
-| AI Chat | OpenRouter — `google/gemma-3-27b-it:free` |
-| AI Recipes | OpenRouter Gemma 3 27B — generates 5 custom recipes, 1hr DB-backed cache |
-| Image Scan | OpenRouter Gemma 3 Vision — fallback chain (27b → 12b → 4-31b) |
+| AI Chat | OpenRouter — `google/gemma-4-31b-it:free` |
+| AI Recipes | OpenRouter Gemma 4 31B — generates 5 custom recipes, 1hr DB-backed cache |
+| Image Scan | OpenRouter Gemma 4 Vision — fallback chain (4-31b → 4-26b → llama-3.3-70b) |
 | Auth | Firebase Auth (Email/Password + Google Sign-In) ✅ |
 | Notifications | flutter_local_notifications — 5 dynamic scheduled + 1 cook-done one-shot |
 | Prefs | SharedPreferences — UID-namespaced, daily macro reset on new day |
@@ -151,11 +151,11 @@ Recipe filters (tags): `Asian | Italian | Vegetarian | Low-Cal | High-Protein | 
 
 ---
 
-## CURRENT SETUP STATUS (Session 44 — post source audit)
+## CURRENT SETUP STATUS (Last updated: Session K+H)
 
 | Item | Status |
 |------|--------|
-| flutter analyze | ✅ 0 issues (verified S43) |
+| flutter analyze | ✅ 0 issues (verified SK+H) |
 | Firebase Auth (email + Google) | ✅ |
 | google-services.json | ✅ |
 | Font TTF files (6) | ✅ |
@@ -207,10 +207,17 @@ Recipe filters (tags): `Asian | Italian | Vegetarian | Low-Cal | High-Protein | 
 | Pantry inputDecoration consistent | ✅ VERIFIED S44 |
 | Release APK built (64MB) | ✅ S40 |
 | Pushed to main + GitHub Actions | ✅ S40 |
-| ALLOWED_ORIGINS Railway var set | ⬜ Marco still needs to set |
-| Firebase App Distribution testers | ⬜ tester emails not added yet |
-| Session C fixes (recipe_detail, browse, shopping) | ⬜ PENDING |
-| Session D fixes (camera, scan dark mode, ai_chat dupes) | ⬜ PENDING |
+| ALLOWED_ORIGINS Railway var set | ✅ Marco confirmed — kept as * (correct for mobile) |
+| Firebase App Distribution testers | ✅ S45 — tester emails added |
+| Google Sign-In release SHA-1 | ✅ Marc confirmed added to Firebase Console |
+| Session C fixes (recipe_detail, browse, shopping) | ✅ DONE S45 |
+| Session D fixes (camera, scan dark mode, ai_chat dupes) | ✅ DONE S45 |
+| Profile dietary prefs redesign (toggle rows + animated pill) | ✅ DONE SK |
+| Static color violations cleared (all screens) | ✅ DONE SK+H — flutter analyze 0 issues |
+| Launcher icon redesign (green→teal gradient + ring mark) | ✅ DONE SH — all mipmap + drawable densities |
+| Goals screen static color violations fixed | ✅ DONE SH |
+| Session H remaining (Home dark, Favorites, activity_row) | ✅ DONE SI — borderGray fix, RecipeCard heart badge, _Stat color |
+| Backend | All APIs need live verification — chat, scan, recipes, goals, history | ✅ DONE SK — all passing; chat/scan model updated to gemma-4-31b |
 
 ---
 

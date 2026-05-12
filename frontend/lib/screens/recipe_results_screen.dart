@@ -413,7 +413,7 @@ class _RecipeResultsScreenState extends State<RecipeResultsScreen> {
               padding: const EdgeInsets.fromLTRB(20, 8, 20, 0),
               child: Text(
                 '$total result${total == 1 ? '' : 's'} for "$_searchQuery"',
-                style: const TextStyle(color: AppTheme.mutedText, fontSize: 12,
+                style: TextStyle(color: AppTheme.textMuted(context), fontSize: 12,
                     fontFamily: 'DM Sans', fontWeight: FontWeight.w500),
               ),
             ),
@@ -424,7 +424,7 @@ class _RecipeResultsScreenState extends State<RecipeResultsScreen> {
               padding: const EdgeInsets.fromLTRB(20, 8, 20, 0),
               child: Text(
                 'Showing ${visible.length} of $total recipes',
-                style: const TextStyle(color: AppTheme.mutedText, fontSize: 12,
+                style: TextStyle(color: AppTheme.textMuted(context), fontSize: 12,
                     fontFamily: 'DM Sans', fontWeight: FontWeight.w500),
               ),
             ),

@@ -357,13 +357,8 @@ class _ProfileScreenState extends State<ProfileScreen> {
 
   // ── Dietary prefs ──────────────────────────────────────────────────────────
   Widget _dietaryPrefs() {
-    // Derive active state from boolean flags:
-    //   pref_veg=true   → Vegetarian ON
-    //   pref_hipro=true → High-Protein ON
-    //   pref_gluten=false → Gluten-Free ON (user avoids gluten)
-    //   pref_dairy=false  → Dairy-Free ON  (user avoids dairy)
-    final isVeg    = (_data['pref_veg']    as bool?) == true;
-    final isHiPro  = (_data['pref_hipro']  as bool?) == true;
+    final isVeg        = (_data['pref_veg']    as bool?) == true;
+    final isHiPro      = (_data['pref_hipro']  as bool?) == true;
     final isGlutenFree = (_data['pref_gluten'] as bool?) == false;
     final isDairyFree  = (_data['pref_dairy']  as bool?) == false;
 
@@ -379,90 +374,131 @@ class _ProfileScreenState extends State<ProfileScreen> {
           await UserPrefsService.savePrefHiPro(next);
           setState(() => _data['pref_hipro'] = next);
         case 'Gluten-Free':
-          // pref_gluten=false means ON. Toggling OFF means pref_gluten=true.
-          final nextPrefVal = isGlutenFree; // if currently ON (false), set to true (OFF)
+          final nextPrefVal = isGlutenFree;
           await UserPrefsService.savePrefGluten(nextPrefVal);
           setState(() => _data['pref_gluten'] = nextPrefVal);
         case 'Dairy-Free':
-          // pref_dairy=false means ON. Toggling OFF means pref_dairy=true.
           final nextPrefVal = isDairyFree;
           await UserPrefsService.savePrefDairy(nextPrefVal);
           setState(() => _data['pref_dairy'] = nextPrefVal);
       }
     }
 
-    final chips = <(String, bool)>[
-      ('Vegetarian',   isVeg),
-      ('High-Protein', isHiPro),
-      ('Gluten-Free',  isGlutenFree),
-      ('Dairy-Free',   isDairyFree),
+    final prefs = <(String, bool, String, IconData)>[
+      ('Vegetarian',   isVeg,        'No meat or fish',                      LucideIcons.leafyGreen),
+      ('High-Protein', isHiPro,      'Prioritise 30g+ protein per meal',     LucideIcons.dumbbell),
+      ('Gluten-Free',  isGlutenFree, 'Exclude gluten-containing ingredients', LucideIcons.wheatOff),
+      ('Dairy-Free',   isDairyFree,  'Exclude dairy products',               LucideIcons.milkOff),
     ];
 
     return Container(
       margin: const EdgeInsets.symmetric(horizontal: 20),
-      padding: const EdgeInsets.all(18),
       decoration: BoxDecoration(
         color: AppTheme.cardBg(context),
         borderRadius: BorderRadius.circular(18),
         border: Border.all(color: AppTheme.border(context)),
       ),
       child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-        Row(children: [
-          const Icon(LucideIcons.leafyGreen, color: AppTheme.primaryDark, size: 18),
-          const SizedBox(width: 8),
-          Text('Dietary Preferences', style: TextStyle(color: AppTheme.textPrimary(context),
-              fontSize: 15, fontFamily: 'DM Sans', fontWeight: FontWeight.w700)),
-        ]),
-        const SizedBox(height: 14),
-        Wrap(
-          spacing: 8, runSpacing: 8,
-          children: chips.map(((String, bool) chip) {
-            final opt = chip.$1;
-            final on  = chip.$2;
-            return GestureDetector(
+        Padding(
+          padding: const EdgeInsets.fromLTRB(18, 16, 18, 4),
+          child: Row(children: [
+            const Icon(LucideIcons.leafyGreen, color: AppTheme.primaryDark, size: 18),
+            const SizedBox(width: 8),
+            Text('Dietary Preferences', style: TextStyle(color: AppTheme.textPrimary(context),
+                fontSize: 15, fontFamily: 'DM Sans', fontWeight: FontWeight.w700)),
+          ]),
+        ),
+        ...prefs.asMap().entries.map((e) {
+          final i   = e.key;
+          final opt = e.value.$1;
+          final on  = e.value.$2;
+          final sub = e.value.$3;
+          final ico = e.value.$4;
+          return Column(children: [
+            if (i > 0) Divider(height: 1, color: AppTheme.border(context), indent: 18, endIndent: 18),
+            TapScale(
               onTap: () => toggle(opt),
-              child: AnimatedContainer(
-                duration: const Duration(milliseconds: 160),
-                padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 8),
-                decoration: BoxDecoration(
-                  color: on ? AppTheme.primaryDark : AppTheme.cardAltBg(context),
-                  borderRadius: BorderRadius.circular(20),
-                  border: Border.all(color: on ? AppTheme.primaryDark : AppTheme.border(context)),
-                ),
-                child: Row(mainAxisSize: MainAxisSize.min, children: [
-                  if (on) ...[
-                    const Icon(LucideIcons.check, size: 12, color: Colors.white),
-                    const SizedBox(width: 5),
-                  ],
-                  Text(opt, style: TextStyle(
-                    color: on ? Colors.white : AppTheme.textPrimary(context),
-                    fontSize: 12, fontFamily: 'DM Sans', fontWeight: FontWeight.w600)),
+              child: Padding(
+                padding: const EdgeInsets.symmetric(horizontal: 18, vertical: 14),
+                child: Row(children: [
+                  Container(
+                    width: 38, height: 38,
+                    decoration: BoxDecoration(
+                      color: on
+                          ? AppTheme.primaryDark.withValues(alpha: 0.10)
+                          : AppTheme.cardAltBg(context),
+                      borderRadius: BorderRadius.circular(11),
+                      border: Border.all(color: on
+                          ? AppTheme.primaryDark.withValues(alpha: 0.25)
+                          : AppTheme.border(context)),
+                    ),
+                    child: Icon(ico,
+                        size: 17,
+                        color: on ? AppTheme.primaryDark : AppTheme.textMuted(context)),
+                  ),
+                  const SizedBox(width: 14),
+                  Expanded(child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+                    Text(opt, style: TextStyle(
+                      color: AppTheme.textPrimary(context),
+                      fontSize: 14, fontFamily: 'DM Sans', fontWeight: FontWeight.w600)),
+                    const SizedBox(height: 2),
+                    Text(sub, style: TextStyle(
+                      color: AppTheme.textMuted(context),
+                      fontSize: 12, fontFamily: 'DM Sans')),
+                  ])),
+                  const SizedBox(width: 12),
+                  // Animated pill toggle
+                  GestureDetector(
+                    onTap: () => toggle(opt),
+                    child: AnimatedContainer(
+                      duration: const Duration(milliseconds: 200),
+                      width: 48, height: 26,
+                      decoration: BoxDecoration(
+                        color: on ? AppTheme.primaryDark : AppTheme.border(context),
+                        borderRadius: BorderRadius.circular(13),
+                      ),
+                      child: AnimatedAlign(
+                        duration: const Duration(milliseconds: 200),
+                        alignment: on ? Alignment.centerRight : Alignment.centerLeft,
+                        child: Container(
+                          width: 20, height: 20,
+                          margin: const EdgeInsets.symmetric(horizontal: 3),
+                          decoration: const BoxDecoration(
+                            color: Colors.white, shape: BoxShape.circle,
+                          ),
+                        ),
+                      ),
+                    ),
+                  ),
                 ]),
               ),
-            );
-          }).toList(),
-        ),
-        // High Protein explanation shown when active
-        if (isHiPro) ...[
-          const SizedBox(height: 12),
-          Container(
-            padding: const EdgeInsets.all(10),
-            decoration: BoxDecoration(
-              color: AppTheme.primaryDark.withValues(alpha: 0.06),
-              borderRadius: BorderRadius.circular(10),
-              border: Border.all(color: AppTheme.primaryDark.withValues(alpha: 0.14)),
             ),
-            child: Row(crossAxisAlignment: CrossAxisAlignment.start, children: [
-              const Icon(LucideIcons.info, size: 13, color: AppTheme.primaryDark),
-              const SizedBox(width: 8),
-              Expanded(child: Text(
-                'High Protein — recipes will prioritize options above your protein goal per serving.',
-                style: TextStyle(color: AppTheme.textMuted(context), fontSize: 12,
-                    fontFamily: 'DM Sans', height: 1.45),
-              )),
-            ]),
-          ),
-        ],
+          ]);
+        }),
+        // High Protein explanation when active
+        if (isHiPro)
+          Padding(
+            padding: const EdgeInsets.fromLTRB(18, 0, 18, 14),
+            child: Container(
+              padding: const EdgeInsets.all(10),
+              decoration: BoxDecoration(
+                color: AppTheme.primaryDark.withValues(alpha: 0.06),
+                borderRadius: BorderRadius.circular(10),
+                border: Border.all(color: AppTheme.primaryDark.withValues(alpha: 0.14)),
+              ),
+              child: Row(crossAxisAlignment: CrossAxisAlignment.start, children: [
+                const Icon(LucideIcons.info, size: 13, color: AppTheme.primaryDark),
+                const SizedBox(width: 8),
+                Expanded(child: Text(
+                  'Recipes will prioritize options above your protein goal per serving.',
+                  style: TextStyle(color: AppTheme.textMuted(context),
+                      fontSize: 12, fontFamily: 'DM Sans', height: 1.45),
+                )),
+              ]),
+            ),
+          )
+        else
+          const SizedBox(height: 4),
       ]),
     );
   }
@@ -547,7 +583,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
           Expanded(child: Text(label, style: TextStyle(
               color: danger ? const Color(0xFFD14444) : AppTheme.textPrimary(context),
               fontSize: 14, fontFamily: 'DM Sans', fontWeight: FontWeight.w600))),
-          trailing ?? const Icon(LucideIcons.chevronRight, color: AppTheme.mutedText, size: 16),
+          trailing ?? Icon(LucideIcons.chevronRight, color: AppTheme.textMuted(context), size: 16),
         ]),
       ),
     );
@@ -636,16 +672,16 @@ class _ProfileScreenState extends State<ProfileScreen> {
         border: Border.all(color: AppTheme.border(context)),
       ),
       child: Row(mainAxisAlignment: MainAxisAlignment.center, children: [
-        const Icon(LucideIcons.info, size: 14, color: AppTheme.mutedText),
+        Icon(LucideIcons.info, size: 14, color: AppTheme.textMuted(context)),
         const SizedBox(width: 8),
         Text('Plately v$_appVersion',
-            style: const TextStyle(color: AppTheme.mutedText, fontSize: 13,
+            style: TextStyle(color: AppTheme.textMuted(context), fontSize: 13,
                 fontFamily: 'DM Sans', fontWeight: FontWeight.w500)),
         const SizedBox(width: 6),
-        const Text('·', style: TextStyle(color: AppTheme.mutedText, fontSize: 13)),
+        Text('·', style: TextStyle(color: AppTheme.textMuted(context), fontSize: 13)),
         const SizedBox(width: 6),
-        const Text("Chishiya's Dogs",
-            style: TextStyle(color: AppTheme.mutedText, fontSize: 13, fontFamily: 'DM Sans')),
+        Text("Chishiya's Dogs",
+            style: TextStyle(color: AppTheme.textMuted(context), fontSize: 13, fontFamily: 'DM Sans')),
       ]),
     ),
   );
@@ -689,14 +725,14 @@ class _ProfileScreenState extends State<ProfileScreen> {
                     decoration: BoxDecoration(color: AppTheme.cardAltBg(context),
                         borderRadius: BorderRadius.circular(8),
                         border: Border.all(color: AppTheme.border(context))),
-                    child: const Icon(LucideIcons.x, size: 16, color: AppTheme.mutedText))),
+                    child: Icon(LucideIcons.x, size: 16, color: AppTheme.textMuted(context)))),
               ]),
             ),
             const Divider(height: 24),
             Expanded(
               child: ListView(controller: ctrl, padding: const EdgeInsets.fromLTRB(20, 0, 20, 30),
-                children: const [
-                  _PolicySection(
+                children: [
+                  const _PolicySection(
                     icon: LucideIcons.database,
                     title: 'What We Store',
                     body: 'Plately stores your Firebase UID, cooking history, macro goals, '
@@ -704,8 +740,8 @@ class _ProfileScreenState extends State<ProfileScreen> {
                         'on your device (SharedPreferences) or in our secure database. '
                         'We do not sell or share your personal data with third parties.',
                   ),
-                  SizedBox(height: 16),
-                  _PolicySection(
+                  const SizedBox(height: 16),
+                  const _PolicySection(
                     icon: LucideIcons.bot,
                     title: 'AI & Data Processing',
                     body: 'Recipe generation and chat are powered by OpenRouter '
@@ -713,24 +749,25 @@ class _ProfileScreenState extends State<ProfileScreen> {
                         'Only your ingredient list and preferences are sent — no personally '
                         'identifiable information is included in AI requests.',
                   ),
-                  SizedBox(height: 16),
-                  _PolicySection(
+                  const SizedBox(height: 16),
+                  const _PolicySection(
                     icon: LucideIcons.shieldOff,
                     title: 'What We Don\'t Do',
                     body: 'We do not display ads. We do not sell your data. We do not '
                         'track your location. We do not share your information with '
                         'advertisers or analytics platforms.',
                   ),
-                  SizedBox(height: 16),
-                  _PolicySection(
+                  const SizedBox(height: 16),
+                  const _PolicySection(
                     icon: LucideIcons.mail,
                     title: 'Contact Us',
                     body: 'Questions or concerns? Reach us at marcdarylle5@gmail.com. '
                         'We respond within 3 business days.',
                   ),
-                  SizedBox(height: 16),
+                  const SizedBox(height: 16),
                   Text('Last updated: May 2026',
-                      style: TextStyle(color: AppTheme.mutedText, fontSize: 11,
+                      style: TextStyle(color: AppTheme.textMuted(context),
+                          fontSize: 11,
                           fontFamily: 'DM Sans')),
                 ],
               ),
@@ -840,7 +877,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
       style: TextStyle(fontFamily: 'DM Sans', color: AppTheme.textPrimary(context), fontSize: 14),
       decoration: InputDecoration(
         labelText: label,
-        labelStyle: const TextStyle(fontFamily: 'DM Sans', color: AppTheme.mutedText, fontSize: 13),
+        labelStyle: TextStyle(fontFamily: 'DM Sans', color: AppTheme.textMuted(context), fontSize: 13),
         filled: true,
         fillColor: AppTheme.cardAltBg(context),
         border: OutlineInputBorder(borderRadius: BorderRadius.circular(12),
@@ -883,7 +920,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
                 style: TextStyle(fontFamily: 'DM Sans', color: AppTheme.textPrimary(context), fontSize: 14),
                 decoration: InputDecoration(
                   labelText: 'Display Name',
-                  labelStyle: const TextStyle(fontFamily: 'DM Sans', color: AppTheme.mutedText, fontSize: 13),
+                labelStyle: TextStyle(fontFamily: 'DM Sans', color: AppTheme.textMuted(context), fontSize: 13),
                   filled: true,
                   fillColor: AppTheme.cardAltBg(context),
                   border: OutlineInputBorder(borderRadius: BorderRadius.circular(12),
@@ -903,13 +940,13 @@ class _ProfileScreenState extends State<ProfileScreen> {
                   border: Border.all(color: AppTheme.border(context)),
                 ),
                 child: Row(children: [
-                  const Icon(LucideIcons.mail, color: AppTheme.mutedText, size: 16),
+                  Icon(LucideIcons.mail, color: AppTheme.textMuted(context), size: 16),
                   const SizedBox(width: 10),
                   Expanded(child: Text(
                     (_data['email'] as String?) ?? '',
-                    style: const TextStyle(color: AppTheme.mutedText, fontSize: 13, fontFamily: 'DM Sans'),
+                    style: TextStyle(color: AppTheme.textMuted(context), fontSize: 13, fontFamily: 'DM Sans'),
                   )),
-                  const Text('(read-only)', style: TextStyle(color: AppTheme.mutedText,
+                  Text('(read-only)', style: TextStyle(color: AppTheme.textMuted(context),
                       fontSize: 11, fontFamily: 'DM Sans')),
                 ]),
               ),

@@ -3,6 +3,7 @@ import 'package:flutter/services.dart';
 import 'package:flutter_animate/flutter_animate.dart';
 import 'package:lucide_icons_flutter/lucide_icons.dart';
 import 'package:shared_preferences/shared_preferences.dart';
+import 'package:firebase_auth/firebase_auth.dart';
 import 'dart:convert';
 import '../theme/app_theme.dart';
 import '../widgets/tap_scale.dart';
@@ -63,8 +64,14 @@ class _PantryScreenState extends State<PantryScreen> {
   String _unit    = 'pcs';
   bool   _loading = true;
 
-  static const _kKey = 'pantry_items_v2';
+  static const _kBase = 'pantry_items_v2';
   static const _units = ['pcs', 'g', 'kg', 'ml', 'L', 'cups', 'tbsp', 'tsp', ''];
+
+  /// UID-namespaced key — matches UserPrefsService convention.
+  static String _pantryKey() {
+    final uid = FirebaseAuth.instance.currentUser?.uid ?? 'anonymous';
+    return '$uid:$_kBase';
+  }
   static const _suggestions = [
     'eggs', 'rice', 'chicken', 'garlic', 'onion', 'soy sauce',
     'cooking oil', 'butter', 'salt', 'pepper', 'sugar', 'vinegar',
@@ -81,10 +88,12 @@ class _PantryScreenState extends State<PantryScreen> {
   }
 
   Future<void> _load() async {
-    final p = await SharedPreferences.getInstance();
-    String raw = p.getString(_kKey) ?? '';
+    final p   = await SharedPreferences.getInstance();
+    final key = _pantryKey();
+    String raw = p.getString(key) ?? '';
     if (raw.isEmpty) {
-      final oldRaw = p.getString('pantry_items') ?? '[]';
+      // Migrate from legacy un-namespaced key (one-time, first login per device)
+      final oldRaw = p.getString(_kBase) ?? p.getString('pantry_items') ?? '[]';
       final old = (jsonDecode(oldRaw) as List).map((e) {
         final m = e as Map<String, dynamic>;
         return PantryItem(name: m['name'] as String, alwaysStocked: m['always'] as bool? ?? false);
@@ -98,7 +107,7 @@ class _PantryScreenState extends State<PantryScreen> {
 
   Future<void> _save() async {
     final p = await SharedPreferences.getInstance();
-    await p.setString(_kKey, jsonEncode(_items.map((i) => i.toJson()).toList()));
+    await p.setString(_pantryKey(), jsonEncode(_items.map((i) => i.toJson()).toList()));
   }
 
   void _add(String name) {
@@ -653,19 +662,23 @@ class _PantryScreenState extends State<PantryScreen> {
   );
 }
 
-// ── Public helpers (used by recipe_detail + shopping_list) ───────────────────
+// ── UID-namespaced key helper (mirrors _PantryScreenState._pantryKey) ────────
+String _pantryKeyForCurrentUser() {
+  final uid = FirebaseAuth.instance.currentUser?.uid ?? 'anonymous';
+  return '$uid:pantry_items_v2';
+}
 
 Future<List<String>> getPantryItems() async {
-  final p = await SharedPreferences.getInstance();
-  final raw = p.getString('pantry_items_v2') ?? '[]';
+  final p   = await SharedPreferences.getInstance();
+  final raw = p.getString(_pantryKeyForCurrentUser()) ?? '[]';
   final list = (jsonDecode(raw) as List)
       .map((e) => PantryItem.fromJson(e as Map<String, dynamic>)).toList();
   return list.map((i) => i.name).toList();
 }
 
 Future<List<PantryItem>> getPantryItemsFull() async {
-  final p = await SharedPreferences.getInstance();
-  final raw = p.getString('pantry_items_v2') ?? '[]';
+  final p   = await SharedPreferences.getInstance();
+  final raw = p.getString(_pantryKeyForCurrentUser()) ?? '[]';
   return (jsonDecode(raw) as List)
       .map((e) => PantryItem.fromJson(e as Map<String, dynamic>)).toList();
 }
@@ -677,8 +690,9 @@ Future<List<String>> getAlwaysStocked() async {
 
 /// Deduct 1 unit per ingredient after cooking. Skips always-stocked. Removes at 0.
 Future<void> deductPantryIngredients(List<String> ingredientNames) async {
-  final p = await SharedPreferences.getInstance();
-  final raw = p.getString('pantry_items_v2') ?? '[]';
+  final p   = await SharedPreferences.getInstance();
+  final key = _pantryKeyForCurrentUser();
+  final raw = p.getString(key) ?? '[]';
   final items = (jsonDecode(raw) as List)
       .map((e) => PantryItem.fromJson(e as Map<String, dynamic>)).toList();
 
@@ -698,5 +712,5 @@ Future<void> deductPantryIngredients(List<String> ingredientNames) async {
       items[idx] = item.copyWith(quantity: newQty);
     }
   }
-  await p.setString('pantry_items_v2', jsonEncode(items.map((i) => i.toJson()).toList()));
+  await p.setString(key, jsonEncode(items.map((i) => i.toJson()).toList()));
 }

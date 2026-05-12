@@ -243,16 +243,12 @@ class _IngredientEntryScreenState extends State<IngredientEntryScreen>
       backgroundColor: _isDark ? Colors.black : AppTheme.scaffoldBg(context),
       body: Stack(children: [
         // Camera layer — shows live feed OR frozen captured image
-        if (_camReady && _cam != null)
-          AnimatedOpacity(
-            opacity: _isDark ? 1.0 : 0.0,
-            duration: const Duration(milliseconds: 300),
-            child: Positioned.fill(
-              child: _capturedPath != null
-                  // Freeze on captured image — no more live feed after shutter
-                  ? Image.file(File(_capturedPath!), fit: BoxFit.cover)
-                  : CameraPreview(_cam!),
-            ),
+        if (_camReady && _cam != null && _isDark)
+          Positioned.fill(
+            child: _capturedPath != null
+                // Freeze on captured image — no more live feed after shutter
+                ? Image.file(File(_capturedPath!), fit: BoxFit.cover)
+                : CameraPreview(_cam!),
           ),
         // Vignette
         if (_isDark && _camReady)
@@ -375,7 +371,7 @@ class _IngredientEntryScreenState extends State<IngredientEntryScreen>
         child: Text(
           _isDark ? 'Add Ingredients' : 'Type Ingredients',
           key: ValueKey(_mode),
-          style: TextStyle(color: _isDark ? Colors.white : AppTheme.darkText,
+          style: TextStyle(color: _isDark ? Colors.white : AppTheme.textPrimary(context),
               fontSize: 15, fontFamily: 'DM Sans', fontWeight: FontWeight.w700),
         ),
       ),
@@ -539,7 +535,7 @@ class _IngredientEntryScreenState extends State<IngredientEntryScreen>
       const SizedBox(height: 20),
       if (_ingredients.isNotEmpty) ...[
         Text('${_ingredients.length} ingredient${_ingredients.length == 1 ? '' : 's'} added',
-            style: const TextStyle(color: AppTheme.mutedText, fontSize: 12, fontFamily: 'DM Sans')),
+            style: TextStyle(color: AppTheme.textMuted(context), fontSize: 12, fontFamily: 'DM Sans')),
         const SizedBox(height: 10),
         Wrap(spacing: 8, runSpacing: 8,
             children: _ingredients.map((i) => _Chip(label: i, dark: false, onRemove: () => _removeChip(i))).toList()),
@@ -710,10 +706,10 @@ class _PillTab extends StatelessWidget {
           boxShadow: active ? const [BoxShadow(color: Color(0x40043B3C), blurRadius: 10, offset: Offset(0, 3))] : null,
         ),
         child: Row(mainAxisAlignment: MainAxisAlignment.center, children: [
-          Icon(icon, size: 14, color: active ? Colors.white : (darkBg ? Colors.white54 : AppTheme.mutedText)),
+          Icon(icon, size: 14, color: active ? Colors.white : (darkBg ? Colors.white54 : AppTheme.textMuted(context))),
           const SizedBox(width: 5),
           Text(label, style: TextStyle(
-            color: active ? Colors.white : (darkBg ? Colors.white54 : AppTheme.mutedText),
+            color: active ? Colors.white : (darkBg ? Colors.white54 : AppTheme.textMuted(context)),
             fontSize: 13, fontFamily: 'DM Sans', fontWeight: FontWeight.w700,
           )),
         ]),
@@ -787,7 +783,7 @@ class _Chip extends StatelessWidget {
       border: Border.all(color: dark ? Colors.white.withValues(alpha: 0.2) : AppTheme.primaryDark.withValues(alpha: 0.15)),
     ),
     child: Row(mainAxisSize: MainAxisSize.min, children: [
-      Text(label, style: TextStyle(color: dark ? Colors.white : AppTheme.darkText,
+      Text(label, style: TextStyle(color: dark ? Colors.white : AppTheme.textPrimary(context),
           fontSize: 13, fontFamily: 'DM Sans', fontWeight: FontWeight.w600)),
       const SizedBox(width: 6),
       TapScale(
@@ -798,7 +794,7 @@ class _Chip extends StatelessWidget {
             color: dark ? Colors.white.withValues(alpha: 0.12) : AppTheme.primaryDark.withValues(alpha: 0.1),
             shape: BoxShape.circle,
           ),
-          child: Icon(LucideIcons.x, size: 10, color: dark ? Colors.white : AppTheme.darkText),
+          child: Icon(LucideIcons.x, size: 10, color: dark ? Colors.white : AppTheme.textPrimary(context)),
         ),
       ),
     ]),

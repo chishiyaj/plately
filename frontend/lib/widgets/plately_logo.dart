@@ -22,6 +22,8 @@ class PlatelyLogo extends StatelessWidget {
   Widget build(BuildContext context) {
     final isOnDark = theme == PlatelyLogoTheme.onDark;
     final wordmarkColor = isOnDark ? Colors.white : AppTheme.primaryDark;
+    // Never show background box when placed on a scaffold/appbar — only for launcher icon
+    const showBg = false;
 
     return Row(
       mainAxisSize: MainAxisSize.min,
@@ -32,7 +34,7 @@ class PlatelyLogo extends StatelessWidget {
           child: CustomPaint(
               painter: _RingMarkPainter(
                   size: iconSize,
-                  showBackground: isOnDark)),
+                  showBackground: showBg)),
         ),
         if (showWordmark) ...[
           SizedBox(width: iconSize * 0.22),

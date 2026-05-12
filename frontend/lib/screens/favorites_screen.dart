@@ -88,7 +88,7 @@ class _FavoritesScreenState extends State<FavoritesScreen> {
                     style: TextStyle(color: AppTheme.textPrimary(context), fontSize: 24,
                         fontFamily: 'DM Sans', fontWeight: FontWeight.w800)),
                 Text(_loading ? 'Loading...' : '${_favorites.length} saved recipes',
-                    style: const TextStyle(color: AppTheme.mutedText, fontSize: 13, fontFamily: 'DM Sans')),
+                    style: TextStyle(color: AppTheme.textMuted(context), fontSize: 13, fontFamily: 'DM Sans')),
               ],
             ),
           ),
@@ -121,16 +121,18 @@ class _FavoritesScreenState extends State<FavoritesScreen> {
       child: TextField(
         controller: _searchCtrl,
         onChanged: (v) => setState(() => _query = v),
-        style: const TextStyle(fontSize: 14, fontFamily: 'DM Sans', color: AppTheme.darkText),
-        decoration: const InputDecoration(
+        style: TextStyle(fontSize: 14, fontFamily: 'DM Sans', color: AppTheme.textPrimary(context)),
+        decoration: InputDecoration(
           hintText: 'Search saved recipes...',
-          hintStyle: TextStyle(color: AppTheme.mutedText, fontSize: 14, fontFamily: 'DM Sans'),
+          hintStyle: TextStyle(color: AppTheme.textMuted(context), fontSize: 14, fontFamily: 'DM Sans'),
           prefixIcon: Padding(
-            padding: EdgeInsets.all(14),
-            child: Icon(LucideIcons.search, size: 18, color: AppTheme.mutedText),
+            padding: const EdgeInsets.all(14),
+            child: Icon(LucideIcons.search, size: 18, color: AppTheme.textMuted(context)),
           ),
-          contentPadding: EdgeInsets.symmetric(vertical: 15),
+          contentPadding: const EdgeInsets.symmetric(vertical: 15),
           border: InputBorder.none,
+          enabledBorder: InputBorder.none,
+          focusedBorder: InputBorder.none,
         ),
       ),
     ).animate().fadeIn(delay: 80.ms, duration: 300.ms);
@@ -263,6 +265,7 @@ class _FavoritesScreenState extends State<FavoritesScreen> {
           difficulty: r.difficulty, index: i,
           imageUrl: r.imageUrl,
           costPhp: r.costPhp,
+          isFavorited: true,
           onTap: () => Navigator.push(context,
               AppTheme.slideUp(RecipeDetailScreen(recipe: r))).then((_) => _loadFavorites()),
         ).animate().fadeIn(delay: (i * 60).ms, duration: 300.ms)

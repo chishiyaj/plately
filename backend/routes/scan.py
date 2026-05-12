@@ -1,5 +1,5 @@
 """
-routes/scan.py — Ingredient detection via free AI (OpenRouter Gemma 3).
+routes/scan.py — Ingredient detection via free AI (OpenRouter Gemma 4).
 Replaces Google Vision + Imagga entirely — zero billing required.
 Flow: base64 image → AI vision prompt → ingredient list matched against DB.
 Falls back to mock if OPENROUTER_API_KEY not set.
@@ -20,9 +20,9 @@ OPENROUTER_URL = "https://openrouter.ai/api/v1/chat/completions"
 
 # Model priority list — first available (non-429) is used
 MODELS = [
-    "google/gemma-3-27b-it:free",   # primary
-    "google/gemma-3-4b-it:free",    # fallback (smaller, usually available)
-    "meta-llama/llama-4-scout:free", # fallback
+    "google/gemma-4-31b-it:free",            # primary — Gemma 4 31B vision
+    "google/gemma-4-26b-a4b-it:free",        # fallback — Gemma 4 26B vision
+    "meta-llama/llama-3.3-70b-instruct:free", # text fallback (no vision — returns empty gracefully)
 ]
 
 

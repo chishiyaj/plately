@@ -362,8 +362,8 @@ class _OnboardingGoalsScreenState extends State<OnboardingGoalsScreen> {
 
   Widget _sexSelector() {
     return Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-      const Text('Sex', style: TextStyle(
-          fontFamily: 'DM Sans', color: AppTheme.mutedText, fontSize: 13)),
+      Text('Sex', style: TextStyle(
+          fontFamily: 'DM Sans', color: AppTheme.textMuted(context), fontSize: 13)),
       const SizedBox(height: 8),
       Row(children: [
         Expanded(child: _sexChip('male',   'Male')),
@@ -498,7 +498,7 @@ class _OnboardingGoalsScreenState extends State<OnboardingGoalsScreen> {
           borderRadius: BorderRadius.circular(8),
           border: Border.all(color: AppTheme.border(context)),
         ),
-        child: const Icon(LucideIcons.penLine, size: 14, color: AppTheme.mutedText),
+        child: const Icon(LucideIcons.penLine, size: 14, color: AppTheme.primaryDark),
       ),
     ),
   ]);
@@ -541,8 +541,8 @@ class _OnboardingGoalsScreenState extends State<OnboardingGoalsScreen> {
                   fontSize: 18, fontWeight: FontWeight.w700),
               decoration: InputDecoration(
                 suffixText: unit,
-                suffixStyle: const TextStyle(
-                    fontFamily: 'DM Sans', color: AppTheme.mutedText),
+                suffixStyle: TextStyle(
+                    fontFamily: 'DM Sans', color: AppTheme.textMuted(context)),
                 filled: true,
                 fillColor: AppTheme.cardAltBg(context),
                 border: OutlineInputBorder(

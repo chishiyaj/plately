@@ -421,8 +421,8 @@ class _HomeScreenState extends State<HomeScreen> {
         const SizedBox(width: 8),
         GestureDetector(
           onTap: () => setState(() => _updateDismissed = true),
-          child: const Text('Later', style: TextStyle(
-            color: AppTheme.mutedText, fontSize: 12, fontFamily: 'DM Sans',
+          child: Text('Later', style: TextStyle(
+            color: AppTheme.textMuted(context), fontSize: 12, fontFamily: 'DM Sans',
           )),
         ),
       ]),
@@ -689,16 +689,16 @@ class _HomeScreenState extends State<HomeScreen> {
               Container(
                 width: 44, height: 44,
                 decoration: BoxDecoration(
-                  color: _streak > 0 ? AppTheme.yellow.withValues(alpha: 0.15) : AppTheme.borderGray.withValues(alpha: 0.4),
+                  color: _streak > 0 ? AppTheme.yellow.withValues(alpha: 0.15) : AppTheme.border(context).withValues(alpha: 0.5),
                   shape: BoxShape.circle,
                 ),
                 child: Icon(LucideIcons.flame,
-                    color: _streak > 0 ? AppTheme.orange : AppTheme.mutedText, size: 20),
+                    color: _streak > 0 ? AppTheme.orange : AppTheme.textMuted(context), size: 20),
               ),
               const SizedBox(height: 4),
               Text('$_streak day${_streak != 1 ? 's' : ''}',
                   style: TextStyle(
-                    color: _streak > 0 ? AppTheme.orange : AppTheme.mutedText,
+                    color: _streak > 0 ? AppTheme.orange : AppTheme.textMuted(context),
                     fontSize: 10, fontFamily: 'DM Sans', fontWeight: FontWeight.w700,
                   )),
             ]),
@@ -714,11 +714,11 @@ class _HomeScreenState extends State<HomeScreen> {
                 borderRadius: BorderRadius.circular(12),
                 border: Border.all(color: AppTheme.border(context)),
               ),
-              child: const Row(mainAxisAlignment: MainAxisAlignment.center, children: [
-                SizedBox(width: 13, height: 13,
+              child: Row(mainAxisAlignment: MainAxisAlignment.center, children: [
+                const SizedBox(width: 13, height: 13,
                     child: CircularProgressIndicator(strokeWidth: 2, color: AppTheme.primaryDark)),
-                SizedBox(width: 10),
-                Text('Loading...', style: TextStyle(color: AppTheme.mutedText,
+                const SizedBox(width: 10),
+                Text('Loading...', style: TextStyle(color: AppTheme.textMuted(context),
                     fontSize: 12, fontFamily: 'DM Sans')),
               ]),
             )
@@ -860,7 +860,7 @@ class _HomeScreenState extends State<HomeScreen> {
               const SizedBox(height: 14),
               // weekday headers
               Row(children: ['M','T','W','T','F','S','S'].map((d) => Expanded(
-                child: Center(child: Text(d, style: const TextStyle(color: AppTheme.mutedText,
+                child: Center(child: Text(d, style: TextStyle(color: AppTheme.textMuted(context),
                     fontSize: 11, fontFamily: 'DM Sans', fontWeight: FontWeight.w700))),
               )).toList()),
               const SizedBox(height: 6),
@@ -903,8 +903,8 @@ class _HomeScreenState extends State<HomeScreen> {
                             fontFamily: 'DM Sans', fontSize: 13,
                             fontWeight: isToday2 || isSelected ? FontWeight.w800 : FontWeight.w500,
                             color: isSelected ? Colors.white
-                                : isFuture ? AppTheme.mutedText.withValues(alpha: 0.35)
-                                : AppTheme.textPrimary(context),
+                                : isFuture ? AppTheme.textMuted(ctx).withValues(alpha: 0.35)
+                                : AppTheme.textPrimary(ctx),
                           )),
                           if (hasDot && !isSelected)
                             Positioned(bottom: 4,
@@ -1051,10 +1051,10 @@ class _HomeScreenState extends State<HomeScreen> {
       );
     }
     if (_suggested.isEmpty) {
-      return const Padding(
-        padding: EdgeInsets.fromLTRB(20, 14, 20, 0),
+      return Padding(
+        padding: const EdgeInsets.fromLTRB(20, 14, 20, 0),
         child: Text('No recipes found. Is the backend running?',
-            style: TextStyle(color: AppTheme.mutedText, fontSize: 13, fontFamily: 'DM Sans')),
+            style: TextStyle(color: AppTheme.textMuted(context), fontSize: 13, fontFamily: 'DM Sans')),
       );
     }
     return SizedBox(
@@ -1149,7 +1149,7 @@ class _HomeScreenState extends State<HomeScreen> {
   String _formatTimestamp(String ts) {
     if (ts.isEmpty) return '';
     try {
-      final dt = DateTime.parse(ts);
+      final dt = DateTime.parse(ts).toLocal();
       final now = DateTime.now();
       final diff = now.difference(dt);
       if (diff.inMinutes < 60) return '${diff.inMinutes}m ago';

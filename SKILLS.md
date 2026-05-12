@@ -1,6 +1,6 @@
 # PLATELY V2 — SKILLS.md
 > Paste alongside MEMORY.md + TASKS.md at start of every chat.
-> Last updated: Session 44 — patterns verified against full source audit.
+> Last updated: Session K — OpenRouter model updated in AI rules section.
 
 ---
 

@@ -44,7 +44,7 @@ class AiTipCard extends StatelessWidget {
                   style: TextStyle(color: AppTheme.primaryDark, fontSize: 12, fontFamily: 'DM Sans', fontWeight: FontWeight.w700),
                 ),
                 const SizedBox(height: 3),
-                Text(tip, style: const TextStyle(color: AppTheme.mutedText, fontSize: 13, fontFamily: 'DM Sans', height: 1.5)),
+                Text(tip, style: TextStyle(color: AppTheme.textMuted(context), fontSize: 13, fontFamily: 'DM Sans', height: 1.5)),
               ],
             ),
           ),

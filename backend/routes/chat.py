@@ -16,7 +16,7 @@ bp     = Blueprint("chat", __name__)
 logger = logging.getLogger(__name__)
 
 OPENROUTER_URL = "https://openrouter.ai/api/v1/chat/completions"
-MODEL          = "google/gemma-3-27b-it:free"
+MODEL          = "google/gemma-4-31b-it:free"
 MAX_MSG_LEN    = 500
 MAX_HISTORY    = 6   # keep last N exchanges (N/2 turns each)
 CACHE_TTL      = 3600
@@ -97,7 +97,6 @@ def _set_cached(message: str, reply: str) -> None:
 def _build_messages(message: str, history: list) -> list:
     """Build OpenRouter messages array with system prompt + optional history.
 
-    Gemma constraint: no two consecutive messages with the same role.
     Strategy: merge system prompt into the FIRST user message so we never
     have a bare system-role entry, then interleave history strictly alternating
     user/assistant. If history order is broken, drop the offending entry.
@@ -116,7 +115,7 @@ def _build_messages(message: str, history: list) -> list:
         content = str(h.get("content", ""))[:500].strip()
         if role not in ("user", "assistant") or not content:
             continue
-        # Drop if same role as last entry (Gemma rejects consecutive same-role)
+        # Drop if same role as last entry (prevents consecutive same-role messages)
         if valid and valid[-1]["role"] == role:
             continue
         valid.append({"role": role, "content": content})

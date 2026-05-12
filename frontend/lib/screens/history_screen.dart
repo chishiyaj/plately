@@ -408,6 +408,9 @@ class _HistoryScreenState extends State<HistoryScreen> {
                   recipeCount: recipeCount,
                   actionType: h['action_type'] as String? ?? 'cooked',
                   onTap: () => _openHistoryEntry(h),
+                  onCookAgain: (h['recipe_id'] as int? ?? -1) > 0
+                      ? () => _openHistoryEntry(h)
+                      : null,
                 ).animate().fadeIn(duration: 280.ms).slideX(begin: 0.04),
               );
             }),
@@ -665,8 +668,10 @@ class _HistoryRow extends StatelessWidget {
   final String displayName, time, actionType;
   final int recipeCount;
   final VoidCallback onTap;
+  final VoidCallback? onCookAgain;
   const _HistoryRow({required this.displayName, required this.time,
-      required this.recipeCount, required this.actionType, required this.onTap});
+      required this.recipeCount, required this.actionType, required this.onTap,
+      this.onCookAgain});
 
   @override
   Widget build(BuildContext context) => TapScale(
@@ -707,8 +712,29 @@ class _HistoryRow extends StatelessWidget {
                 style: const TextStyle(color: AppTheme.greenDark, fontSize: 11,
                     fontFamily: 'DM Sans', fontWeight: FontWeight.w600)),
           ),
-          const SizedBox(height: 4),
-          const Icon(LucideIcons.chevronRight, size: 14, color: AppTheme.mutedText),
+          if (onCookAgain != null) ...[
+            const SizedBox(height: 6),
+            TapScale(
+              onTap: onCookAgain!,
+              child: Container(
+                padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                decoration: BoxDecoration(
+                  color: AppTheme.primaryDark.withValues(alpha: 0.08),
+                  borderRadius: BorderRadius.circular(8),
+                  border: Border.all(color: AppTheme.primaryDark.withValues(alpha: 0.18)),
+                ),
+                child: const Row(mainAxisSize: MainAxisSize.min, children: [
+                  Icon(LucideIcons.refreshCw, size: 10, color: AppTheme.primaryDark),
+                  SizedBox(width: 4),
+                  Text('Cook Again', style: TextStyle(color: AppTheme.primaryDark,
+                      fontSize: 10, fontFamily: 'DM Sans', fontWeight: FontWeight.w700)),
+                ]),
+              ),
+            ),
+          ] else ...[
+            const SizedBox(height: 4),
+            const Icon(LucideIcons.chevronRight, size: 14, color: AppTheme.mutedText),
+          ],
         ]),
       ]),
     ),

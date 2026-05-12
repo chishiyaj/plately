@@ -432,7 +432,7 @@ class _RecipeDetailScreenState extends State<RecipeDetailScreen> with TickerProv
                   borderRadius: BorderRadius.circular(12),
                 ),
                 child: Icon(
-                  _isFavorited ? LucideIcons.heart : LucideIcons.heart,
+                  _isFavorited ? Icons.favorite : Icons.favorite_border,
                   color: _isFavorited ? AppTheme.red : Colors.white60,
                   size: 18,
                 ),
@@ -450,7 +450,8 @@ class _RecipeDetailScreenState extends State<RecipeDetailScreen> with TickerProv
       height: 44,
       decoration: BoxDecoration(
           color: AppTheme.cardAltBg(context),
-          borderRadius: BorderRadius.circular(14)),
+          borderRadius: BorderRadius.circular(14),
+          border: Border.all(color: AppTheme.border(context))),
       child: Row(children: [
         _Tab(label: 'Ingredients', selected: _showIngredients,  onTap: () => setState(() => _showIngredients = true)),
         _Tab(label: 'Steps',       selected: !_showIngredients, onTap: () => setState(() => _showIngredients = false)),
@@ -555,7 +556,20 @@ class _RecipeDetailScreenState extends State<RecipeDetailScreen> with TickerProv
   Widget _buildSteps() {
     final steps = _steps;
     return Column(
-      children: List.generate(steps.length, (i) {
+      children: [
+        // Tappable hint — disappears once user taps first step
+        if (_completedSteps.isEmpty)
+          Padding(
+            padding: const EdgeInsets.only(bottom: 12),
+            child: Row(mainAxisAlignment: MainAxisAlignment.center, children: [
+              Icon(LucideIcons.hand, size: 12, color: AppTheme.textMuted(context)),
+              const SizedBox(width: 5),
+              Text('Tap a step to mark it done',
+                style: TextStyle(color: AppTheme.textMuted(context), fontSize: 11, fontFamily: 'DM Sans'),
+              ),
+            ]),
+          ),
+        ...List.generate(steps.length, (i) {
         final timerSecs = _extractSeconds(steps[i]);
         final timerRunning = _timerSeconds.containsKey(i);
         final timerRemaining = _timerSeconds[i] ?? 0;
@@ -635,6 +649,7 @@ class _RecipeDetailScreenState extends State<RecipeDetailScreen> with TickerProv
           ),
         ).animate(delay: (i * 50).ms).fadeIn(duration: 300.ms).slideX(begin: 0.04);
       }),
+      ],
     );
   }
 
@@ -818,9 +833,7 @@ class _RecipeDetailScreenState extends State<RecipeDetailScreen> with TickerProv
     await Future.delayed(const Duration(milliseconds: 1200));
     if (!mounted) return;
     _showShareSheet(cal: scaledCal, protein: scaledPro, streak: currentStreak);
-    await Future.delayed(const Duration(milliseconds: 200));
-    if (!mounted) return;
-    Navigator.pop(context);
+    // Navigator.pop is now inside the share sheet's Done button — user controls dismissal
   }
 
   // ── Post-cook share sheet ─────────────────────────────────────────────────
@@ -1036,6 +1049,9 @@ class _ShareBottomSheetState extends State<_ShareBottomSheet> {
         text: 'Just cooked ${widget.dishName} 🔥 +${widget.calories}kcal +${widget.protein}g protein. '
               'Tracking macros before I cook, not after. #Plately #NoCap',
       );
+      if (!mounted) return;
+      Navigator.pop(context); // close sheet
+      Navigator.pop(context); // back to previous screen
     } catch (_) {
       // share failed silently
     } finally {
@@ -1057,7 +1073,7 @@ class _ShareBottomSheetState extends State<_ShareBottomSheet> {
           Container(
             width: 40, height: 4,
             decoration: BoxDecoration(
-              color: AppTheme.borderGray,
+              color: AppTheme.border(context),
               borderRadius: BorderRadius.circular(2),
             ),
           ),
@@ -1067,8 +1083,8 @@ class _ShareBottomSheetState extends State<_ShareBottomSheet> {
             fontFamily: 'DM Sans', fontWeight: FontWeight.w800,
           )),
           const SizedBox(height: 4),
-          const Text('let the world know you ate different today',
-            style: TextStyle(color: AppTheme.mutedText, fontSize: 13, fontFamily: 'DM Sans')),
+          Text('let the world know you ate different today',
+            style: TextStyle(color: AppTheme.textMuted(context), fontSize: 13, fontFamily: 'DM Sans')),
           const SizedBox(height: 20),
           Center(
             child: PlatelyShareCard(
@@ -1099,9 +1115,12 @@ class _ShareBottomSheetState extends State<_ShareBottomSheet> {
           ),
           const SizedBox(height: 10),
           TextButton(
-            onPressed: () => Navigator.pop(context),
-            child: const Text('Skip', style: TextStyle(
-                color: AppTheme.mutedText, fontFamily: 'DM Sans', fontSize: 14)),
+            onPressed: () {
+              Navigator.pop(context); // close sheet
+              Navigator.pop(context); // back to previous screen
+            },
+            child: Text('Done', style: TextStyle(
+                color: AppTheme.textMuted(context), fontFamily: 'DM Sans', fontSize: 14)),
           ),
         ],
       ),

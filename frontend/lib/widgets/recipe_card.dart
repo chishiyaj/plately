@@ -92,6 +92,8 @@ class RecipeCard extends StatelessWidget {
   /// When non-empty, the DB/API image URL takes priority over the keyword map.
   final String imageUrl;
   final int costPhp;
+  /// When true, shows a filled red heart badge (used in Favorites grid).
+  final bool isFavorited;
 
   const RecipeCard({
     required this.title, required this.time, required this.calories,
@@ -99,6 +101,7 @@ class RecipeCard extends StatelessWidget {
     required this.onTap, this.cardGradientColors, this.cardFgColor,
     this.imageUrl = '',
     this.costPhp = 0,
+    this.isFavorited = false,
     super.key,
   });
 
@@ -182,6 +185,20 @@ class RecipeCard extends StatelessWidget {
                         fontFamily: 'DM Sans', fontWeight: FontWeight.w600)),
                   ),
                 ),
+                // ── Heart badge (filled when favorited) ───────────────────
+                if (isFavorited)
+                  Positioned(top: 10, left: 10,
+                    child: Container(
+                      width: 28, height: 28,
+                      decoration: BoxDecoration(
+                        color: Colors.white.withValues(alpha: 0.92),
+                        shape: BoxShape.circle,
+                        boxShadow: const [BoxShadow(color: Color(0x22000000), blurRadius: 4)],
+                      ),
+                      child: const Icon(Icons.favorite,
+                          color: AppTheme.red, size: 14),
+                    ),
+                  ),
               ]),
             ),
             // ── Info section ───────────────────────────────────────────────
@@ -245,12 +262,15 @@ class RecipeCard extends StatelessWidget {
 }
 
 class _Stat extends StatelessWidget {
-  final IconData icon; final String label; final Color color;
-  const _Stat({required this.icon, required this.label, this.color = AppTheme.mutedText});
+  final IconData icon; final String label; final Color? color;
+  const _Stat({required this.icon, required this.label, this.color});
   @override
-  Widget build(BuildContext context) => Row(children: [
-    Icon(icon, size: 11, color: color), const SizedBox(width: 3),
-    Text(label, style: TextStyle(color: color, fontSize: 11,
-        fontFamily: 'DM Sans', fontWeight: FontWeight.w500)),
-  ]);
+  Widget build(BuildContext context) {
+    final c = color ?? AppTheme.textMuted(context);
+    return Row(children: [
+      Icon(icon, size: 11, color: c), const SizedBox(width: 3),
+      Text(label, style: TextStyle(color: c, fontSize: 11,
+          fontFamily: 'DM Sans', fontWeight: FontWeight.w500)),
+    ]);
+  }
 }
