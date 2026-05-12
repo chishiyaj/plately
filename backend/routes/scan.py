@@ -67,7 +67,7 @@ def _call_openrouter(model: str, base64_image: str, prompt: str, key: str) -> di
 
 def _ai_detect(base64_image: str) -> list[str]:
     """Send image to Gemma vision and return detected food ingredients."""
-    key = os.getenv("OPENROUTER_API_KEY", "")
+    key = os.getenv("OPENROUTER_API_KEY", "").strip()
     if not key:
         return []
 

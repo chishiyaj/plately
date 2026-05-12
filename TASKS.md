@@ -1,6 +1,6 @@
 # PLATELY V2 — TASKS.md
 > Paste alongside MEMORY.md + SKILLS.md at start of every chat.
-> Last updated: Session 44 — Full source audit. Sessions A, B (partial), E, F verified DONE in source. TASKS.md, MEMORY.md, SKILLS.md updated to reflect actual code state.
+> Last updated: Session 45 — Sessions C+D completed. New QA round from physical device. Sessions H, I, J, K written.
 
 ---
 
@@ -9,155 +9,305 @@ This file must be updated AT THE END OF EVERY SESSION without exception.
 
 ---
 
-## CURRENT STATE (Session 44 — Post source audit ✅)
+## CURRENT STATE (Session 45)
 
-### Done in S44 (Source Audit — verified against actual files on disk):
-- Confirmed Sessions A, B (most items), E, F are already implemented in source
-- TASKS.md, MEMORY.md, SKILLS.md updated to reflect true state
-- Items previously marked ⬜ in bug queue but actually DONE in source → flipped to ✅
+### Done in S45:
+- Session C: finish cooking animation 1200ms, steps tap-to-complete (verified in source)
+- Session D: send button dark mode fix (iconColor context-aware), scan type field enabledBorder/focusedBorder fix
+- Committed + pushed: `fbe8545` "Fix dark mode, auth screens, history, recipe UX, chat backend"
+- flutter analyze → 0 issues
 
-### Still pending (human tasks):
-- ⬜ Marco: set `ALLOWED_ORIGINS=https://plately-production.up.railway.app` in Railway Variables
-- ⬜ Marco: redeploy backend after setting ALLOWED_ORIGINS
-- ⬜ Marc/Adrian: add tester emails in Firebase Console → App Distribution → Testers
-- ⬜ Marc: commit + push all changes, rebuild APK
+### Human tasks completed:
+- ✅ Marco: ALLOWED_ORIGINS set in Railway (kept as * — correct for mobile backend)
+- ✅ Marco: backend redeployed
+- ✅ Marc/Adrian: tester emails added in Firebase App Distribution
+
+### New bugs found on physical device (QA round 2):
+- See Sessions H, I, J, K below — all pending
 
 ---
 
-## 🐛 BUG QUEUE — TRUE STATUS (verified against source S44)
+## 🐛 BUG QUEUE
 
 > Priority: P0=crash/data loss | P1=broken feature | P2=wrong behavior | P3=visual only
 
 | Priority | Screen | Description | Session | Status |
 |----------|--------|-------------|---------|--------|
-| P3 | Splash | 3 splash screens → should be 1 branded splash | A | ✅ DONE (single splash + first-time carousel) |
-| P1 | Login (light) | Input fields: sharp vs rounded border mismatch | A | ✅ DONE (_AuthField uses AnimatedContainer with consistent radius 14) |
-| P1 | Login (dark) | Input field bg ≈ text color — unreadable | A | ✅ DONE (S43) |
-| P2 | Login (dark) | Wrong dark mode — scaffold bg not adapting | A | ✅ DONE (S43) |
-| P2 | Forgot Password | No clarification it only resets Plately password | A | ✅ DONE (S43 — sheet says "Plately password only") |
-| P1 | Goals | Male/Female selector misaligned | B | ✅ DONE (both _sexChip() are Expanded, height 44) |
-| P1 | Goals | TDEE result not reflected in daily targets | B | ✅ DONE (_calculate() does setState on result) |
-| P0 | Goals | After Save → black screen | B | ✅ DONE (pushAndRemoveUntil with canPop() guard) |
-| P3 | Home | Logo renders as square with bg color | B | ✅ N/A (uses PlatelyLogo widget — no raw asset) |
-| P1 | Home (dark) | Macro/text info barely visible in dark mode | B | ✅ DONE (S43 partial + uses textPrimary/textMuted) |
-| P1 | Home | Scan FAB label garbled 'aE' text | B | ✅ DONE (_ScanFab is clean circle, no label) |
-| P1 | Browse (light) | Search text field missing corner borders | C | ⬜ NEEDS FIX |
-| P1 | Recipe Detail (dark) | Tab buttons barely visible | C | ⬜ NEEDS FIX |
-| P2 | Recipe Detail | Favorite heart: delay + bg turns red | C | ⬜ NEEDS FIX |
-| P3 | Recipe Detail | Finish cooking animation too fast | C | ⬜ NEEDS FIX |
-| P2 | Recipe Detail | Steps UX: tap to mark done | C | ⬜ NEEDS FIX |
-| P2 | Recipe Detail | Ingredient chip — unclear if changes macros | C | ⬜ NEEDS FIX |
-| P1 | Shopping List | "All in pantry" when pantry is empty | C | ⬜ NEEDS FIX |
-| P1 | Timer | Pauses when app switches — needs deadline-based | D | ⬜ NEEDS FIX |
-| P1 | Timer | No notification when user in another app | D | ⬜ NEEDS FIX |
-| P0 | Camera | White/blank viewfinder | D | ⬜ NEEDS FIX |
-| P1 | Scan (dark) | Overall scan page UI poor in dark mode | D | ⬜ NEEDS FIX |
-| P1 | Scan type (light) | Text field missing corner edges | D | ⬜ NEEDS FIX |
-| P1 | Ask Plately (dark) | Send button invisible | D | ⬜ NEEDS FIX |
-| P1 | Ask Plately (dark) | Duplicate text field visible | D | ⬜ NEEDS FIX |
-| P1 | Ask Plately | /api/chat returns internal error | G | ✅ DONE (S43 logging+guards added) |
-| P2 | History | Timestamps military time + GMT | E | ✅ DONE (_formatTimestamp() human-friendly) |
-| P1 | History | Tapping entry navigates wrong | E | ✅ DONE (_openHistoryEntry() uses recipe_id) |
-| P2 | History | 7-day overview poor layout | E | ✅ DONE (full _weeklyCalendar() Mon–Sun bars + nav) |
-| P1 | Profile | Gluten-Free & Dairy-Free chips not toggling | F | ✅ DONE (correct inversion logic in toggle()) |
-| P2 | Profile | No High Protein explanation | F | ✅ DONE (info container shown when isHiPro) |
-| P3 | Profile | Theme picker plain pills → icon+label rows | F | ✅ DONE (_themeRow() with icon + label + checkmark) |
-| P1 | Pantry (light) | Text field sharp/rounded inconsistency | F | ✅ DONE (uses AppTheme.inputDecoration()) |
-| P1 | Global | Text fields inconsistent light/dark | G | ✅ DONE (S43 inputDecoration helper) |
-| P1 | Global (dark) | Dark mode visibility widespread | G | ✅ DONE (S43 — login, signup, home, onboarding, ai_chat, recipe_results) |
+| P1 | App icon | Launcher icon dull/low contrast on home screen | H | ⬜ PENDING |
+| P1 | Auth | Google Sign-In fails — only Gmail accounts work | H | ⬜ PENDING |
+| P1 | Goals | Calculate TDEE button does not update displayed targets | H | ⬜ PENDING |
+| P1 | Home (dark) | No contrast — text/icons barely visible | I | ⬜ PENDING |
+| P1 | Home (dark) | Logo shows box/background in dark mode | I | ⬜ PENDING |
+| P2 | Home (dark) | Date label ("May 12") has no highlight, barely visible | I | ⬜ PENDING |
+| P1 | Home (dark) | Recent Activity rows use hardcoded white bg (ActivityRow widget) | I | ⬜ PENDING |
+| P1 | Favorites | Heart icon only outlines red — fill should be solid red when active | I | ⬜ PENDING |
+| P1 | Favorites | Search field missing rounded corners in light mode | I | ⬜ PENDING |
+| P2 | Recipe Detail | Finish cooking share sheet opens and closes instantly — user can't read it | J | ⬜ PENDING |
+| P2 | Recipe Detail | Tab divider visible in dark mode but invisible in light mode | J | ⬜ PENDING |
+| P2 | Recipe Detail | No visual hint that steps are tappable to mark done | J | ⬜ PENDING |
+| P1 | Camera / Scan | Camera viewfinder still white/blank on physical device | J | ⬜ PENDING |
+| P1 | Scan (dark) | Overall scan UI poor in dark mode | J | ⬜ PENDING |
+| P1 | Scan type | Text/search field missing corners in both light and dark mode | J | ⬜ PENDING |
+| P1 | Profile | Dietary preferences layout/display needs redesign | K | ⬜ PENDING |
+| P2 | Profile | Theme picker (Light/Dark/System) display issues | K | ⬜ PENDING |
+| P1 | Global | Full UI audit: contrast, font sizes, button sizes, highlights | K | ⬜ PENDING |
+| P1 | Backend | All APIs need live verification — chat, scan, recipes, goals, history | K | ⬜ PENDING |
 
 ---
 
-## 🔧 REMAINING FIX SESSION PROMPTS
-> Only Sessions C and D remain. Run these next.
+## 🔧 REMAINING SESSION PROMPTS
 
 ---
 
-### SESSION C — Browse / Recipe Results & Recipe Detail & Shopping List
-**Files:** `recipe_results_screen.dart`, `recipe_detail_screen.dart`, `shopping_list_screen.dart`
-**Note:** recipe_results_screen shimmer dark mode fixed in S43. Session E items (history) all done in source.
+### SESSION H — App Icon + Google Auth + Goals TDEE
+**Files:** `android/app/src/main/res/` (icon), `login_screen.dart`, `signup_screen.dart`, `onboarding_goals_screen.dart`
+**Root causes identified:**
+- App icon: `plately_logo.dart` `_RingMarkPainter` uses `showBackground=true` on dark → dark teal gradient bg with low contrast on phone grid. Launcher icon needs a vibrant, high-contrast version.
+- Google Sign-In: Firebase project likely only has Gmail OAuth scope or SHA-1 only covers debug keystore not release keystore. Both keystores must be registered in Firebase console.
+- Goals TDEE: `_calculate()` in `onboarding_goals_screen.dart` calls `ApiService.setGoals()` and updates `_calGoal`/`_proteinGoal` state correctly in code — but the Calculate button may not be wired or the result card is not showing. Need to verify the button calls `_calculate()` and the result is displayed visually before `_save()`.
 
 ```
 You are fixing the Plately V2 Flutter app. Read MEMORY.md, SKILLS.md, TASKS.md first.
 
-SCREENS: recipe_results_screen.dart, recipe_detail_screen.dart, shopping_list_screen.dart
+FILES: android/app/src/main/res/ icons, login_screen.dart, signup_screen.dart, onboarding_goals_screen.dart
 
 FIXES NEEDED:
 
-1. BROWSE SEARCH FIELD LIGHT MODE: The search bar uses a Container + TextField with
-   InputBorder.none. In light mode the border clips or goes missing. Ensure the outer
-   Container has borderRadius: BorderRadius.circular(12) + Border.all(color: AppTheme.border(context)).
-   Also verify the inner TextField has InputBorder.none so there's no double border.
+1. APP LAUNCHER ICON — VIBRANT REDESIGN:
+   The current launcher icon uses a dark teal gradient background that looks dull
+   on the Android home screen next to colourful apps like Spotify.
+   Use the SAME ring-mark design from PlatelyLogo but with a vivid background:
+   - Background: bright gradient from AppTheme.green (#76CC4F) to AppTheme.primaryDark (#043B3C),
+     top-left to bottom-right, with rounded corners (radius ~22% of size).
+   - Ring track: white with alpha 0.25
+   - Green arc: white (so it pops on the green bg)
+   - Accent arc: white with alpha 0.90
+   - Centre dot: white outer, green inner
+   This makes the icon instantly recognisable and vibrant on any wallpaper.
+   Generate the icon programmatically via a Flutter script or update the
+   existing adaptive icon XML in android/app/src/main/res/.
+   The foreground layer should be the ring mark centred on transparent bg.
+   The background layer should be the green-to-teal gradient.
+   Also update ic_launcher.png files in all mipmap folders (use a script).
 
-2. RECIPE DETAIL DARK MODE — TABS: TabBar labelColor / unselectedLabelColor must use
-   AppTheme.textPrimary(context) for selected and AppTheme.textMuted(context) for unselected.
-   TabBar indicatorColor → AppTheme.primaryDark.
+2. GOOGLE SIGN-IN — RELEASE KEYSTORE SHA-1:
+   The release APK uses upload-keystore.jks but only the debug SHA-1 may be
+   registered in Firebase. This causes Google Sign-In to fail on release builds.
+   FIX: Print the release SHA-1 from the keystore and add instructions for Marc
+   to add it to Firebase Console → Project Settings → Android app → Add fingerprint.
+   In android/app/build.gradle, verify signingConfigs.release is wired correctly.
+   Output the exact SHA-1 command Marc needs to run and the exact Firebase Console
+   step to add it. Do NOT change any code — this is a config fix only.
 
-3. FAVORITE BUTTON — Two bugs:
-   a) Delay: move setState() for optimistic UI BEFORE the async API call. Revert on failure.
-   b) Wrong element: ONLY the Icon color changes to AppTheme.red — NOT a container background.
-      IconButton with icon: Icon(LucideIcons.heart, color: _isFavorited ? AppTheme.red : AppTheme.iconColor(context))
+3. GOALS — VERIFY CALCULATE IS WIRED AND RESULT IS SHOWN:
+   In onboarding_goals_screen.dart:
+   a) The Calculate button MUST call _calculate() on tap — verify it does.
+   b) After _calculate() succeeds, show a result banner ABOVE the Save button:
+      Container with AppTheme.green bg, showing:
+      "Daily Target: {_calGoal} kcal · {_proteinGoal}g protein"
+      Only show this banner when _calGoal != 2200 || _proteinGoal != 120
+      (i.e. after a successful calculation). Use AnimatedSwitcher to fade it in.
+   c) _save() must use the current _calGoal/_proteinGoal values — verify it does.
 
-4. FINISH COOKING ANIMATION: Slow to at least 1200ms.
-   Use flutter_animate with duration: const Duration(milliseconds: 1200).
-
-5. STEPS UX — MARK AS DONE: Add List<bool> _completedSteps. On tap, toggle → setState().
-   Completed: TextDecoration.lineThrough + AppTheme.textMuted(context) + checkmark icon.
-
-6. INGREDIENT CHIPS LABEL: Add helper text below ingredient list:
-   "Tap to check off — macros are pre-calculated for the full recipe."
-   TextStyle: AppTheme.textMuted(context), 12px DM Sans.
-
-7. SHOPPING LIST — WRONG EMPTY STATE: Only exclude ingredient if it ACTUALLY EXISTS in
-   pantry list. If pantry is empty → show all recipe ingredients.
-   Audit _buildShoppingList(): the pantry cross-reference must check actual list contents.
-
-Output complete replacement files.
+Output complete replacement files for onboarding_goals_screen.dart only.
+For the icon and Google auth, output instructions only (no code changes to source).
 ```
 
 ---
 
-### SESSION D — Timer, Camera / Scan & Ask Plately UI
-**Files:** `ingredient_entry_screen.dart`, `ai_chat_screen.dart`, `recipe_detail_screen.dart` (timer only)
-**Note:** ai_chat_screen welcome subtitle + markdown code bg fixed in S43.
+### SESSION I — Home Dark Mode + Favorites UI
+**Files:** `home_screen.dart`, `widgets/activity_row.dart`, `favorites_screen.dart`, `widgets/plately_logo.dart`
+**Root causes identified:**
+- Home dark mode: multiple hardcoded static colors throughout `home_screen.dart` and `activity_row.dart` using `Colors.white`, `AppTheme.darkText`, `AppTheme.mutedText` instead of context-aware helpers.
+- ActivityRow: `color: Colors.white` hardcoded on the card container — turns white in dark mode. Uses `const TextStyle(color: AppTheme.darkText)` — static, not dark-aware.
+- Logo box: `PlatelyLogo` with `showBackground=true` renders a dark teal box in the AppBar. In dark mode this creates a visible square. Fix: always use `showBackground: false` in AppBar/header contexts; background is only for the launcher icon.
+- Favorites heart: `LucideIcons.heart` (outline) vs `LucideIcons.heartFilled` (solid). When favorited, should show `heartFilled` in red — like Instagram, Spotify, every major app. Currently only color changes on an outline icon.
+- Favorites search field: uses `Container + InputBorder.none` without explicit `OutlineInputBorder` — same issue as other fields.
 
 ```
 You are fixing the Plately V2 Flutter app. Read MEMORY.md, SKILLS.md, TASKS.md first.
 
-SCREENS: ingredient_entry_screen.dart, ai_chat_screen.dart, recipe_detail_screen.dart (timer only)
-
-NOTE: ai_chat_screen welcome subtitle dark mode and markdown code block bg fixed in S43.
-Do NOT re-fix those. Focus only on items below.
+FILES: home_screen.dart, widgets/activity_row.dart, favorites_screen.dart, widgets/plately_logo.dart
 
 FIXES NEEDED:
 
-1. STEP TIMER — BACKGROUND SAFE: Replace Timer.periodic with deadline-based timer.
-   On start: save endTime = DateTime.now().add(duration). Each tick: compute
-   remaining = endTime.difference(DateTime.now()). Catches up correctly on resume.
+1. ACTIVITY ROW DARK MODE (activity_row.dart — P1):
+   The entire widget uses hardcoded light-mode colors. Fix every one:
+   - Container color: Colors.white → AppTheme.cardBg(context)
+   - Border: AppTheme.borderGray → AppTheme.border(context)
+   - recipeName TextStyle: const color AppTheme.darkText → AppTheme.textPrimary(context)
+   - subtitle TextStyle: const color AppTheme.mutedText → AppTheme.textMuted(context)
+   - Badge bg: AppTheme.scanGreen → keep (decorative, fine in both modes)
+   Remove all const from TextStyle that use static dark-text colors.
 
-2. STEP TIMER — NOTIFICATION: Use flutter_local_notifications one-shot notification
-   at timer end via zonedSchedule. Label: "Timer done — Step [N]".
-   Same pattern as cook-done notifications in NotificationService.
+2. HOME SCREEN DARK MODE (home_screen.dart — P1):
+   Audit the ENTIRE file for any hardcoded Colors.white, AppTheme.darkText,
+   AppTheme.mutedText used in TextStyle inside widget build methods.
+   Replace all with context-aware equivalents per SKILLS.md rules.
+   Special attention to:
+   - Section header labels ("Suggested For You", "Recent Activity")
+   - Macro ring labels and values
+   - Date label ("Today, May 12") — use AppTheme.textPrimary(context) with w700
+   - Calendar day labels
+   - The greeting text
 
-3. CAMERA VIEWFINDER — WHITE SCREEN (P0): CameraPreview renders white/blank.
-   Fix: await _controller.initialize() fully, then setState(). Guard:
-   if (_controller == null || !_controller!.value.isInitialized) return LoadingSpinner().
-   Verify didChangeAppLifecycleState correctly re-initializes on resume.
+3. LOGO IN APPBAR / HEADER (plately_logo.dart — P2):
+   Add a named constructor or parameter `inAppBar: bool = false`.
+   When inAppBar=true (or when theme=onLight and showBackground=true):
+   set showBackground=false automatically so the ring mark never draws
+   a background box when placed on a scaffold/card background.
+   The background tile is ONLY for the launcher icon.
+   In home_screen.dart AppBar, pass the correct theme variant with no background.
 
-4. SCAN PAGE DARK MODE: Scaffold, AppBar, bottom sheets use AppTheme.scaffoldBg(context)
-   and AppTheme.cardBg(context). All text uses AppTheme.textPrimary(context).
-   Chip labels visible on dark backgrounds.
+4. FAVORITES HEART — FILLED WHEN ACTIVE (favorites_screen.dart — P1):
+   Find the heart icon in the recipe card or favorite button.
+   When favorited: Icon(LucideIcons.heartFilled, color: AppTheme.red)
+   When not favorited: Icon(LucideIcons.heart, color: AppTheme.iconColor(context))
+   This is standard across all major apps — filled solid heart = saved.
+   Also check recipe_detail_screen.dart hero favorite button — same fix.
 
-5. SCAN TYPE MODE — TEXT FIELD: Apply AppTheme.inputDecoration() helper for consistent
-   OutlineInputBorder radius 12 in both light and dark mode.
+5. FAVORITES SEARCH FIELD CORNERS (favorites_screen.dart — P1):
+   Apply AppTheme.inputDecoration() to the search TextField, OR ensure the
+   wrapping Container has borderRadius: BorderRadius.circular(12) AND
+   Border.all(color: AppTheme.border(context)), with the TextField using
+   enabledBorder: InputBorder.none and focusedBorder: InputBorder.none.
 
-6. ASK PLATELY DARK MODE — SEND BUTTON: Verify hasText && !loading condition shows
-   AppTheme.tealGradient. Check _InputBar's container background in dark mode.
+Output complete replacement files for all 4 files.
+```
 
-7. ASK PLATELY DARK MODE — DOUBLE TEXT FIELD: Find and remove the duplicate TextField
-   in _InputBar. There should be exactly ONE TextField for input.
+---
 
-Output complete replacement files.
+### SESSION J — Recipe Detail UX + Camera P0 + Scan UI
+**Files:** `recipe_detail_screen.dart`, `ingredient_entry_screen.dart`
+**Root causes identified:**
+- Share sheet closes instantly: `_showShareSheet` uses `showModalBottomSheet` — it may be dismissed by `Navigator.pop(context)` running 200ms after it opens. The pop should only happen after user explicitly closes the sheet, not on a timer.
+- Tab divider light mode: `_Tab` container uses `color: AppTheme.cardAltBg(context)` as the pill bg. In light mode `cardAltBg` is very close to white scaffold, so no visible border around the pill. Need an explicit `border: Border.all(color: AppTheme.border(context))` on the tab container.
+- Steps tappable hint: no visual affordance. Add a small one-time hint row at the top of the steps list.
+- Camera white screen: likely an Android TextureView/SurfaceView issue where `CameraPreview` is placed inside a `Stack` with `AnimatedOpacity`. On some devices the opacity animation causes a blank frame. Fix: remove `AnimatedOpacity` wrapper and use `Visibility` or direct conditional rendering.
+- Scan dark mode: already partially done but chip panel, mode pill, type content need audit.
+- Scan type field: `enabledBorder`/`focusedBorder` fix was applied in S45 but needs verification; also the wrapping Container must have explicit rounded corners visible in both modes.
+
+```
+You are fixing the Plately V2 Flutter app. Read MEMORY.md, SKILLS.md, TASKS.md first.
+
+FILES: recipe_detail_screen.dart, ingredient_entry_screen.dart
+
+FIXES NEEDED:
+
+1. SHARE SHEET — DO NOT AUTO-DISMISS (recipe_detail_screen.dart — P2):
+   Current: after _showShareSheet(), there is a Future.delayed(200ms) then Navigator.pop().
+   This instantly closes the screen before the user can interact with the share sheet.
+   FIX: Remove the auto Navigator.pop() entirely from _finishCooking().
+   Instead, inside _showShareSheet()'s bottom sheet, add a "Done" button that calls
+   Navigator.pop(context) to close the sheet, then Navigator.pop(context) again to
+   go back to the previous screen. User stays in control.
+
+2. TAB DIVIDER LIGHT MODE (recipe_detail_screen.dart — P2):
+   The tab switcher Container (height 44, borderRadius 14) uses only
+   color: AppTheme.cardAltBg(context) with no border.
+   Add: border: Border.all(color: AppTheme.border(context), width: 1)
+   to the BoxDecoration so it's visible in light mode.
+
+3. STEPS TAPPABLE HINT (recipe_detail_screen.dart — P2):
+   At the top of _buildSteps(), before the List.generate, add one small hint row:
+   Row with Icon(LucideIcons.handPointing, size: 12) and Text "Tap a step to mark it done"
+   Style: AppTheme.textMuted(context), 11px DM Sans.
+   Only show this hint if _completedSteps.isEmpty (disappears once user taps first step).
+
+4. CAMERA WHITE SCREEN P0 (ingredient_entry_screen.dart — P0):
+   Root cause: CameraPreview is wrapped in AnimatedOpacity which causes blank frames
+   on some Android devices (TextureView rendering issue with opacity animations).
+   FIX: Replace AnimatedOpacity wrapping CameraPreview with a direct conditional:
+   if (_camReady && _cam != null && _isDark) CameraPreview(_cam!)
+   else if (_camReady && _cam != null) CameraPreview(_cam!) with Opacity(0) via
+   a simpler IgnorePointer + Offstage approach.
+   Simplest correct fix: remove AnimatedOpacity entirely. Use:
+     if (_camReady && _cam != null)
+       Positioned.fill(child: _capturedPath != null
+         ? Image.file(File(_capturedPath!), fit: BoxFit.cover)
+         : CameraPreview(_cam!))
+   Only show it when _isDark (camera mode + ready). Otherwise keep it off the tree.
+
+5. SCAN PAGE DARK MODE AUDIT (ingredient_entry_screen.dart — P1):
+   Go through every widget in _cameraContent(), _typeContent(), _modePill(),
+   _topBar(), _chipPanel(), _addRow():
+   - Any Colors.white used as TEXT color → replace with context-aware or keep white
+     only when explicitly on dark bg (camera mode).
+   - _typeContent empty state: ensure text uses AppTheme.textPrimary/textMuted.
+   - _addRow when dark=false: verify corners visible, border visible, hint text visible.
+
+6. SCAN TYPE FIELD (ingredient_entry_screen.dart — P1):
+   _addRow(dark: false) TextField must use:
+   border: InputBorder.none, enabledBorder: InputBorder.none, focusedBorder: InputBorder.none
+   The wrapping Container must have borderRadius: BorderRadius.circular(16) AND
+   Border.all(color: AppTheme.border(context)) — verify both are present.
+
+Output complete replacement files for both files.
+```
+
+---
+
+### SESSION K — Profile Redesign + Global UI Audit + Backend Verification
+**Files:** `profile_screen.dart`, all screens for audit, backend routes for live testing
+**Root causes identified:**
+- Profile dietary prefs: using `Wrap` of chips — looks cluttered. Best practice (Spotify, MyFitnessPal) uses toggle rows with icon + label + switch/checkmark on right. Each pref on its own full-width row.
+- Profile theme picker: `_themeRow()` with icon+label+checkmark — needs audit for dark mode visibility.
+- Global UI audit: after all fixes, do a pass checking typography hierarchy, button tap targets (min 44px), color contrast on both modes.
+- Backend: call each endpoint directly and verify response shape matches what Flutter expects.
+
+```
+You are doing a final polish + verification pass on Plately V2. Read MEMORY.md, SKILLS.md, TASKS.md first.
+
+PART 1 — PROFILE DIETARY PREFS REDESIGN (profile_screen.dart):
+
+Replace the Wrap of chip buttons with full-width toggle rows. Each dietary pref
+gets its own row inside the dietary card:
+
+Row layout: [Icon] [Label + subtitle] [Spacer] [Animated toggle indicator]
+- Icon: small, AppTheme.primaryDark or AppTheme.green when active
+- Label: 14px DM Sans w600, AppTheme.textPrimary(context)
+- Subtitle: 12px DM Sans, AppTheme.textMuted(context) — brief description of the pref
+- Toggle: use a custom AnimatedContainer pill (48x26) — teal when ON, grey when OFF
+  with a white circle that slides left/right. NO Flutter Switch widget.
+
+Prefs and their subtitles:
+- Vegetarian | "No meat or fish"
+- High-Protein | "Prioritise 30g+ protein per meal"
+- Gluten-Free | "Exclude gluten-containing ingredients"
+- Dairy-Free | "Exclude dairy products"
+
+Keep the exact same toggle logic (pref_gluten=false means active, etc.) per SKILLS.md.
+
+PART 2 — GLOBAL UI AUDIT (all screens):
+
+Go through each screen and fix any remaining violations of these rules:
+1. CONTRAST: Every text element must be legible in both light and dark mode.
+   No static AppTheme.darkText or AppTheme.mutedText in widget bodies.
+2. BUTTON SIZES: Every tappable element min 44×44px.
+3. FONT HIERARCHY: Screen titles 18-20px w800, section labels 15px w700,
+   body 14px w500, captions 12px w400. Verify each screen follows this.
+4. BORDER RADIUS: All input fields radius 12, cards radius 16, large cards radius 20.
+5. EMPTY STATES: Every list/grid has a proper empty state with icon + message.
+
+Only output files where you actually find and fix violations.
+
+PART 3 — BACKEND LIVE API VERIFICATION:
+
+Test each endpoint against https://plately-production.up.railway.app using curl
+or Python requests. Verify:
+- GET  /api/health → {"status":"ok"}
+- POST /api/goals with sample payload → returns calories + protein
+- POST /api/recipes with sample payload → returns array of recipes
+- POST /api/chat with sample message → returns AI reply
+- POST /api/scan with tiny base64 image → returns ingredients or error (not 500)
+- GET  /api/history?user_id=test → returns array
+- GET  /api/history/stats?user_id=test → returns total_sessions etc.
+
+For any endpoint that returns an error or unexpected shape, output the fix
+for the relevant backend route file.
+
+Output: fixed profile_screen.dart, any other screens with actual violations found,
+and any backend route fixes needed.
 ```
 
 ---
@@ -168,21 +318,21 @@ Output complete replacement files.
 - [x] Railway backend live ✅
 - [x] Neon DB connected + seeded ✅
 - [x] cron-job.org keepalive ✅
-- [x] history.py DELETE guards ✅ S39
-- [x] app.py CORS uses ALLOWED_ORIGINS env var ✅ S39
-- [x] recipes.py prefs validation ✅ S39
-- [x] chat.py error logging + OpenRouter guards ✅ S43
-- [ ] Set ALLOWED_ORIGINS in Railway Variables ← STILL NEEDED
-- [ ] Redeploy after setting ALLOWED_ORIGINS
+- [x] history.py DELETE guards ✅
+- [x] app.py CORS uses ALLOWED_ORIGINS env var ✅
+- [x] recipes.py prefs validation ✅
+- [x] chat.py error logging + OpenRouter guards ✅
+- [x] ALLOWED_ORIGINS set in Railway ✅ (kept as * — correct for mobile)
 
 ### Marc (frontend):
-- [x] Keystore path fixed ✅ S40
-- [x] flutter analyze → 0 issues ✅ S43
-- [x] Release APK built (64MB) ✅ S40
-- [ ] Commit + push all changes ← DO THIS
-- [ ] Run Sessions C + D
-- [ ] Rebuild APK after C + D done
-- [ ] Firebase App Distribution → add tester emails ← STILL NEEDED
+- [x] Keystore path fixed ✅
+- [x] flutter analyze → 0 issues ✅
+- [x] Release APK built ✅
+- [x] Committed + pushed fbe8545 ✅
+- [x] Firebase App Distribution testers added ✅
+- [ ] Run Sessions H → K
+- [ ] Add release SHA-1 to Firebase Console (from Session H instructions)
+- [ ] Rebuild APK after H → K done
 
 ---
 
@@ -192,18 +342,19 @@ Output complete replacement files.
 |---------|---------------|-----------|
 | 1–31 | See prior TASKS.md | — |
 | 32 | Full source audit — 6 fix queues written | TASKS.md |
-| 33 | history.py crash fix, camera permission flow, profile theme toggle, icon fixes | history.py, ingredient_entry_screen.dart, profile_screen.dart, ai_chat_screen.dart, pubspec.yaml |
-| 34 | chat.py Gemma fix, camera error overlay, dark mode: history/profile/favorites | chat.py, ingredient_entry_screen.dart, history_screen.dart, profile_screen.dart, favorites_screen.dart |
-| 35 | Dark mode fixes: home, onboarding, profile, ai_chat, recipe_detail, pantry, shopping, recipe_card | All screens |
-| 36 | Deleted dead _buildMacroRings, fixed AlertDialog dCtx, fixed _finishCooking mounted checks, dietary pref toggle inversion, retake not wiping ingredients, calendar upper bound | home_screen.dart, history_screen.dart, recipe_detail_screen.dart, profile_screen.dart, ingredient_entry_screen.dart |
-| 37 | Dark mode regressions: ai_chat header + welcome, recipe_results states/filter/shimmer, history header, pantry empty, ingredient_entry type empty, recipe_detail borders, profile Display label | All screens |
-| 38 | Streak reset logic, Shopee fallback browser fix, pull-to-refresh day sync, _loadHistory try/catch | user_prefs_service.dart, recipe_detail_screen.dart, home_screen.dart, shopping_list_screen.dart |
-| 39 | Backend hardening: DELETE guards, CORS env var, prefs validation, rate limit verified | history.py, app.py, recipes.py |
-| 40 | flutter analyze 0 issues, all S36-S39 fixes verified, keystore path fixed, APK built + shipped | All files |
-| 41 | QA test plan written (111 TCs). Marc ran tests. | TASKS.md |
-| 42 | QA observations logged by Adrian. 7 fix sessions (A–G) written. | TASKS.md |
-| 43 | Session G done: inputDecoration helper, login/signup dark mode, home milestone dialog, onboarding label styles, ai_chat welcome subtitle, shimmer dark mode, chat.py error logging. flutter analyze 0 issues. | app_theme.dart, login_screen.dart, signup_screen.dart, home_screen.dart, onboarding_goals_screen.dart, ai_chat_screen.dart, recipe_results_screen.dart, chat.py |
-| 44 | Full source audit — Sessions A, B, E, F verified done in actual source files. TASKS.md/MEMORY.md/SKILLS.md updated. Only Sessions C + D remain. | TASKS.md, MEMORY.md, SKILLS.md |
+| 33 | history.py crash fix, camera permission flow, profile theme toggle, icon fixes | history.py, ingredient_entry_screen.dart, profile_screen.dart, ai_chat_screen.dart |
+| 34 | chat.py Gemma fix, camera error overlay, dark mode: history/profile/favorites | chat.py, ingredient_entry_screen.dart, history_screen.dart, profile_screen.dart |
+| 35 | Dark mode fixes: home, onboarding, profile, ai_chat, recipe_detail, pantry, shopping | All screens |
+| 36 | Deleted dead _buildMacroRings, AlertDialog dCtx, _finishCooking mounted checks, dietary toggle, retake, calendar | home_screen.dart, history_screen.dart, recipe_detail_screen.dart, profile_screen.dart |
+| 37 | Dark mode regressions across all screens | All screens |
+| 38 | Streak reset, Shopee fallback, pull-to-refresh sync, _loadHistory try/catch | user_prefs_service.dart, recipe_detail_screen.dart, home_screen.dart, shopping_list_screen.dart |
+| 39 | Backend hardening: DELETE guards, CORS env var, prefs validation | history.py, app.py, recipes.py |
+| 40 | flutter analyze 0 issues, keystore fix, APK built | All files |
+| 41 | QA test plan written (111 TCs) | TASKS.md |
+| 42 | QA observations logged. 7 fix sessions (A–G) written | TASKS.md |
+| 43 | Session G: inputDecoration helper, login/signup dark mode, home, onboarding, ai_chat, shimmer, chat.py | Multiple files |
+| 44 | Full source audit — Sessions A,B,E,F verified done. Only C+D remained | TASKS.md, MEMORY.md, SKILLS.md |
+| 45 | Sessions C+D completed. Pushed fbe8545. New QA round from device. Sessions H,I,J,K written | TASKS.md |
 
 ---
 
@@ -215,6 +366,5 @@ Output complete replacement files.
 - [ ] Ingredient substitution AI ("I don't have X")
 - [ ] Sentry error monitoring (free tier)
 - [ ] Pantry header badge: split "X in fridge / Y always stocked"
-- [ ] Recipe detail timer: persist across tab switch
 - [ ] AI Chat: show "history trimmed" badge on sessions > 30 messages
 - [ ] Recipe detail: Cook Again pre-scales to last used serving size

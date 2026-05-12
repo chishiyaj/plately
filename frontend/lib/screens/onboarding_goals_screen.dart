@@ -22,6 +22,7 @@ class _OnboardingGoalsScreenState extends State<OnboardingGoalsScreen> {
   String _goal = 'maintain';
   bool   _saving  = false;
   bool   _loading = false;
+  bool   _tdeeCalculated = false;
 
   int _calGoal     = 2200;
   int _proteinGoal = 120;
@@ -85,8 +86,9 @@ class _OnboardingGoalsScreenState extends State<OnboardingGoalsScreen> {
       if (mounted) {
         setState(() {
           if (result != null) {
-            _calGoal     = (result['calories'] as num?)?.toInt()  ?? _calGoal;
-            _proteinGoal = (result['protein']  as num?)?.toInt()  ?? _proteinGoal;
+            _calGoal         = (result['calorie_target'] as num?)?.toInt() ?? _calGoal;
+            _proteinGoal     = (result['protein_target'] as num?)?.toInt() ?? _proteinGoal;
+            _tdeeCalculated  = true;
           }
           _loading = false;
         });
@@ -142,7 +144,34 @@ class _OnboardingGoalsScreenState extends State<OnboardingGoalsScreen> {
                 _bodyStatsCard().animate().fadeIn(delay: 120.ms, duration: 300.ms),
                 const SizedBox(height: 16),
                 _calculateButton().animate().fadeIn(delay: 180.ms, duration: 300.ms),
-                const SizedBox(height: 20),
+                const SizedBox(height: 12),
+                AnimatedSwitcher(
+                  duration: const Duration(milliseconds: 400),
+                  child: _tdeeCalculated
+                    ? Container(
+                        key: const ValueKey('tdee_result'),
+                        width: double.infinity,
+                        padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+                        decoration: BoxDecoration(
+                          color: AppTheme.green.withValues(alpha: 0.12),
+                          borderRadius: BorderRadius.circular(14),
+                          border: Border.all(color: AppTheme.green.withValues(alpha: 0.4)),
+                        ),
+                        child: Row(children: [
+                          const Icon(LucideIcons.circleCheck, color: AppTheme.green, size: 16),
+                          const SizedBox(width: 10),
+                          Text(
+                            'Target set: $_calGoal kcal · ${_proteinGoal}g protein/day',
+                            style: const TextStyle(
+                              color: AppTheme.green, fontSize: 13,
+                              fontFamily: 'DM Sans', fontWeight: FontWeight.w700,
+                            ),
+                          ),
+                        ]),
+                      ).animate().fadeIn(duration: 300.ms).slideY(begin: -0.1)
+                    : const SizedBox.shrink(key: ValueKey('tdee_empty')),
+                ),
+                const SizedBox(height: 8),
                 _sectionLabel('Daily Targets'),
                 const SizedBox(height: 10),
                 _targetsCard().animate().fadeIn(delay: 240.ms, duration: 300.ms),

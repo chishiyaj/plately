@@ -185,7 +185,7 @@ def _extract_json_array(raw: str) -> str:
 
 
 def _generate_ai_recipes(ingredients: list, prefs: dict) -> list:
-    key = os.getenv("OPENROUTER_API_KEY", "")
+    key = os.getenv("OPENROUTER_API_KEY", "").strip()
     if not key:
         logger.warning("OPENROUTER_API_KEY not set — returning empty for DB fallback")
         return []

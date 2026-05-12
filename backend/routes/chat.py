@@ -155,7 +155,7 @@ def _ask_ai(message: str, history: list) -> str:
         if cached:
             return cached
 
-    key = os.getenv("OPENROUTER_API_KEY", "")
+    key = os.getenv("OPENROUTER_API_KEY", "").strip()
     if not key:
         logger.warning("OPENROUTER_API_KEY not set — returning fallback response")
         return (
