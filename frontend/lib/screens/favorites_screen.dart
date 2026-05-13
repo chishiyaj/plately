@@ -6,6 +6,7 @@ import '../models/recipe.dart';
 import '../widgets/recipe_card.dart';
 import '../widgets/tap_scale.dart';
 import '../services/api_service.dart';
+import '../main_shell.dart';
 import 'recipe_detail_screen.dart';
 
 class FavoritesScreen extends StatefulWidget {
@@ -198,31 +199,78 @@ class _FavoritesScreenState extends State<FavoritesScreen> {
 
     if (_favorites.isEmpty) {
       return Center(
-        child: Column(
-          mainAxisAlignment: MainAxisAlignment.center,
-          children: [
-            Container(
-              width: 80, height: 80,
-              decoration: const BoxDecoration(gradient: LinearGradient(
-                colors: [Color(0x22BA5CCC), Color(0x11BA5CCC)],
-                begin: Alignment.topLeft, end: Alignment.bottomRight,
-              ), shape: BoxShape.circle),
-              child: const Icon(LucideIcons.heart, size: 36, color: AppTheme.purple),
-            ),
-            const SizedBox(height: 18),
-            Text('No favourites yet',
-                style: TextStyle(color: AppTheme.textPrimary(context), fontSize: 16,
-                    fontFamily: 'DM Sans', fontWeight: FontWeight.w700)),
-            const SizedBox(height: 8),
-            Padding(
-              padding: const EdgeInsets.symmetric(horizontal: 40),
-              child: Text('Save recipes you love — tap the ♥ on any recipe.',
-                  textAlign: TextAlign.center,
-                  style: TextStyle(color: AppTheme.textMuted(context), fontSize: 13,
-                      fontFamily: 'DM Sans', height: 1.5)),
-            ),
-          ],
-        ).animate().fadeIn(duration: 300.ms),
+        child: Padding(
+          padding: const EdgeInsets.symmetric(horizontal: 32),
+          child: Column(
+            mainAxisAlignment: MainAxisAlignment.center,
+            children: [
+              // Illustrated icon stack — plate + heart
+              SizedBox(
+                width: 100, height: 100,
+                child: Stack(alignment: Alignment.center, children: [
+                  Container(
+                    width: 100, height: 100,
+                    decoration: BoxDecoration(
+                      color: AppTheme.primaryDark.withValues(alpha: 0.06),
+                      shape: BoxShape.circle,
+                    ),
+                  ),
+                  Icon(LucideIcons.utensils, size: 44,
+                      color: AppTheme.primaryDark.withValues(alpha: 0.18)),
+                  Positioned(
+                    bottom: 14, right: 14,
+                    child: Container(
+                      width: 32, height: 32,
+                      decoration: BoxDecoration(
+                        color: AppTheme.cardBg(context),
+                        shape: BoxShape.circle,
+                        border: Border.all(color: AppTheme.border(context), width: 1.5),
+                      ),
+                      child: const Icon(LucideIcons.heart, size: 16, color: AppTheme.red),
+                    ),
+                  ),
+                ]),
+              ),
+              const SizedBox(height: 20),
+              Text('No saved recipes yet',
+                  style: TextStyle(
+                    color: AppTheme.textPrimary(context), fontSize: 17,
+                    fontFamily: 'DM Sans', fontWeight: FontWeight.w700,
+                  )),
+              const SizedBox(height: 8),
+              Text(
+                'Tap the heart on any recipe to save it here for later.',
+                textAlign: TextAlign.center,
+                style: TextStyle(
+                  color: AppTheme.textMuted(context), fontSize: 13,
+                  fontFamily: 'DM Sans', height: 1.5,
+                ),
+              ),
+              const SizedBox(height: 24),
+              TapScale(
+                onTap: () => MainShell.switchTab(0),
+                child: Container(
+                  padding: const EdgeInsets.symmetric(horizontal: 28, vertical: 14),
+                  decoration: BoxDecoration(
+                    gradient: AppTheme.tealGradient,
+                    borderRadius: BorderRadius.circular(14),
+                    boxShadow: const [
+                      BoxShadow(color: Color(0x33043B3C), blurRadius: 12, offset: Offset(0, 4)),
+                    ],
+                  ),
+                  child: const Row(mainAxisSize: MainAxisSize.min, children: [
+                    Icon(LucideIcons.chefHat, color: Colors.white, size: 16),
+                    SizedBox(width: 8),
+                    Text('Browse Recipes', style: TextStyle(
+                      color: Colors.white, fontSize: 14,
+                      fontFamily: 'DM Sans', fontWeight: FontWeight.w700,
+                    )),
+                  ]),
+                ),
+              ),
+            ],
+          ).animate().fadeIn(duration: 400.ms).slideY(begin: 0.06),
+        ),
       );
     }
 

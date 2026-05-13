@@ -1,6 +1,6 @@
 # PLATELY V2 — TASKS.md
 > Paste alongside MEMORY.md + SKILLS.md at start of every chat.
-> Last updated: QA L4 Complete — All 4 QA levels PASSED. Cook Again added to history. flutter analyze 0. READY TO PUSH + REDEPLOY.
+> Last updated: Session L — 5 new device-tested bugs found and logged. Session L prompt written. Needs fix + redeploy.
 
 ---
 
@@ -9,24 +9,18 @@ This file must be updated AT THE END OF EVERY SESSION without exception.
 
 ---
 
-## CURRENT STATE (QA ALL LEVELS COMPLETE ✅)
+## CURRENT STATE (SESSION L — IN PROGRESS)
 
-### Done in QA L4 Fixes (this chat):
-- `history_screen.dart` — Added "Cook Again" button to `_HistoryRow`. Shows only when `recipe_id > 0` (real recipe). Taps open `RecipeDetailScreen` for that recipe. flutter analyze 0 ✅
-- `TASKS.md`, `MEMORY.md`, `SKILLS.md` — Updated to reflect QA complete, app_theme_mode documented
-- All 4 QA levels passed: L1 (Auth/Backend), L2 (Home/Recipes/Favorites), L3 (History/Chat/Pantry/Scan), L4 (Profile/Global)
+### Done this session (device testing by Marc):
+- APK built, deployed to Railway, uploaded to Firebase App Distribution ✅
+- Device testing revealed 5 new bugs (see bug queue below)
+- Session L prompt written — ready to execute
 
-### QA L4 Verdict: PASS — READY TO RELEASE
-- 14 screens all clean. No P0/P1 blockers.
-- P2 pantry UID key bug: fixed in prior session, verified ✅
-- P3 Cook Again: now implemented ✅
-- `app_theme_mode` SharedPrefs key: intentionally NOT UID-namespaced (device-level), documented in SKILLS.md ✅
-
-### Pending human tasks:
-- ⬜ Marc: `git add -A; git commit -m "QA complete: Cook Again history, all L1-L4 fixes"; git push origin main`
-- ⬜ Marco: after push, `railway up` or trigger Railway redeploy (backend chat.py/recipes.py/scan.py have gemma-4-31b fixes)
-- ⬜ Marc: rebuild release APK — `flutter build apk --release --dart-define=PLATELY_API_URL=https://plately-production.up.railway.app`
-- ⬜ Marc: upload new APK to Firebase App Distribution
+### Pending:
+- ⬜ Run Session L fixes (see prompt below)
+- ⬜ Rebuild APK after Session L
+- ⬜ Redeploy Railway after Session L (if backend files changed)
+- ⬜ Re-upload to Firebase App Distribution
 
 ---
 
@@ -36,7 +30,11 @@ This file must be updated AT THE END OF EVERY SESSION without exception.
 
 | Priority | Screen | Description | Session | Status |
 |----------|--------|-------------|---------|--------|
-| P1 | Backend /api/chat | 502 on all chat requests — Railway still runs old `gemma-3-27b-it:free` model (permanently removed from OpenRouter). Fix is already in chat.py locally. Needs `git push` + Railway redeploy. | QA L1 | ⬜ NEEDS REDEPLOY — push + railway up |
+| P1 | Auth | Google Sign-In fails on release APK — OAuth error on device | L | ⬜ OPEN |
+| P1 | Goals | Calculate TDEE button does not reflect updated calorie/protein targets in UI | L | ⬜ OPEN |
+| P1 | AI Chat | "AI Service Error" on every message — OpenRouter account may be rate-limited or exhausted; consider switching accounts or model | L | ⬜ OPEN |
+| P1 | Scan / Camera | Camera viewfinder shows white blank screen on physical device — CameraPreview not rendering | L | ⬜ OPEN |
+| P3 | Favorites | "No Favorites Yet" empty state uses a generic icon + repeated icon/text UI — needs a proper illustrated empty state design | L | ⬜ OPEN |
 | P1 | App icon | Launcher icon dull/low contrast on home screen | H | ✅ DONE SH |
 | P1 | Auth | Google Sign-In fails — only Gmail accounts work | H | ✅ DONE — SHA-1 added to Firebase |
 | P1 | Goals | Calculate TDEE button does not update displayed targets | H | ✅ VERIFIED — already wired in source |
@@ -63,7 +61,119 @@ This file must be updated AT THE END OF EVERY SESSION without exception.
 
 ---
 
-### SESSION H — App Icon + Google Auth + Goals TDEE
+### SESSION L — Google Sign-In + TDEE Fix + AI Chat + Camera + Favorites Empty State
+**Files:** `login_screen.dart`, `signup_screen.dart`, `onboarding_goals_screen.dart`, `routes/chat.py`, `ingredient_entry_screen.dart`, `favorites_screen.dart`
+**Root causes identified:**
+- Google Sign-In: OAuth client ID mismatch on release build. SHA-1 is registered but the google-services.json OAuth client may be missing the release client entry, or the Android OAuth client in Google Cloud Console is not configured for the release package.
+- TDEE Calculate: `_calculate()` calls the API and updates `_calGoal`/`_proteinGoal` in state but the UI widget showing the target values may be reading from a different source (e.g. SharedPreferences loaded at init, not from state). The banner/display needs to read directly from the state variables, not cached prefs.
+- AI Chat 502: OpenRouter free tier may be rate-limited or the gemma-4-31b model is unavailable. Switch to `google/gemma-3-12b-it:free` as primary with `meta-llama/llama-3.3-8b-instruct:free` as fallback. Also add better error message in Flutter UI — instead of generic "AI Service Error", show "AI is busy, try again in a moment."
+- Camera white screen: `CameraPreview` on physical Android devices fails when the controller is not fully initialized before being added to the widget tree. Need to gate render on `_cam!.value.isInitialized` not just `_camReady` bool. Also ensure `dispose()` properly calls `_cam?.dispose()`.
+- Favorites empty state: current empty state is a plain `Column` with `Icon` + `Text` — looks unfinished. Replace with a proper illustrated SVG/custom painted empty state card matching Plately design system.
+
+```
+You are fixing the Plately V2 Flutter app. Read MEMORY.md, SKILLS.md, TASKS.md first.
+
+FILES TO CHANGE:
+- lib/screens/login_screen.dart
+- lib/screens/signup_screen.dart
+- lib/screens/onboarding_goals_screen.dart
+- backend/routes/chat.py
+- lib/screens/ingredient_entry_screen.dart
+- lib/screens/favorites_screen.dart
+
+FIXES NEEDED:
+
+1. GOOGLE SIGN-IN RELEASE FIX (login_screen.dart + signup_screen.dart — P1):
+   The release APK Google Sign-In fails with an OAuth error. The SHA-1 is already
+   registered in Firebase. The likely cause is that google-services.json is missing
+   the release OAuth web client ID, OR the GoogleSignIn() call is missing the
+   clientId parameter on Android.
+   FIX:
+   a) In both login_screen.dart and signup_screen.dart, find the GoogleSignIn()
+      instantiation. Add explicit serverClientId from google-services.json:
+      GoogleSignIn(scopes: ['email'], serverClientId: 'YOUR_WEB_CLIENT_ID')
+      The web client ID is in google-services.json under
+      oauth_client where client_type == 3. Extract and hardcode it.
+   b) In _handleGoogleSignIn(), add a try/catch that catches PlatformException
+      and shows a SnackBar with the error code so we can debug further if needed.
+   c) Read google-services.json via Desktop Commander to find the correct
+      web client ID and use it in both files.
+
+2. TDEE CALCULATE NOT REFLECTING (onboarding_goals_screen.dart — P1):
+   After _calculate() runs and sets _calGoal/_proteinGoal in setState(),
+   the displayed targets must update immediately in the UI.
+   FIX:
+   a) Find where calorie and protein targets are displayed in the screen.
+      They must reference _calGoal and _proteinGoal state variables directly —
+      NOT values loaded from SharedPreferences at init.
+   b) Add a visible result banner that appears after Calculate is tapped:
+      AnimatedSwitcher wrapping a green Container that shows:
+      "Daily Target: $_calGoal kcal · $_proteinGoal g protein"
+      Only visible when _calGoal != 2200 || _proteinGoal != 120.
+   c) Make sure the Calculate button has a loading state (_calculating bool)
+      that shows a CircularProgressIndicator inside the button while waiting.
+   d) Verify _save() uses _calGoal and _proteinGoal (not hardcoded defaults).
+   Output complete replacement file for onboarding_goals_screen.dart.
+
+3. AI CHAT — SWITCH MODEL + BETTER ERROR UI (chat.py + ai_chat_screen.dart — P1):
+   BACKEND (chat.py):
+   - Change primary model from google/gemma-4-31b-it:free to google/gemma-3-12b-it:free
+   - Add fallback: if primary returns non-200 or empty, retry with
+     meta-llama/llama-3.3-8b-instruct:free
+   - Add detailed error logging: log the full response body when status != 200
+   - Return {"status": "error", "message": "AI is busy, please try again"} on failure
+     instead of a generic 500.
+
+   FRONTEND (ai_chat_screen.dart):
+   - Change the red error bubble text from "AI Service Error" to the actual
+     message returned in the error response body if available.
+   - If message contains "busy" or "unavailable", show:
+     "AI Chef is busy right now — tap to retry"
+     with a retry icon button that resends the last message.
+   Output complete replacement files for both.
+
+4. CAMERA WHITE SCREEN — PROPER INIT GATE (ingredient_entry_screen.dart — P1):
+   Root cause: _camReady is set to true in setState() after initializeController()
+   completes, but CameraPreview is rendered before the controller's internal
+   value.isInitialized is true on some devices.
+   FIX:
+   a) Replace the _camReady bool gate with a direct check:
+      (_cam != null && _cam!.value.isInitialized)
+      Use this everywhere CameraPreview is conditionally rendered.
+   b) In _initCamera(), after await _cam!.initialize(), add:
+      if (!_cam!.value.isInitialized) return; // extra safety guard
+   c) In dispose(), ensure:
+      await _cam?.dispose();
+      _cam = null;
+      This prevents "CameraController was used after being disposed" crashes.
+   d) Wrap the CameraPreview in a direct Positioned.fill with no AnimatedOpacity:
+      Positioned.fill(
+        child: (_cam != null && _cam!.value.isInitialized)
+          ? CameraPreview(_cam!)
+          : const SizedBox.shrink(),
+      )
+   Output complete replacement file for ingredient_entry_screen.dart.
+
+5. FAVORITES EMPTY STATE REDESIGN (favorites_screen.dart — P3):
+   Replace the plain icon + text empty state with a polished card:
+   - Centered Column inside a rounded Container (radius 20, AppTheme.cardBg)
+   - A large custom SVG-style illustration: a plate with a heart on it, drawn
+     using Flutter's CustomPaint or a Stack of Icons — no external assets needed.
+     Use LucideIcons.utensils (size 48, color AppTheme.primaryDark.withValues(alpha:0.15))
+     as the base, overlaid with LucideIcons.heart (size 24, AppTheme.red) offset
+     to bottom-right of the utensils icon.
+   - Title: "No saved recipes yet" — 16px DM Sans w700, AppTheme.textPrimary(context)
+   - Subtitle: "Tap the heart on any recipe to save it here"
+     13px DM Sans w400, AppTheme.textMuted(context)
+   - A "Browse Recipes" button: ElevatedButton with AppTheme.primaryDark bg,
+     onPressed: () => MainShell.switchTab(0) to go to Home.
+   Output complete replacement file for favorites_screen.dart.
+
+After all fixes:
+- Run flutter analyze — must be 0 issues
+- List all files changed
+- Update TASKS.md, MEMORY.md session log
+```
 **Files:** `android/app/src/main/res/` (icon), `login_screen.dart`, `signup_screen.dart`, `onboarding_goals_screen.dart`
 **Root causes identified:**
 - App icon: `plately_logo.dart` `_RingMarkPainter` uses `showBackground=true` on dark → dark teal gradient bg with low contrast on phone grid. Launcher icon needs a vibrant, high-contrast version.
@@ -366,6 +476,7 @@ and any backend route fixes needed.
 | QA L2 Fixes | _formatTimestamp toLocal() fix in home_screen.dart; RecipeCard isFavorited uses Icons.favorite (filled); recipe_detail verified correct; flutter analyze 0 | home_screen.dart, recipe_card.dart |
 | QA L3 | History + AI Chat + Pantry + Shopping + Scan audit complete. 1 P2 bug: pantry key not UID-namespaced. All critical flows pass. | TASKS.md |
 | QA L4 Fixes | Cook Again button added to _HistoryRow (shows when recipe_id > 0); TASKS/MEMORY/SKILLS updated; flutter analyze 0; READY TO COMMIT + PUSH | history_screen.dart, TASKS.md, MEMORY.md, SKILLS.md |
+| L (setup) | APK deployed + device tested. 5 bugs found: Google Sign-In failure, TDEE not reflecting, AI chat service error, camera white screen, favorites empty state. Session L prompt written. | TASKS.md |
 
 ---
 

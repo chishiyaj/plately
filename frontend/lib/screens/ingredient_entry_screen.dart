@@ -94,6 +94,12 @@ class _IngredientEntryScreenState extends State<IngredientEntryScreen>
       final ctrl = CameraController(_cameras.first, ResolutionPreset.high,
           enableAudio: false, imageFormatGroup: ImageFormatGroup.jpeg);
       await ctrl.initialize();
+      // Extra safety: confirm the controller reports itself as initialized
+      if (!ctrl.value.isInitialized) {
+        ctrl.dispose();
+        if (mounted) setState(() { _camError = 'Camera failed to initialize. Try again.'; });
+        return;
+      }
       if (!mounted) { ctrl.dispose(); return; }
       setState(() { _cam = ctrl; _camReady = true; _camPermissionDenied = false; _camError = null; });
     } on CameraException catch (e) {
@@ -227,6 +233,7 @@ class _IngredientEntryScreenState extends State<IngredientEntryScreen>
   void dispose() {
     _pulse.dispose();
     _cam?.dispose();
+    _cam = null;
     _typeCtrl.dispose();
     _typeFocus.dispose();
     SystemChrome.setSystemUIOverlayStyle(SystemUiOverlayStyle.dark);
@@ -243,15 +250,14 @@ class _IngredientEntryScreenState extends State<IngredientEntryScreen>
       backgroundColor: _isDark ? Colors.black : AppTheme.scaffoldBg(context),
       body: Stack(children: [
         // Camera layer — shows live feed OR frozen captured image
-        if (_camReady && _cam != null && _isDark)
+        if (_cam != null && _cam!.value.isInitialized && _isDark)
           Positioned.fill(
             child: _capturedPath != null
-                // Freeze on captured image — no more live feed after shutter
                 ? Image.file(File(_capturedPath!), fit: BoxFit.cover)
                 : CameraPreview(_cam!),
           ),
         // Vignette
-        if (_isDark && _camReady)
+        if (_isDark && _cam != null && _cam!.value.isInitialized)
           Positioned.fill(child: DecoratedBox(
             decoration: BoxDecoration(gradient: LinearGradient(
               begin: Alignment.topCenter, end: Alignment.bottomCenter,
@@ -339,7 +345,7 @@ class _IngredientEntryScreenState extends State<IngredientEntryScreen>
           _modePill(),
           if (_isDark) ...[
             Expanded(child: _cameraContent()),
-            if (_camReady) _shutterBar(),
+            if (_cam != null && _cam!.value.isInitialized) _shutterBar(),
           ] else if (_mode == _Mode.camera && !_camReady)
             // Camera mode but not ready — show empty spacer so top bar stays visible
             const Spacer()

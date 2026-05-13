@@ -15,9 +15,10 @@ import requests
 bp     = Blueprint("chat", __name__)
 logger = logging.getLogger(__name__)
 
-OPENROUTER_URL = "https://openrouter.ai/api/v1/chat/completions"
-MODEL          = "google/gemma-4-31b-it:free"
-MAX_MSG_LEN    = 500
+OPENROUTER_URL  = "https://openrouter.ai/api/v1/chat/completions"
+MODEL_PRIMARY   = "meta-llama/llama-3.3-8b-instruct:free"
+MODEL_FALLBACK  = "mistralai/mistral-7b-instruct:free"
+MAX_MSG_LEN     = 500
 MAX_HISTORY    = 6   # keep last N exchanges (N/2 turns each)
 CACHE_TTL      = 3600
 
@@ -147,8 +148,39 @@ def _build_messages(message: str, history: list) -> list:
     return msgs
 
 
+def _call_model(model: str, messages: list, key: str) -> str:
+    """Call one OpenRouter model. Raises on failure."""
+    resp = requests.post(
+        OPENROUTER_URL,
+        headers={
+            "Authorization": f"Bearer {key}",
+            "Content-Type": "application/json",
+            "HTTP-Referer": "https://plately.app",
+            "X-Title": "Plately",
+        },
+        json={
+            "model": model,
+            "messages": messages,
+            "max_tokens": 600,
+        },
+        timeout=20,
+    )
+    logger.info("OpenRouter [%s] status: %d", model, resp.status_code)
+    if resp.status_code != 200:
+        logger.error("OpenRouter [%s] error: %s", model, resp.text[:400])
+        resp.raise_for_status()
+    resp_json = resp.json()
+    choices = resp_json.get("choices")
+    if not choices:
+        logger.error("OpenRouter [%s] empty choices: %s", model, str(resp_json)[:300])
+        raise ValueError(f"No choices returned from {model}")
+    reply = choices[0]["message"]["content"].strip()
+    reply = reply.replace("```", "").replace("<br>", "\n").strip()
+    logger.info("OpenRouter [%s] reply (%d chars)", model, len(reply))
+    return reply
+
+
 def _ask_ai(message: str, history: list) -> str:
-    # Only use cache when no history (single-turn)
     if not history:
         cached = _get_cached(message)
         if cached:
@@ -159,46 +191,28 @@ def _ask_ai(message: str, history: list) -> str:
         logger.warning("OPENROUTER_API_KEY not set — returning fallback response")
         return (
             "Here are 3 quick high-protein meal ideas for students:\n"
-            "1. Chicken Stir Fry — 20 min — 38g protein — ~₱150\n"
-            "2. Egg Fried Rice — 15 min — 22g protein — ~₱80\n"
-            "3. Tuna Pasta — 18 min — 34g protein — ~₱120\n\n"
+            "1. **Chicken Stir Fry** — 20 min — 38g protein — ~₱150\n"
+            "2. **Egg Fried Rice** — 15 min — 22g protein — ~₱80\n"
+            "3. **Tuna Pasta** — 18 min — 34g protein — ~₱120\n\n"
             "Want the full steps for any of these?"
         )
 
-    resp = requests.post(
-        OPENROUTER_URL,
-        headers={
-            "Authorization": f"Bearer {key}",
-            "Content-Type": "application/json",
-            "HTTP-Referer": "https://plately.app",
-            "X-Title": "Plately",
-        },
-        json={
-            "model": MODEL,
-            "messages": _build_messages(message, history),
-            "max_tokens": 600,
-        },
-        timeout=20,
-    )
-    logger.info("OpenRouter status: %d", resp.status_code)
-    if resp.status_code != 200:
-        # Log the full error body so Railway logs show what went wrong
-        logger.error("OpenRouter error body: %s", resp.text[:500])
-        resp.raise_for_status()
-    resp_json = resp.json()
-    # Guard against unexpected response shapes
-    choices = resp_json.get("choices")
-    if not choices:
-        logger.error("OpenRouter returned no choices: %s", str(resp_json)[:300])
-        raise ValueError(f"OpenRouter returned empty choices: {str(resp_json)[:200]}")
-    reply = choices[0]["message"]["content"].strip()
-    logger.info("Raw OpenRouter chat response (first 200 chars): %s", reply[:200])
-    # Strip only code fences and HTML — keep ** and bullet markdown (rendered by MarkdownBody)
-    reply = reply.replace("```", "").replace("<br>", "\n").strip()
+    messages = _build_messages(message, history)
+
+    # Try primary model first, fall back to secondary on any failure
+    reply = None
+    for model in (MODEL_PRIMARY, MODEL_FALLBACK):
+        try:
+            reply = _call_model(model, messages, key)
+            break
+        except Exception as e:
+            logger.warning("Model %s failed: %s — trying fallback", model, e)
+
+    if reply is None:
+        raise ValueError("All AI models failed. Please try again later.")
 
     if not history:
         _set_cached(message, reply)
-    logger.info("AI reply generated (%d chars)", len(reply))
     return reply
 
 
