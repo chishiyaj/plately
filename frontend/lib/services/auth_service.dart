@@ -1,4 +1,6 @@
 import 'package:firebase_auth/firebase_auth.dart';
+import 'package:flutter/foundation.dart';
+import 'package:flutter/services.dart';
 import 'package:google_sign_in/google_sign_in.dart';
 
 /// Wraps Firebase Auth. All methods return [AuthResult].
@@ -61,8 +63,9 @@ class AuthService {
   // ── Google Sign-In ────────────────────────────────────────────────────────
   static Future<AuthResult> signInWithGoogle() async {
     try {
-      // Sign out first to force account picker every time
-      await _google.signOut();
+      // NOTE: Do NOT call _google.signOut() here before signIn().
+      // Pre-signout resets OAuth state mid-flow on some Android versions,
+      // causing silent failures or account picker not appearing correctly.
 
       final googleUser = await _google.signIn();
       if (googleUser == null) return AuthResult.error('Sign-in cancelled.');
@@ -76,8 +79,17 @@ class AuthService {
       return AuthResult.ok(message: 'Signed in with Google!');
     } on FirebaseAuthException catch (e) {
       return AuthResult.error(_emailError(e.code));
+    } on PlatformException catch (e) {
+      // Surface the actual platform error code so it's visible in logs/debugger.
+      debugPrint('Google Sign-In PlatformException: ${e.code} — ${e.message}');
+      if (e.code == 'sign_in_canceled' || e.code == 'sign_in_cancelled') {
+        return AuthResult.error('Sign-in cancelled.');
+      }
+      if (e.code == 'network_error') {
+        return AuthResult.error('No internet connection.');
+      }
+      return AuthResult.error('Google sign-in failed (${e.code}). Try again.');
     } catch (e) {
-      // Surface the actual error code for easier debugging
       final msg = e.toString();
       if (msg.contains('network')) {
         return AuthResult.error('No internet connection.');

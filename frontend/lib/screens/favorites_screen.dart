@@ -6,8 +6,8 @@ import '../models/recipe.dart';
 import '../widgets/recipe_card.dart';
 import '../widgets/tap_scale.dart';
 import '../services/api_service.dart';
-import '../main_shell.dart';
 import 'recipe_detail_screen.dart';
+import 'recipe_results_screen.dart';
 
 class FavoritesScreen extends StatefulWidget {
   const FavoritesScreen({super.key});
@@ -248,7 +248,11 @@ class _FavoritesScreenState extends State<FavoritesScreen> {
               ),
               const SizedBox(height: 24),
               TapScale(
-                onTap: () => MainShell.switchTab(0),
+                // FIX: open the full recipe browse grid instead of Home tab
+                onTap: () => Navigator.push(
+                  context,
+                  AppTheme.slideUp(const RecipeResultsScreen(ingredients: [])),
+                ),
                 child: Container(
                   padding: const EdgeInsets.symmetric(horizontal: 28, vertical: 14),
                   decoration: BoxDecoration(

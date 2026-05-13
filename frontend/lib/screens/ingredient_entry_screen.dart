@@ -214,7 +214,9 @@ class _IngredientEntryScreenState extends State<IngredientEntryScreen>
       ));
       return;
     }
-    Navigator.pushReplacement(context, AppTheme.zoomIn(RecipeResultsScreen(ingredients: _ingredients)));
+    // FIX: Use push (not pushReplacement) so back from RecipeResults returns here
+    // with ingredients intact — pushReplacement caused a black screen on back.
+    Navigator.push(context, AppTheme.zoomIn(RecipeResultsScreen(ingredients: _ingredients)));
   }
 
   void _switchMode(_Mode m) {
@@ -250,11 +252,18 @@ class _IngredientEntryScreenState extends State<IngredientEntryScreen>
       backgroundColor: _isDark ? Colors.black : AppTheme.scaffoldBg(context),
       body: Stack(children: [
         // Camera layer — shows live feed OR frozen captured image
+        // FIX: wrap CameraPreview in AspectRatio to prevent stretching on devices
+        // where the sensor ratio doesn't match the screen ratio.
         if (_cam != null && _cam!.value.isInitialized && _isDark)
           Positioned.fill(
             child: _capturedPath != null
                 ? Image.file(File(_capturedPath!), fit: BoxFit.cover)
-                : CameraPreview(_cam!),
+                : Center(
+                    child: AspectRatio(
+                      aspectRatio: _cam!.value.aspectRatio,
+                      child: CameraPreview(_cam!),
+                    ),
+                  ),
           ),
         // Vignette
         if (_isDark && _cam != null && _cam!.value.isInitialized)
@@ -427,11 +436,8 @@ class _IngredientEntryScreenState extends State<IngredientEntryScreen>
       const _ScanningIndicator(),
     const Spacer(),
     if (_ingredients.isNotEmpty || _scanError != null || _scanFailed) _chipPanel(),
-    // _addRow only visible after scan — user can add more ingredients manually
-    if (!_scanning && _capturedPath != null) ...[
-      _addRow(dark: true),
-      const SizedBox(height: 8),
-    ],
+    // NOTE: _addRow intentionally removed from camera mode — the "Type Instead"
+    // button in _chipPanel() already handles manual entry after a scan failure.
     if (_capturedPath != null) ...[
       GestureDetector(
         onTap: () => setState(() {

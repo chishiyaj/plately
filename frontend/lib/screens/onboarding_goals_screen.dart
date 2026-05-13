@@ -93,8 +93,20 @@ class _OnboardingGoalsScreenState extends State<OnboardingGoalsScreen> {
           _loading = false;
         });
       }
-    } catch (_) {
-      if (mounted) setState(() => _loading = false);
+    } catch (e) {
+      if (mounted) {
+        setState(() => _loading = false);
+        ScaffoldMessenger.of(context).showSnackBar(SnackBar(
+          content: const Text(
+            'Could not calculate TDEE. Check your connection and try again.',
+            style: TextStyle(fontFamily: 'DM Sans', fontWeight: FontWeight.w500),
+          ),
+          backgroundColor: AppTheme.red,
+          behavior: SnackBarBehavior.floating,
+          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+          margin: const EdgeInsets.fromLTRB(16, 0, 16, 16),
+        ));
+      }
     }
   }
 
