@@ -30,7 +30,9 @@ def _recipe_with_nutrition_and_ingredients(r, ing_rows) -> dict:
 @bp.route('/api/favorites', methods=['GET'])
 def get_favorites():
     try:
-        user_id = request.args.get('user_id', 'default')
+        user_id = request.args.get('user_id', '').strip()
+        if not user_id:
+            return jsonify({"status": "error", "message": "user_id required"}), 400
         rows = query(f"""
             SELECT r.*, n.calories, n.protein, n.carbs, n.fat, n.cost_php
             FROM favorites f
@@ -85,7 +87,9 @@ def add_favorite():
 @bp.route('/api/favorites/<int:recipe_id>', methods=['DELETE'])
 def remove_favorite(recipe_id):
     try:
-        user_id = request.args.get('user_id', 'default')
+        user_id = request.args.get('user_id', '').strip()
+        if not user_id:
+            return jsonify({"status": "error", "message": "user_id required"}), 400
         execute(f"DELETE FROM favorites WHERE user_id = {ph} AND recipe_id = {ph}", (user_id, recipe_id))
         return jsonify({"status": "ok", "data": {"removed": True}}), 200
     except Exception:
@@ -96,7 +100,9 @@ def remove_favorite(recipe_id):
 @bp.route('/api/favorites/check/<int:recipe_id>', methods=['GET'])
 def check_favorite(recipe_id):
     try:
-        user_id = request.args.get('user_id', 'default')
+        user_id = request.args.get('user_id', '').strip()
+        if not user_id:
+            return jsonify({"status": "error", "message": "user_id required"}), 400
         rows    = query(
             f"SELECT id FROM favorites WHERE user_id = {ph} AND recipe_id = {ph}",
             (user_id, recipe_id),

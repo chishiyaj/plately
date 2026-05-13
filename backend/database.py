@@ -229,6 +229,8 @@ def _create_tables():
                 "ALTER TABLE history ADD COLUMN IF NOT EXISTS calories_logged INTEGER NOT NULL DEFAULT 0",
                 "ALTER TABLE history ADD COLUMN IF NOT EXISTS protein_logged INTEGER NOT NULL DEFAULT 0",
                 "ALTER TABLE nutrition ADD COLUMN IF NOT EXISTS cost_php INTEGER NOT NULL DEFAULT 0",
+                "ALTER TABLE history ADD COLUMN IF NOT EXISTS recipe_id INTEGER NOT NULL DEFAULT 0",
+                "ALTER TABLE history ADD COLUMN IF NOT EXISTS recipe_name TEXT NOT NULL DEFAULT ''",
             ]
             for m in migrations:
                 cur.execute(m)
@@ -285,6 +287,8 @@ def _create_tables():
                 recipe_count     INTEGER NOT NULL DEFAULT 0,
                 calories_logged  INTEGER NOT NULL DEFAULT 0,
                 protein_logged   INTEGER NOT NULL DEFAULT 0,
+                recipe_id        INTEGER NOT NULL DEFAULT 0,
+                recipe_name      TEXT NOT NULL DEFAULT '',
                 timestamp        DATETIME DEFAULT CURRENT_TIMESTAMP
             );
             CREATE TABLE IF NOT EXISTS favorites (

@@ -1,6 +1,7 @@
 """routes/history.py"""
 from flask import Blueprint, request, jsonify
 from database import query, execute, USE_PG, PLACEHOLDER as ph
+from datetime import datetime, timezone
 import logging
 
 bp     = Blueprint('history', __name__)
@@ -15,7 +16,27 @@ def get_history():
             f"SELECT * FROM history WHERE user_id = {ph} ORDER BY timestamp DESC LIMIT 50",
             (user_id,)
         )
-        return jsonify({"status": "ok", "data": rows}), 200
+        # Normalise timestamp to ISO 8601 so Flutter's DateTime.parse() always works.
+        # Flask/psycopg may return datetime objects or RFC 2822 strings — both handled.
+        result = []
+        for r in rows:
+            row = dict(r)
+            ts = row.get('timestamp')
+            if ts is not None:
+                if isinstance(ts, datetime):
+                    row['timestamp'] = ts.replace(tzinfo=timezone.utc).isoformat()
+                else:
+                    ts_str = str(ts)
+                    # Try parsing RFC 2822 / common formats and re-emit ISO
+                    for fmt in ('%a, %d %b %Y %H:%M:%S %Z', '%Y-%m-%d %H:%M:%S', '%Y-%m-%dT%H:%M:%S'):
+                        try:
+                            parsed = datetime.strptime(ts_str.split('.')[0], fmt)
+                            row['timestamp'] = parsed.replace(tzinfo=timezone.utc).isoformat()
+                            break
+                        except ValueError:
+                            pass
+            result.append(row)
+        return jsonify({"status": "ok", "data": result}), 200
     except Exception:
         logger.exception("get_history error")
         return jsonify({"status": "error", "message": "Internal error."}), 500
@@ -70,14 +91,18 @@ def add_history():
         recipe_count     = max(0, int(data.get('recipe_count', 1)))
         calories_logged  = max(0, int(data.get('calories_logged', 0)))
         protein_logged   = max(0, int(data.get('protein_logged', 0)))
+        recipe_id        = max(0, int(data.get('recipe_id', 0)))
+        recipe_name      = (data.get('recipe_name') or '').strip()[:200]
 
         if action_type not in ('cooked', 'scanned', 'typed', 'browsed'):
             action_type = 'cooked'
 
         execute(
-            f"INSERT INTO history (user_id, action_type, ingredient_names, recipe_count, calories_logged, protein_logged) "
-            f"VALUES ({ph},{ph},{ph},{ph},{ph},{ph})",
-            (user_id, action_type, ingredient_names[:500], recipe_count, calories_logged, protein_logged),
+            f"INSERT INTO history (user_id, action_type, ingredient_names, recipe_count,"
+            f" calories_logged, protein_logged, recipe_id, recipe_name)"
+            f" VALUES ({ph},{ph},{ph},{ph},{ph},{ph},{ph},{ph})",
+            (user_id, action_type, ingredient_names[:500], recipe_count,
+             calories_logged, protein_logged, recipe_id, recipe_name),
         )
         return jsonify({"status": "ok", "data": {"logged": True}}), 200
     except (ValueError, TypeError) as e:
