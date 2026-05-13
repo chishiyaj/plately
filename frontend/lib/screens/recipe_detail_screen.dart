@@ -755,15 +755,16 @@ class _RecipeDetailScreenState extends State<RecipeDetailScreen> with TickerProv
               )),
               const Spacer(),
               const Text('est. cost', style: TextStyle(
-                color: AppTheme.mutedText, fontSize: 11, fontFamily: 'DM Sans',
+                color: AppTheme.orange, fontSize: 11,
+                fontFamily: 'DM Sans',
               )),
             ]),
           ),
         ],
         const SizedBox(height: 8),
-        const Text(
+        Text(
           'Macros are estimates based on standard serving sizes.',
-          style: TextStyle(color: AppTheme.mutedText, fontSize: 11, fontFamily: 'DM Sans'),
+          style: TextStyle(color: AppTheme.textMuted(context), fontSize: 11, fontFamily: 'DM Sans'),
           textAlign: TextAlign.center,
         ),
       ]),
@@ -791,12 +792,15 @@ class _RecipeDetailScreenState extends State<RecipeDetailScreen> with TickerProv
         recipeCount: 1,
         caloriesLogged: scaledCal,
         proteinLogged: scaledPro,
+        recipeId: r.id,
+        recipeName: r.name,
       ),
       UserPrefsService.saveCalConsumed(calNow + scaledCal),
       UserPrefsService.saveProteinConsumed(proteinNow + scaledPro),
       UserPrefsService.incrementRecipeCount(),
       UserPrefsService.incrementStreak(),
       UserPrefsService.saveLastCookDate(),
+      UserPrefsService.saveLastCookedName(r.name),
       NotificationService.notifyCookingDone(
         r.name,
         cal:      scaledCal,
@@ -824,9 +828,6 @@ class _RecipeDetailScreenState extends State<RecipeDetailScreen> with TickerProv
       margin: const EdgeInsets.fromLTRB(16, 0, 16, 90),
       duration: const Duration(seconds: 3),
     ));
-
-    // Save last cooked name for hyperpersonalised notifications (Session 28)
-    await UserPrefsService.saveLastCookedName(r.name);
 
     // Show share sheet after snackbar has a moment to appear
     final currentStreak = await UserPrefsService.getStreak();

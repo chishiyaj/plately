@@ -2,6 +2,7 @@
 from flask import Blueprint, request, jsonify
 from database import query, execute, USE_PG, PLACEHOLDER as ph
 from datetime import datetime, timezone
+from app import limiter
 import logging
 
 bp     = Blueprint('history', __name__)
@@ -11,7 +12,9 @@ logger = logging.getLogger(__name__)
 @bp.route('/api/history', methods=['GET'])
 def get_history():
     try:
-        user_id = request.args.get('user_id', 'default')
+        user_id = request.args.get('user_id', '').strip()
+        if not user_id:
+            return jsonify({"status": "error", "message": "user_id required"}), 400
         rows = query(
             f"SELECT * FROM history WHERE user_id = {ph} ORDER BY timestamp DESC LIMIT 50",
             (user_id,)
@@ -45,7 +48,9 @@ def get_history():
 @bp.route('/api/history/daily', methods=['GET'])
 def get_daily_history():
     try:
-        user_id = request.args.get('user_id', 'default')
+        user_id = request.args.get('user_id', '').strip()
+        if not user_id:
+            return jsonify({"status": "error", "message": "user_id required"}), 400
         date    = request.args.get('date', '')   # expects YYYY-MM-DD
         if not date:
             return jsonify({"status": "error", "message": "date param required"}), 400
@@ -82,6 +87,7 @@ def get_daily_history():
 
 
 @bp.route('/api/history', methods=['POST'])
+@limiter.limit("60 per minute")
 def add_history():
     try:
         data             = request.json or {}
@@ -115,7 +121,9 @@ def add_history():
 @bp.route('/api/history/stats', methods=['GET'])
 def get_history_stats():
     try:
-        user_id = request.args.get('user_id', 'default')
+        user_id = request.args.get('user_id', '').strip()
+        if not user_id:
+            return jsonify({"status": "error", "message": "user_id required"}), 400
         total = query(
             f"SELECT COUNT(*) as c, COALESCE(SUM(recipe_count),0) as r "
             f"FROM history WHERE user_id = {ph}",

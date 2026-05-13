@@ -1,6 +1,7 @@
 ﻿import 'dart:async';
 import 'dart:convert';
 import 'dart:math' as math;
+import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_animate/flutter_animate.dart';
@@ -277,15 +278,16 @@ class _HomeScreenState extends State<HomeScreen> {
       _loadingDayData = day != today;
     });
     if (day == today) return;
-    final uid = await _getUid();
+    final uid = _getUid();
     final dateStr = '${day.year}-${day.month.toString().padLeft(2,'0')}-${day.day.toString().padLeft(2,'0')}';
     final data = await ApiService.getDailyHistory(uid, dateStr);
     if (mounted) setState(() { _selectedDayData = data; _loadingDayData = false; });
   }
 
-  Future<String> _getUid() async {
-    final data = await UserPrefsService.load();
-    return data['email'] as String? ?? 'anonymous';
+  String _getUid() {
+    // MUST match ApiService._uid — Firebase UID, not email.
+    // History is written with the UID, so lookups must use the UID too.
+    return FirebaseAuth.instance.currentUser?.uid ?? 'anonymous';
   }
 
   Future<void> _checkForUpdate() async {

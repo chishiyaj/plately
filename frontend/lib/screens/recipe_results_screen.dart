@@ -300,7 +300,7 @@ class _RecipeResultsScreenState extends State<RecipeResultsScreen> {
         const SizedBox(height: 48),
         Center(child: Icon(
           isBusy ? LucideIcons.clockAlert : LucideIcons.serverOff,
-          size: 52, color: AppTheme.mutedText)),
+          size: 52, color: AppTheme.textMuted(context))),
         const SizedBox(height: 20),
         Center(child: Text(
           isBusy ? 'AI is busy right now' : 'Could not load recipes',
@@ -336,7 +336,7 @@ class _RecipeResultsScreenState extends State<RecipeResultsScreen> {
       onRefresh: _loadRecipes,
       child: ListView(padding: const EdgeInsets.all(32), children: [
         const SizedBox(height: 48),
-        const Center(child: Icon(LucideIcons.wifiOff, size: 52, color: AppTheme.mutedText)),
+        Center(child: Icon(LucideIcons.wifiOff, size: 52, color: AppTheme.textMuted(context))),
         const SizedBox(height: 20),
         Center(child: Text('No internet connection',
             style: TextStyle(fontFamily: 'DM Sans', fontWeight: FontWeight.w700,
@@ -365,7 +365,7 @@ class _RecipeResultsScreenState extends State<RecipeResultsScreen> {
 
   Widget _buildNoSearchResults() {
     return Center(child: Column(mainAxisSize: MainAxisSize.min, children: [
-      const Icon(LucideIcons.searchX, size: 48, color: AppTheme.mutedText),
+      Icon(LucideIcons.searchX, size: 48, color: AppTheme.textMuted(context)),
       const SizedBox(height: 16),
       Text('No recipes match "$_searchQuery"',
           style: TextStyle(fontFamily: 'DM Sans',
@@ -389,7 +389,7 @@ class _RecipeResultsScreenState extends State<RecipeResultsScreen> {
 
   Widget _buildEmpty() {
     return Center(child: Column(mainAxisSize: MainAxisSize.min, children: [
-      const Icon(LucideIcons.chefHat, size: 48, color: AppTheme.mutedText),
+      Icon(LucideIcons.chefHat, size: 48, color: AppTheme.textMuted(context)),
       const SizedBox(height: 16),
       Text('No recipes found', style: TextStyle(fontFamily: 'DM Sans',
           fontWeight: FontWeight.w700, fontSize: 16, color: AppTheme.textPrimary(context))),

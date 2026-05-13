@@ -733,7 +733,7 @@ class _HistoryRow extends StatelessWidget {
             ),
           ] else ...[
             const SizedBox(height: 4),
-            const Icon(LucideIcons.chevronRight, size: 14, color: AppTheme.mutedText),
+            Icon(LucideIcons.chevronRight, size: 14, color: AppTheme.textMuted(context)),
           ],
         ]),
       ]),

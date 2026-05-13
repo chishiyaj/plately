@@ -276,7 +276,7 @@ class _Header extends StatelessWidget {
             borderRadius: BorderRadius.circular(10),
           ),
           child: Icon(LucideIcons.clock3, size: 16,
-              color: showTimes ? AppTheme.primaryDark : AppTheme.mutedText),
+              color: showTimes ? AppTheme.primaryDark : AppTheme.textMuted(context)),
         ),
       ),
       const SizedBox(width: 4),
@@ -289,10 +289,10 @@ class _Header extends StatelessWidget {
             width: 36, height: 36,
             decoration: BoxDecoration(
               gradient: isEmpty ? null : AppTheme.tealGradient,
-              color: isEmpty ? AppTheme.borderGray : null,
+              color: isEmpty ? AppTheme.border(context) : null,
               borderRadius: BorderRadius.circular(10),
             ),
-            child: Icon(LucideIcons.squarePen, color: isEmpty ? AppTheme.mutedText : Colors.white, size: 16),
+            child: Icon(LucideIcons.squarePen, color: isEmpty ? AppTheme.textMuted(context) : Colors.white, size: 16),
           ),
         ),
       ),
@@ -489,7 +489,7 @@ class _Bubble extends StatelessWidget {
             padding: EdgeInsets.only(top: 4, bottom: 8,
                 left: message.isUser ? 0 : 36, right: message.isUser ? 4 : 0),
             child: Text(_fmtTs(message.timestamp), style: TextStyle(
-              color: AppTheme.mutedText.withValues(alpha: 0.55), fontSize: 10, fontFamily: 'DM Sans')),
+              color: AppTheme.textMuted(context).withValues(alpha: 0.55), fontSize: 10, fontFamily: 'DM Sans')),
           )
         else
           const SizedBox(height: 10),

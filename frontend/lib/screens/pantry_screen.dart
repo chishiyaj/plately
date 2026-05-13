@@ -374,7 +374,7 @@ class _PantryScreenState extends State<PantryScreen> {
               .map((e) => _itemCard(context, e.key, e.value)),
         const SizedBox(height: 24),
         Row(mainAxisAlignment: MainAxisAlignment.center, children: [
-          const Icon(LucideIcons.info, size: 12, color: AppTheme.mutedText),
+          Icon(LucideIcons.info, size: 12, color: AppTheme.textMuted(context)),
           const SizedBox(width: 6),
           Text('Ingredients auto-deduct after you finish cooking.',
               style: TextStyle(color: AppTheme.textMuted(context), fontSize: 11, fontFamily: 'DM Sans')),

@@ -1,7 +1,9 @@
 from flask import Blueprint, request, jsonify
-import math
+from app import limiter
+import math, logging
 
-bp = Blueprint('goals', __name__)
+bp     = Blueprint('goals', __name__)
+logger = logging.getLogger(__name__)
 
 
 def _mifflin_st_jeor(weight_kg: float, height_cm: float, age: int, sex: str) -> float:
@@ -26,6 +28,7 @@ def _tdee(bmr: float, activity: str = 'moderate') -> float:
 
 
 @bp.route('/api/goals', methods=['POST'])
+@limiter.limit("20 per minute")
 def set_goals():
     """
     POST body: {
@@ -49,9 +52,21 @@ def set_goals():
         weight   = float(data['weight'])
         height   = float(data['height'])
         age      = int(data['age'])
-        sex      = str(data['sex'])
-        goal     = str(data['goal'])
-        activity = str(data.get('activity', 'moderate'))
+        sex      = str(data['sex']).lower().strip()
+        goal     = str(data['goal']).lower().strip()
+        activity = str(data.get('activity', 'moderate')).lower().strip()
+
+        # Range validation
+        if not (20 <= weight <= 300):
+            return jsonify({"status": "error", "message": "weight must be between 20 and 300 kg"}), 400
+        if not (100 <= height <= 250):
+            return jsonify({"status": "error", "message": "height must be between 100 and 250 cm"}), 400
+        if not (10 <= age <= 100):
+            return jsonify({"status": "error", "message": "age must be between 10 and 100"}), 400
+        if sex not in ('male', 'female'):
+            return jsonify({"status": "error", "message": "sex must be 'male' or 'female'"}), 400
+        if goal not in ('lose', 'maintain', 'gain'):
+            return jsonify({"status": "error", "message": "goal must be 'lose', 'maintain', or 'gain'"}), 400
 
         bmr  = _mifflin_st_jeor(weight, height, age, sex)
         tdee = _tdee(bmr, activity)
@@ -79,5 +94,6 @@ def set_goals():
 
     except (ValueError, TypeError) as e:
         return jsonify({"status": "error", "message": f"Invalid input: {e}"}), 400
-    except Exception as e:
-        return jsonify({"status": "error", "message": str(e)}), 500
+    except Exception:
+        logger.exception("set_goals error")
+        return jsonify({"status": "error", "message": "Internal error."}), 500

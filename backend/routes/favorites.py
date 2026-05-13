@@ -62,7 +62,9 @@ def get_favorites():
 def add_favorite():
     try:
         data      = request.json or {}
-        user_id   = (data.get('user_id') or 'default').strip()
+        user_id   = (data.get('user_id') or '').strip()
+        if not user_id or user_id == 'default':
+            return jsonify({"status": "error", "message": "user_id required"}), 400
         recipe_id = data.get('recipe_id')
         if recipe_id is None:
             return jsonify({"status": "error", "message": "recipe_id required"}), 400

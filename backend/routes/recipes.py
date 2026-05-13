@@ -9,6 +9,7 @@ routes/recipes.py
 
 from flask import Blueprint, request, jsonify
 from database import query, execute, PLACEHOLDER as ph, USE_PG
+from app import limiter
 import os, json, hashlib, requests, logging
 
 bp     = Blueprint('recipes', __name__)
@@ -248,8 +249,8 @@ def _generate_ai_recipes(ingredients: list, prefs: dict) -> list:
 
 
 @bp.route("/api/recipes", methods=["POST"])
+@limiter.limit("30 per minute")
 def get_recipes():
-    from app import limiter
     try:
         data = request.json or {}
 

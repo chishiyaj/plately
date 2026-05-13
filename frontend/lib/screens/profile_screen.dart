@@ -867,7 +867,11 @@ class _ProfileScreenState extends State<ProfileScreen> {
           ),
         );
       }),
-    );
+    ).then((_) {
+      currCtrl.dispose();
+      newCtrl.dispose();
+      confCtrl.dispose();
+    });
   }
 
   Widget _pwField({required TextEditingController ctrl, required String label}) =>

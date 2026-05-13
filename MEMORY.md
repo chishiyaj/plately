@@ -1,6 +1,17 @@
 # PLATELY V2 — MEMORY.md
 > Paste this at the START of every new Claude chat alongside SKILLS.md and TASKS.md.
-> Last updated: QA L4 Fixes — Cook Again added to history, all L1–L4 QA levels passed, flutter analyze 0. READY TO PUSH + REDEPLOY.
+> Last updated: Session Y — v1.0-rc1 APK built (63.5MB). All P0/P1 resolved. Firebase distribute + git commit pending.
+
+## 🖥️ DESKTOP COMMANDER (ALWAYS AVAILABLE)
+Claude has Desktop Commander MCP connected and approved. It can:
+- Read/write/edit any file under `C:/Users/marcd/` directly — no need to upload files
+- Run PowerShell commands via `start_process`
+- Search files and content across the project
+- The project root is `C:/Users/marcd/plately-v2/`
+- Flutter frontend: `C:/Users/marcd/plately-v2/frontend/`
+- Flask backend: `C:/Users/marcd/plately-v2/backend/`
+- Shell is `powershell.exe`. Always use Windows-style absolute paths.
+- **Do NOT ask Marc to paste file contents or upload files** — read them directly.
 
 ---
 
@@ -13,6 +24,8 @@ At the END of every session, Claude must update this file to reflect exactly wha
 - New status items discovered → add as ⬜
 - Tech stack changes → update TECH STACK table
 Do NOT leave stale ⬜ items that were actually fixed. Do NOT mark ✅ things that were not verified.
+
+⚠️ COMMIT RULE: Claude must never commit without being told "chishiya commit" by the user first.
 
 ---
 
@@ -119,7 +132,7 @@ Plately V2 — A Flutter mobile app for Android that helps students cook afforda
 
 ## DATABASE (Neon PostgreSQL prod / SQLite local)
 
-Tables: `ingredients` (~84), `recipes` (~100), `recipe_ingredients`, `nutrition` (has cost_php), `history` (has calories_logged, protein_logged), `favorites`, `ai_recipe_cache`
+Tables: `ingredients` (~84), `recipes` (~100), `recipe_ingredients`, `nutrition` (has cost_php), `history` (has calories_logged, protein_logged, recipe_id, recipe_name), `favorites`, `ai_recipe_cache`
 
 Recipe filters (tags): `Asian | Italian | Vegetarian | Low-Cal | High-Protein | Filipino`
 
@@ -205,7 +218,7 @@ Recipe filters (tags): `Asian | Italian | Vegetarian | Low-Cal | High-Protein | 
 | Profile High Protein explanation | ✅ VERIFIED S44 |
 | Profile theme picker icon+label rows | ✅ VERIFIED S44 |
 | Pantry inputDecoration consistent | ✅ VERIFIED S44 |
-| Release APK built (64MB) | ✅ S40 |
+| Release APK built (64MB) | ✅ v1.0.0+2 built S-Y — 63.5MB |
 | Pushed to main + GitHub Actions | ✅ S40 |
 | ALLOWED_ORIGINS Railway var set | ✅ Marco confirmed — kept as * (correct for mobile) |
 | Firebase App Distribution testers | ✅ S45 — tester emails added |

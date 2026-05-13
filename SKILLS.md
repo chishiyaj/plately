@@ -1,6 +1,11 @@
 # PLATELY V2 — SKILLS.md
 > Paste alongside MEMORY.md + TASKS.md at start of every chat.
-> Last updated: Session K — OpenRouter model updated in AI rules section.
+> Last updated: Session V start — Desktop Commander note added.
+
+## 🖥️ DESKTOP COMMANDER (ALWAYS AVAILABLE)
+Desktop Commander MCP is connected and approved. Claude can access the filesystem directly.
+See MEMORY.md → "DESKTOP COMMANDER" section for full details and paths.
+**Never ask the user to paste or upload files — read them directly from disk.**
 
 ---
 
@@ -10,6 +15,8 @@ At the END of every session, Claude must update this file if:
 - A new NEVER DO rule was discovered → add to NEVER DO list
 - A new package was added → note usage pattern here if relevant
 - A bug was caused by a wrong pattern → document the correct pattern
+
+⚠️ COMMIT RULE: Claude must never `git commit` or `git push` without being told "chishiya commit" by the user first.
 
 ---
 

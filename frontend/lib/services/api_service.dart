@@ -293,6 +293,8 @@ class ApiService {
     int recipeCount = 1,
     int caloriesLogged = 0,
     int proteinLogged = 0,
+    int recipeId = 0,
+    String recipeName = '',
   }) async {
     await _post('/api/history', {
       'user_id':          _uid,
@@ -301,12 +303,27 @@ class ApiService {
       'recipe_count':     recipeCount,
       'calories_logged':  caloriesLogged,
       'protein_logged':   proteinLogged,
+      'recipe_id':        recipeId,
+      'recipe_name':      recipeName,
     });
   }
 
   // ── KEEP-ALIVE PING ───────────────────────────────────────────────────────
   static Future<void> ping() async {
     await _get('/api/health', timeout: const Duration(seconds: 10));
+  }
+
+  // ── ONLINE CHECK ─────────────────────────────────────────────────────────
+  /// Returns true if the backend is reachable. Times out after 3 seconds.
+  static Future<bool> isOnline() async {
+    final res = await _get('/api/health', timeout: const Duration(seconds: 3));
+    if (res == null) return false;
+    try {
+      final data = jsonDecode(res.body) as Map<String, dynamic>;
+      return data['status'] == 'ok';
+    } catch (_) {
+      return false;
+    }
   }
 }
 

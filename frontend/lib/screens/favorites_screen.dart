@@ -286,9 +286,9 @@ class _FavoritesScreenState extends State<FavoritesScreen> {
             Container(
               width: 80, height: 80,
               decoration: BoxDecoration(
-                  color: AppTheme.borderGray.withValues(alpha: 0.5),
+                  color: AppTheme.border(context).withValues(alpha: 0.5),
                   shape: BoxShape.circle),
-              child: const Icon(LucideIcons.searchX, size: 36, color: AppTheme.mutedText),
+              child: Icon(LucideIcons.searchX, size: 36, color: AppTheme.textMuted(context)),
             ),
             const SizedBox(height: 16),
             Text('No recipes found',

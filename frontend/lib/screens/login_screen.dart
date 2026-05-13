@@ -219,7 +219,7 @@ class _LoginScreenState extends State<LoginScreen> {
           ),
         ),
       ),
-    );
+    ).then((_) => ctrl.dispose());
   }
 
   @override
