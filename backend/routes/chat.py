@@ -1,6 +1,7 @@
 """
 routes/chat.py — AI Chat endpoint.
-Rate limited aggressively (protects OpenRouter free-tier credits).
+Provider chain: Groq (fast, free) → OpenRouter (fallback) → smart hardcoded reply.
+Rate limited per Firebase UID to protect free-tier credits.
 Message capped at 500 chars. Accepts optional history for multi-turn conversation.
 """
 
@@ -9,18 +10,34 @@ from flask_limiter.util import get_remote_address
 from app import limiter
 import os
 import time
+import random
 import logging
 import requests
 
 bp     = Blueprint("chat", __name__)
 logger = logging.getLogger(__name__)
 
+# ── Provider URLs ─────────────────────────────────────────────────────────────
+GROQ_URL        = "https://api.groq.com/openai/v1/chat/completions"
 OPENROUTER_URL  = "https://openrouter.ai/api/v1/chat/completions"
-MODEL_PRIMARY   = "meta-llama/llama-3.3-8b-instruct:free"
-MODEL_FALLBACK  = "mistralai/mistral-7b-instruct:free"
-MAX_MSG_LEN     = 500
-MAX_HISTORY    = 6   # keep last N exchanges (N/2 turns each)
-CACHE_TTL      = 3600
+
+# ── Model config ───────────────────────────────────────────────────────────────
+# Groq models — fast, generous free tier, very reliable
+GROQ_MODELS = [
+    "llama-3.3-70b-versatile",   # primary — best quality on Groq
+    "llama3-8b-8192",            # fallback — lighter, still very good
+]
+
+# OpenRouter models — backup when Groq is down
+OPENROUTER_MODELS = [
+    "meta-llama/llama-3.3-70b-instruct:free",
+    "google/gemma-4-31b-it:free",
+    "mistralai/mistral-7b-instruct:free",
+]
+
+MAX_MSG_LEN = 500
+MAX_HISTORY = 6
+CACHE_TTL   = 3600
 
 SYSTEM_PROMPT = """You are Plately, a friendly and knowledgeable AI cooking assistant built for budget-conscious students in the Philippines.
 
@@ -75,9 +92,61 @@ Give a direct answer in 2-4 sentences. Include one pro tip.
 
 ALWAYS: mention protein content somewhere in every reply."""
 
-# TTL-aware cache: {message: (reply, timestamp)} — only for single-turn (no history)
-_cache: dict[str, tuple[str, float]] = {}
+# ── Smart hardcoded fallback replies ──────────────────────────────────────────
+# Rotates through useful cooking tips when all AI providers are down.
+# Each entry is a complete, genuinely helpful response.
+_FALLBACK_REPLIES = [
+    (
+        "Here are 3 quick high-protein meals perfect for students:\n\n"
+        "1. **Tortang Giniling** — 15 min — 28g protein — ~₱80\n"
+        "2. **Egg Fried Rice** — 12 min — 22g protein — ~₱60\n"
+        "3. **Tuna Omelette** — 10 min — 30g protein — ~₱75\n\n"
+        "All three use pantry staples you probably already have. "
+        "Want the full steps for any of these?"
+    ),
+    (
+        "For a budget ₱100-150 high-protein meal, here's what I'd recommend:\n\n"
+        "**Chicken Arroz Caldo** — 25 min — 35g protein — ~₱120\n\n"
+        "1. Sauté garlic, onion, and ginger in oil\n"
+        "2. Add chicken pieces, cook until browned\n"
+        "3. Add 1 cup rice and 4 cups water\n"
+        "4. Simmer 20 minutes, season with fish sauce and pepper\n\n"
+        "Pro tip: use chicken thighs — more protein and flavor than breast at the same price."
+    ),
+    (
+        "Here's a quick protein cheat sheet for common Filipino ingredients:\n\n"
+        "- **Chicken breast** (100g) — 31g protein — ~₱70\n"
+        "- **Eggs** (2 pcs) — 12g protein — ~₱20\n"
+        "- **Canned tuna** (1 can) — 25g protein — ~₱35\n"
+        "- **Tofu** (100g) — 8g protein — ~₱20\n"
+        "- **Ground pork** (100g) — 26g protein — ~₱80\n\n"
+        "Eggs + canned tuna together give you 37g protein for just ₱55 — "
+        "the best budget-protein combo for students."
+    ),
+    (
+        "Three things that make any student meal better:\n\n"
+        "1. **Always add garlic** — it makes cheap ingredients taste expensive\n"
+        "2. **Cook rice in broth** instead of water — zero extra cost, way more flavor\n"
+        "3. **Egg everything** — cracking an egg into noodles, fried rice, or soup "
+        "adds 6g protein for ₱10\n\n"
+        "The highest-protein cheap meal you can make: 3 scrambled eggs + 1 can tuna "
+        "on rice = **43g protein for under ₱80**."
+    ),
+    (
+        "Quick meal prep idea for the whole week — under ₱500 total:\n\n"
+        "**Sunday prep (1 hour):**\n"
+        "- Cook 3 cups rice (lasts 4-5 days)\n"
+        "- Boil 6 eggs (keeps in fridge 1 week)\n"
+        "- Fry 500g chicken thighs with garlic and soy sauce\n\n"
+        "This gives you lunch and dinner bases for 3-4 days. "
+        "Just mix and match with whatever vegetables you have. "
+        "Total protein per day: ~60-80g. Total cost: ~₱400-450."
+    ),
+]
 
+
+# ── Cache ─────────────────────────────────────────────────────────────────────
+_cache: dict[str, tuple[str, float]] = {}
 
 def _get_cached(message: str) -> str | None:
     if message in _cache:
@@ -87,7 +156,6 @@ def _get_cached(message: str) -> str | None:
         del _cache[message]
     return None
 
-
 def _set_cached(message: str, reply: str) -> None:
     if len(_cache) >= 200:
         oldest = min(_cache, key=lambda k: _cache[k][1])
@@ -95,52 +163,31 @@ def _set_cached(message: str, reply: str) -> None:
     _cache[message] = (reply, time.monotonic())
 
 
+# ── Message builder ────────────────────────────────────────────────────────────
 def _build_messages(message: str, history: list) -> list:
-    """Build OpenRouter messages array with system prompt + optional history.
-
-    Strategy: merge system prompt into the FIRST user message so we never
-    have a bare system-role entry, then interleave history strictly alternating
-    user/assistant. If history order is broken, drop the offending entry.
-    """
+    """Build messages array with system prompt + optional history."""
     if not history:
-        # Single-turn: system + question merged into one user message
-        return [{"role": "user", "content": f"{SYSTEM_PROMPT}\n\nUser question: {message}"}]
+        return [
+            {"role": "system", "content": SYSTEM_PROMPT},
+            {"role": "user",   "content": message},
+        ]
 
-    # Trim to last MAX_HISTORY messages
     trimmed = history[-MAX_HISTORY:]
-
-    # Filter to only valid roles and remove consecutive duplicates
     valid = []
     for h in trimmed:
         role    = h.get("role", "user")
         content = str(h.get("content", ""))[:500].strip()
         if role not in ("user", "assistant") or not content:
             continue
-        # Drop if same role as last entry (prevents consecutive same-role messages)
         if valid and valid[-1]["role"] == role:
             continue
         valid.append({"role": role, "content": content})
 
-    # Build final array: system merged into first message, then history, then current
-    msgs = []
-    if valid and valid[0]["role"] == "user":
-        # Merge system prompt into the first historical user message
-        msgs.append({"role": "user", "content": f"{SYSTEM_PROMPT}\n\n{valid[0]['content']}"})
-        rest = valid[1:]
-    else:
-        # History starts with assistant — prepend a synthetic user+system turn
-        msgs.append({"role": "user", "content": SYSTEM_PROMPT})
-        rest = valid
-
-    for h in rest:
-        # Ensure no consecutive same-role after prepend
-        if msgs and msgs[-1]["role"] == h["role"]:
-            continue
+    msgs = [{"role": "system", "content": SYSTEM_PROMPT}]
+    for h in valid:
         msgs.append(h)
 
-    # Append current user message — ensure it doesn't follow another user msg
-    if msgs and msgs[-1]["role"] == "user":
-        # Merge into last user message rather than create consecutive user entries
+    if msgs[-1]["role"] == "user":
         msgs[-1]["content"] = f"{msgs[-1]['content']}\n\n{message}"
     else:
         msgs.append({"role": "user", "content": message})
@@ -148,80 +195,109 @@ def _build_messages(message: str, history: list) -> list:
     return msgs
 
 
-def _call_model(model: str, messages: list, key: str) -> str:
-    """Call one OpenRouter model. Raises on failure."""
+# ── Provider callers ───────────────────────────────────────────────────────────
+def _call_groq(model: str, messages: list, key: str) -> str:
+    """Call Groq API. Raises on failure."""
+    resp = requests.post(
+        GROQ_URL,
+        headers={
+            "Authorization": f"Bearer {key}",
+            "Content-Type":  "application/json",
+        },
+        json={"model": model, "messages": messages, "max_tokens": 600},
+        timeout=15,
+    )
+    logger.info("Groq [%s] status: %d", model, resp.status_code)
+    if resp.status_code != 200:
+        logger.error("Groq [%s] error: %s", model, resp.text[:300])
+        resp.raise_for_status()
+    choices = resp.json().get("choices")
+    if not choices:
+        raise ValueError(f"Groq returned no choices for {model}")
+    reply = choices[0]["message"]["content"].strip()
+    reply = reply.replace("```", "").replace("<br>", "\n").strip()
+    logger.info("Groq [%s] reply (%d chars)", model, len(reply))
+    return reply
+
+
+def _call_openrouter(model: str, messages: list, key: str) -> str:
+    """Call OpenRouter API. Raises on failure."""
     resp = requests.post(
         OPENROUTER_URL,
         headers={
             "Authorization": f"Bearer {key}",
-            "Content-Type": "application/json",
-            "HTTP-Referer": "https://plately.app",
-            "X-Title": "Plately",
+            "Content-Type":  "application/json",
+            "HTTP-Referer":  "https://plately.app",
+            "X-Title":       "Plately",
         },
-        json={
-            "model": model,
-            "messages": messages,
-            "max_tokens": 600,
-        },
+        json={"model": model, "messages": messages, "max_tokens": 600},
         timeout=20,
     )
     logger.info("OpenRouter [%s] status: %d", model, resp.status_code)
     if resp.status_code != 200:
-        logger.error("OpenRouter [%s] error: %s", model, resp.text[:400])
+        logger.error("OpenRouter [%s] error: %s", model, resp.text[:300])
         resp.raise_for_status()
-    resp_json = resp.json()
-    choices = resp_json.get("choices")
+    choices = resp.json().get("choices")
     if not choices:
-        logger.error("OpenRouter [%s] empty choices: %s", model, str(resp_json)[:300])
-        raise ValueError(f"No choices returned from {model}")
+        raise ValueError(f"OpenRouter returned no choices for {model}")
     reply = choices[0]["message"]["content"].strip()
     reply = reply.replace("```", "").replace("<br>", "\n").strip()
     logger.info("OpenRouter [%s] reply (%d chars)", model, len(reply))
     return reply
 
 
-def _ask_ai(message: str, history: list) -> str:
+# ── Main AI caller ─────────────────────────────────────────────────────────────
+def _ask_ai(message: str, history: list) -> tuple[str, bool]:
+    """
+    Returns (reply, is_fallback).
+    Chain: Groq → OpenRouter → smart hardcoded reply.
+    Never raises — always returns something useful.
+    """
     if not history:
         cached = _get_cached(message)
         if cached:
-            return cached
+            return cached, False
 
-    key = os.getenv("OPENROUTER_API_KEY", "").strip()
-    if not key:
-        logger.warning("OPENROUTER_API_KEY not set — returning fallback response")
-        return (
-            "Here are 3 quick high-protein meal ideas for students:\n"
-            "1. **Chicken Stir Fry** — 20 min — 38g protein — ~₱150\n"
-            "2. **Egg Fried Rice** — 15 min — 22g protein — ~₱80\n"
-            "3. **Tuna Pasta** — 18 min — 34g protein — ~₱120\n\n"
-            "Want the full steps for any of these?"
-        )
+    msgs          = _build_messages(message, history)
+    groq_key      = os.getenv("GROQ_API_KEY", "").strip()
+    openrouter_key = os.getenv("OPENROUTER_API_KEY", "").strip()
 
-    messages = _build_messages(message, history)
+    # ── 1. Try Groq first ─────────────────────────────────────────────────────
+    if groq_key:
+        for model in GROQ_MODELS:
+            try:
+                reply = _call_groq(model, msgs, groq_key)
+                if not history:
+                    _set_cached(message, reply)
+                return reply, False
+            except Exception as e:
+                logger.warning("Groq [%s] failed: %s", model, e)
+    else:
+        logger.warning("GROQ_API_KEY not set — skipping Groq")
 
-    # Try primary model first, fall back to secondary on any failure
-    reply = None
-    for model in (MODEL_PRIMARY, MODEL_FALLBACK):
-        try:
-            reply = _call_model(model, messages, key)
-            break
-        except Exception as e:
-            logger.warning("Model %s failed: %s — trying fallback", model, e)
+    # ── 2. Try OpenRouter ─────────────────────────────────────────────────────
+    if openrouter_key:
+        for model in OPENROUTER_MODELS:
+            try:
+                reply = _call_openrouter(model, msgs, openrouter_key)
+                if not history:
+                    _set_cached(message, reply)
+                return reply, False
+            except Exception as e:
+                logger.warning("OpenRouter [%s] failed: %s", model, e)
+    else:
+        logger.warning("OPENROUTER_API_KEY not set — skipping OpenRouter")
 
-    if reply is None:
-        raise ValueError("All AI models failed. Please try again later.")
-
-    if not history:
-        _set_cached(message, reply)
-    return reply
+    # ── 3. Smart hardcoded fallback ───────────────────────────────────────────
+    logger.warning("All AI providers failed — returning smart fallback reply")
+    return random.choice(_FALLBACK_REPLIES), True
 
 
+# ── Rate limit key ─────────────────────────────────────────────────────────────
 def _get_user_id() -> str:
-    """Rate limit key: use Firebase UID from request body, fall back to IP.
-    Prevents all users sharing one IP (Railway NAT) from hitting the same bucket."""
     try:
         data = request.get_json(silent=True) or {}
-        uid = str(data.get("user_id", "")).strip()
+        uid  = str(data.get("user_id", "")).strip()
         if uid and uid != "anonymous":
             return uid
     except Exception:
@@ -229,13 +305,14 @@ def _get_user_id() -> str:
     return get_remote_address()
 
 
+# ── Route ──────────────────────────────────────────────────────────────────────
 @bp.route("/api/chat", methods=["POST"])
-@limiter.limit("15 per minute", key_func=_get_user_id)
+@limiter.limit("20 per minute", key_func=_get_user_id)
 def chat():
     try:
         data    = request.json or {}
         message = (data.get("message") or "").strip()
-        history = data.get("history") or []   # [{role, content}, ...] — last N messages
+        history = data.get("history") or []
 
         if not message:
             return jsonify({"status": "error", "message": "message required"}), 400
@@ -244,29 +321,23 @@ def chat():
             message = message[:MAX_MSG_LEN]
         message = "".join(c for c in message if c >= " " or c in "\n\t")
 
-        # Validate history format — ignore malformed entries
         if not isinstance(history, list):
             history = []
-        history = [h for h in history if isinstance(h, dict) and "role" in h and "content" in h]
+        history = [h for h in history if isinstance(h, dict)
+                   and "role" in h and "content" in h]
 
-        reply = _ask_ai(message, history)
-        return jsonify({"status": "ok", "data": {"reply": reply}}), 200
+        reply, is_fallback = _ask_ai(message, history)
 
-    except requests.exceptions.Timeout:
-        logger.warning("OpenRouter timeout")
-        return jsonify({"status": "error", "message": "AI timed out. Try again."}), 504
-    except requests.exceptions.HTTPError as e:
-        # Surface the actual HTTP status + body for easier diagnosis
-        body = ""
-        try:
-            body = e.response.text[:200] if e.response is not None else ""
-        except Exception:
-            pass
-        logger.error("OpenRouter HTTP error: %s — body: %s", e, body)
-        return jsonify({"status": "error", "message": f"AI service error ({e.response.status_code if e.response else 'unknown'}). {body}"}), 502
-    except ValueError as e:
-        logger.error("OpenRouter response parse error: %s", e)
-        return jsonify({"status": "error", "message": f"AI response error: {e}"}), 502
+        return jsonify({
+            "status": "ok",
+            "data":   {"reply": reply},
+            # Let Flutter know if this was a fallback so it can show a subtle indicator
+            "fallback": is_fallback,
+        }), 200
+
     except Exception as e:
         logger.exception("Unexpected chat error")
-        return jsonify({"status": "error", "message": f"Internal error: {type(e).__name__}: {str(e)[:120]}"}), 500
+        return jsonify({
+            "status":  "error",
+            "message": "Something went wrong. Please try again.",
+        }), 500

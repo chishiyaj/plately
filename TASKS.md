@@ -1,6 +1,6 @@
 # PLATELY V2 — TASKS.md
 > Paste alongside MEMORY.md + SKILLS.md at start of every chat.
-> Last updated: Session L — 5 new device-tested bugs found and logged. Session L prompt written. Needs fix + redeploy.
+> Last updated: Session M — 6 new device-tested bugs logged after Session L deploy. Sessions M + N + Full Backend Audit written. Ready to execute.
 
 ---
 
@@ -9,17 +9,29 @@ This file must be updated AT THE END OF EVERY SESSION without exception.
 
 ---
 
-## CURRENT STATE (SESSION L — IN PROGRESS)
+## CURRENT STATE (SESSION M — PENDING)
 
-### Done this session (device testing by Marc):
-- APK built, deployed to Railway, uploaded to Firebase App Distribution ✅
-- Device testing revealed 5 new bugs (see bug queue below)
-- Session L prompt written — ready to execute
+### Done in Session L deploy:
+- Google Sign-In: added `serverClientId` to `GoogleSignIn()` ✅
+- AI models: switched to llama-3.3-8b + mistral-7b fallback ✅
+- Camera: added `_cam!.value.isInitialized` gate ✅
+- Favorites empty state: redesigned with illustration + Browse button ✅
+- APK rebuilt + deployed to Railway + uploaded to Firebase ✅
+
+### New bugs found after Session L device test:
+- Google Sign-In still failing (root cause: deeper OAuth config issue, not just serverClientId)
+- AI chat: "All AI models failed" — OpenRouter free key exhausted, need new key
+- Camera preview stretched — missing AspectRatio wrapper
+- Redundant input field shown in camera mode after scan failure
+- Black screen after navigating back from scan (pushReplacement bug)
+- "Browse Recipes" button goes to Home tab, not a recipe browse experience
 
 ### Pending:
-- ⬜ Run Session L fixes (see prompt below)
-- ⬜ Rebuild APK after Session L
-- ⬜ Redeploy Railway after Session L (if backend files changed)
+- ⬜ Run Session M — fix all 6 bugs above (frontend + backend)
+- ⬜ Get new OpenRouter API key and update Railway env var
+- ⬜ Rebuild APK after Session M
+- ⬜ Redeploy Railway after Session M
+- ⬜ Run Session N — full backend audit
 - ⬜ Re-upload to Firebase App Distribution
 
 ---
@@ -30,11 +42,13 @@ This file must be updated AT THE END OF EVERY SESSION without exception.
 
 | Priority | Screen | Description | Session | Status |
 |----------|--------|-------------|---------|--------|
-| P1 | Auth | Google Sign-In fails on release APK — OAuth error on device | L | ⬜ OPEN |
-| P1 | Goals | Calculate TDEE button does not reflect updated calorie/protein targets in UI | L | ⬜ OPEN |
-| P1 | AI Chat | "AI Service Error" on every message — OpenRouter account may be rate-limited or exhausted; consider switching accounts or model | L | ⬜ OPEN |
-| P1 | Scan / Camera | Camera viewfinder shows white blank screen on physical device — CameraPreview not rendering | L | ⬜ OPEN |
-| P3 | Favorites | "No Favorites Yet" empty state uses a generic icon + repeated icon/text UI — needs a proper illustrated empty state design | L | ⬜ OPEN |
+| P1 | Auth | Google Sign-In still failing after serverClientId fix — deeper OAuth config issue on Google Cloud Console | M | ⬜ OPEN |
+| P1 | AI Chat | "All AI models failed" — OpenRouter free key rate-limited/exhausted. Need new OPENROUTER_API_KEY in Railway env | M | ⬜ OPEN |
+| P1 | Scan / Camera | Camera preview is stretched — CameraPreview fills screen without AspectRatio wrapper | M | ⬜ OPEN |
+| P2 | Scan / Camera | Redundant text input field shown in camera mode after scan failure — user already has "Type Instead" button | M | ⬜ OPEN |
+| P1 | Scan / Camera | Black screen after going back from scan — `Navigator.pushReplacement` in `_findRecipes()` removes scan from stack, back from RecipeResults skips scan and hits black transition | M | ⬜ OPEN |
+| P2 | Favorites | "Browse Recipes" empty state button navigates to Home tab (tab 0) instead of launching a recipe browsing experience | M | ⬜ OPEN |
+| P1 | Goals | Calculate TDEE does not visually reflect updated targets in UI — state update not triggering rebuild | L | ⬜ OPEN |
 | P1 | App icon | Launcher icon dull/low contrast on home screen | H | ✅ DONE SH |
 | P1 | Auth | Google Sign-In fails — only Gmail accounts work | H | ✅ DONE — SHA-1 added to Firebase |
 | P1 | Goals | Calculate TDEE button does not update displayed targets | H | ✅ VERIFIED — already wired in source |
@@ -61,7 +75,232 @@ This file must be updated AT THE END OF EVERY SESSION without exception.
 
 ---
 
-### SESSION L — Google Sign-In + TDEE Fix + AI Chat + Camera + Favorites Empty State
+### SESSION M — Google Sign-In Deep Fix + OpenRouter Key + Camera + Scan UX + Navigation Bug + Browse Button
+**Files:** `auth_service.dart`, `ingredient_entry_screen.dart`, `favorites_screen.dart`, `onboarding_goals_screen.dart`
+**Root causes:**
+- **Google Sign-In:** `serverClientId` is now set but sign-in still fails. Root cause: the `google-services.json` has two Android OAuth clients (SHA-1 hashes) but Google Cloud Console may not have the web client OAuth consent screen fully configured, OR the `signOut()` before `signIn()` is resetting state in a way that breaks the flow on some Android versions. Fix: remove the `_google.signOut()` pre-call, add detailed PlatformException logging to surface the actual error code.
+- **AI Chat:** OpenRouter free key is exhausted. Marco must create a new OpenRouter account at openrouter.ai, generate a new free API key, and update the `OPENROUTER_API_KEY` env var in Railway. No code change needed — just env var update. Document the steps clearly.
+- **Camera stretched:** `CameraPreview` inside `Positioned.fill` stretches to fill the screen ignoring the camera sensor's natural aspect ratio. Fix: wrap `CameraPreview` in `AspectRatio(aspectRatio: _cam!.value.aspectRatio)` and center it inside the `Positioned.fill` using a `Center` widget.
+- **Redundant input in camera fail state:** After a failed scan, `_addRow(dark: true)` appears below the chip panel even though "Type Instead" button already switches mode. Remove `_addRow` from `_cameraContent()` entirely — it only belongs in `_typeContent()`.
+- **Black screen on back:** `_findRecipes()` calls `Navigator.pushReplacement` which removes `IngredientEntryScreen` from the stack. When user goes back from `RecipeResultsScreen`, they land on whatever is beneath scan (MainShell transition = black flash). Fix: change to `Navigator.push` so the back button returns to the scan screen with ingredients intact.
+- **Browse Recipes button:** `MainShell.switchTab(0)` goes to Home. Change to open `RecipeResultsScreen` with an empty ingredients list (shows the full recipe browse/grid with filters). Use `Navigator.push(context, AppTheme.slideUp(RecipeResultsScreen(ingredients: [])))`.
+- **TDEE not reflecting:** The `_targetsCard()` already reads from `_calGoal`/`_proteinGoal` state. But `_calculate()` wraps the setState in a try/catch that silently swallows API errors. Add explicit error snackbar in the catch block so the user knows if the API failed.
+
+```
+You are fixing the Plately V2 Flutter app. Read MEMORY.md, SKILLS.md, TASKS.md first.
+
+FILES TO CHANGE:
+- frontend/lib/services/auth_service.dart
+- frontend/lib/screens/ingredient_entry_screen.dart
+- frontend/lib/screens/favorites_screen.dart
+- frontend/lib/screens/onboarding_goals_screen.dart
+
+FIXES NEEDED:
+
+1. GOOGLE SIGN-IN — REMOVE PRE-SIGNOUT + BETTER ERROR LOGGING (auth_service.dart — P1):
+   a) In signInWithGoogle(), REMOVE the `await _google.signOut()` line before signIn().
+      This pre-signout causes issues on some Android versions by resetting the OAuth
+      state mid-flow.
+   b) In the catch block for generic exceptions, add PlatformException handling:
+      } on PlatformException catch (e) {
+        logger.error or print: 'Google Sign-In PlatformException: ${e.code} — ${e.message}'
+        return AuthResult.error('Google sign-in failed (${e.code}). Contact support.');
+      }
+      Import: import 'package:flutter/services.dart';
+   c) Keep everything else the same — serverClientId stays as is.
+   Output complete replacement for auth_service.dart.
+
+2. OPENROUTER NEW KEY — INSTRUCTIONS ONLY (no code change):
+   The OpenRouter free API key is exhausted. Steps to fix:
+   a) Go to https://openrouter.ai and create a new account with a different email.
+   b) Generate a free API key from the dashboard.
+   c) In Railway dashboard → mindful-presence project → Variables tab:
+      Update OPENROUTER_API_KEY to the new key value.
+   d) Railway will auto-redeploy. Test /api/chat after redeploy.
+   No code changes needed for this fix — document clearly in session log.
+
+3. CAMERA ASPECT RATIO — FIX STRETCH (ingredient_entry_screen.dart — P1):
+   In the build() method, find the Positioned.fill that renders CameraPreview.
+   Replace it with:
+     Positioned.fill(
+       child: _capturedPath != null
+         ? Image.file(File(_capturedPath!), fit: BoxFit.cover)
+         : Center(
+             child: AspectRatio(
+               aspectRatio: _cam!.value.aspectRatio,
+               child: CameraPreview(_cam!),
+             ),
+           ),
+     )
+   The AspectRatio widget preserves the camera's native sensor ratio so it
+   doesn't stretch to fill the screen. Center keeps it horizontally centered.
+   Condition stays: only render if (_cam != null && _cam!.value.isInitialized && _isDark).
+
+4. REMOVE REDUNDANT INPUT FROM CAMERA FAIL STATE (ingredient_entry_screen.dart — P2):
+   In _cameraContent(), find this block:
+     if (!_scanning && _capturedPath != null) ...[
+       _addRow(dark: true),
+       const SizedBox(height: 8),
+     ],
+   DELETE this entire block. The _addRow field in camera mode is redundant — 
+   the "Type Instead" button in the failure chip panel already handles this.
+   _addRow(dark: false) remains in _typeContent() only.
+
+5. FIX BLACK SCREEN ON BACK — USE PUSH NOT PUSHREPLACEMENT (ingredient_entry_screen.dart — P1):
+   In _findRecipes(), find:
+     Navigator.pushReplacement(context, AppTheme.zoomIn(RecipeResultsScreen(ingredients: _ingredients)));
+   Change to:
+     Navigator.push(context, AppTheme.zoomIn(RecipeResultsScreen(ingredients: _ingredients)));
+   This keeps IngredientEntryScreen in the stack so back from RecipeResults
+   returns to scan with all ingredients still there.
+
+6. BROWSE RECIPES BUTTON — OPEN RECIPE GRID (favorites_screen.dart — P2):
+   In the empty state, find:
+     onTap: () => MainShell.switchTab(0),
+   Change to:
+     onTap: () => Navigator.push(context, AppTheme.slideUp(RecipeResultsScreen(ingredients: []))),
+   Add import at top: import 'recipe_results_screen.dart';
+   This opens the full recipe browse/grid screen with all recipes and filters,
+   which is what "Browse Recipes" should actually do.
+
+7. TDEE CALCULATE — SHOW ERROR IF API FAILS (onboarding_goals_screen.dart — P1):
+   In _calculate(), find the catch block:
+     } catch (_) {
+       if (mounted) setState(() => _loading = false);
+     }
+   Replace with:
+     } catch (e) {
+       if (mounted) {
+         setState(() => _loading = false);
+         ScaffoldMessenger.of(context).showSnackBar(SnackBar(
+           content: Text('Could not calculate TDEE. Check your connection and try again.',
+               style: const TextStyle(fontFamily: 'DM Sans', fontWeight: FontWeight.w500)),
+           backgroundColor: AppTheme.red,
+           behavior: SnackBarBehavior.floating,
+           shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+           margin: const EdgeInsets.fromLTRB(16, 0, 16, 16),
+         ));
+       }
+     }
+
+After all fixes:
+- Run flutter analyze — must be 0 issues
+- List all files changed
+- Update TASKS.md session log and bug queue statuses
+- The OpenRouter key update is a manual step for Marco — document it clearly
+```
+
+---
+
+### SESSION N — Full Backend Audit (All Endpoints, Logic, Security, Edge Cases)
+**Files:** All `backend/routes/*.py`, `database.py`, `app.py`
+**Goal:** Every endpoint must be verified correct, secure, and returning the right shape. No silent failures. No missing guards. All edge cases handled.
+
+```
+You are doing a full backend audit of Plately V2. Read MEMORY.md, SKILLS.md, TASKS.md first.
+
+AUDIT SCOPE — check every single one of these:
+
+ENDPOINT CONTRACT AUDIT:
+For each endpoint, verify:
+a) Input validation — all required fields checked, wrong types handled
+b) Response shape — always {"status":"ok","data":...} or {"status":"error","message":...}
+c) DB errors caught and returned as 500, not unhandled exceptions
+d) user_id guard on all personal data endpoints (history, favorites, goals)
+e) No endpoint returns raw Python exceptions to the client
+
+ENDPOINTS TO AUDIT:
+1. POST /api/scan
+   - Validate image_base64 is present and valid base64
+   - Check all 3 model fallbacks work (gemma-4-31b → gemma-4-26b → llama)
+   - Verify ingredient matching logic returns correct results
+   - Test with empty image, oversized image, non-food image
+
+2. POST /api/recipes
+   - Validate ingredients list (not empty, not >15 items)
+   - Check DB cache hit/miss logic (1hr TTL)
+   - Verify prefs validation (cal_goal, protein_goal, pref_* booleans)
+   - Verify response includes all fields Flutter expects: id, name, cook_time,
+     calories, protein, difficulty, tags, image_url, cost_php, ingredients
+
+3. GET /api/recipe/<id>
+   - Verify 404 returned for unknown id (not 500)
+   - Confirm ingredients list is included in response
+   - Check nutrition data included
+
+4. POST /api/chat
+   - Test with new OpenRouter key (after Marco updates Railway)
+   - Verify rate limit works per user_id
+   - Test history trimming logic (>6 messages)
+   - Verify both MODEL_PRIMARY and MODEL_FALLBACK actually work
+
+5. POST /api/goals
+   - Validate weight/height/age/sex/goal all required
+   - Verify Mifflin-St Jeor formula is correct for both male/female
+   - Verify activity multiplier applied for goal (lose/maintain/gain)
+   - Verify response: {calorie_target, protein_target}
+
+6. GET /api/favorites?user_id=X
+   - Verify user_id required (400 if missing)
+   - Verify returns all recipe fields Flutter needs
+   - Test with unknown user_id (returns empty array, not error)
+
+7. POST /api/favorites
+   - Verify duplicate save doesn't error (idempotent)
+   - Verify user_id required
+
+8. DELETE /api/favorites/<id>?user_id=X
+   - Verify user_id guard
+   - Verify 404 for unknown id
+
+9. GET /api/history?user_id=X
+   - Verify user_id required
+   - Verify timestamps returned in ISO format
+   - Verify grouped by date correctly
+
+10. POST /api/history
+    - Verify all fields: user_id, recipe_id, recipe_name, calories_logged, protein_logged
+    - Verify defaults for optional fields
+
+11. GET /api/history/stats?user_id=X
+    - Verify returns: total_sessions, total_recipes, sessions_this_week
+    - Verify streak calculation is correct
+
+12. GET /api/history/daily?user_id=X&date=YYYY-MM-DD
+    - Verify date format validation
+    - Verify returns: calories_logged, protein_logged for that date
+
+13. DELETE /api/history/<id>?user_id=X
+    - Verify user_id guard
+    - Verify only deletes entries belonging to that user_id
+
+14. DELETE /api/history?user_id=X
+    - Verify user_id guard
+    - Verify clears ALL entries for that user only
+
+15. GET /api/health
+    - Verify returns {"status":"ok"} and DB connection check
+
+ADDITIONAL CHECKS:
+- CORS headers present on all responses
+- Rate limiting configured correctly (not too aggressive for mobile)
+- No N+1 queries in recipes or history endpoints
+- All SQL uses PLACEHOLDER (never f-string values)
+- Error logging is consistent (logger.error not print)
+- gunicorn worker count appropriate for Railway free tier (2 workers max)
+
+For each issue found:
+- State the file + line + what's wrong
+- Output the fixed code
+- Explain the impact if unfixed
+
+After audit:
+- Output a PASS/FAIL table for all 15 endpoints
+- List all fixes applied
+- Update TASKS.md session log
+```
+
+---
 **Files:** `login_screen.dart`, `signup_screen.dart`, `onboarding_goals_screen.dart`, `routes/chat.py`, `ingredient_entry_screen.dart`, `favorites_screen.dart`
 **Root causes identified:**
 - Google Sign-In: OAuth client ID mismatch on release build. SHA-1 is registered but the google-services.json OAuth client may be missing the release client entry, or the Android OAuth client in Google Cloud Console is not configured for the release package.
@@ -477,6 +716,8 @@ and any backend route fixes needed.
 | QA L3 | History + AI Chat + Pantry + Shopping + Scan audit complete. 1 P2 bug: pantry key not UID-namespaced. All critical flows pass. | TASKS.md |
 | QA L4 Fixes | Cook Again button added to _HistoryRow (shows when recipe_id > 0); TASKS/MEMORY/SKILLS updated; flutter analyze 0; READY TO COMMIT + PUSH | history_screen.dart, TASKS.md, MEMORY.md, SKILLS.md |
 | L (setup) | APK deployed + device tested. 5 bugs found: Google Sign-In failure, TDEE not reflecting, AI chat service error, camera white screen, favorites empty state. Session L prompt written. | TASKS.md |
+| L (fixes) | auth_service.dart: serverClientId added; chat.py: model switched to llama-3.3-8b + mistral fallback; ingredient_entry_screen.dart: camera isInitialized gate; favorites_screen.dart: empty state redesign. flutter analyze 0. APK rebuilt + Firebase distributed. | auth_service.dart, chat.py, ingredient_entry_screen.dart, favorites_screen.dart |
+| M (setup) | Device test after L deploy. 6 new bugs: Google Sign-In still failing, AI all models failed (key exhausted), camera stretched, redundant input field, black screen on back, Browse Recipes goes to Home. Session M + N prompts written. | TASKS.md |
 
 ---
 
