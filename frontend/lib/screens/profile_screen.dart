@@ -11,6 +11,7 @@ import '../widgets/tap_scale.dart';
 import '../services/user_prefs_service.dart';
 import '../services/auth_service.dart';
 import '../services/api_service.dart';
+import '../services/notification_service.dart';
 import 'login_screen.dart';
 import 'onboarding_goals_screen.dart';
 
@@ -230,9 +231,9 @@ class _ProfileScreenState extends State<ProfileScreen> {
     return Padding(
       padding: const EdgeInsets.symmetric(horizontal: 20),
       child: Row(children: [
-        _statChip(label: 'Recipes', value: _statsLoaded ? '$recipes' : '—', icon: LucideIcons.chefHat),
+        _statChip(label: 'Recipes', value: _statsLoaded ? '$recipes' : '--', icon: LucideIcons.chefHat),
         const SizedBox(width: 10),
-        _statChip(label: 'This Week', value: _statsLoaded ? '$sessions' : '—', icon: LucideIcons.calendarDays),
+        _statChip(label: 'This Week', value: _statsLoaded ? '$sessions' : '--', icon: LucideIcons.calendarDays),
         const SizedBox(width: 10),
         _statChip(label: 'Streak', value: '$streak d', icon: LucideIcons.flame),
       ]),
@@ -532,11 +533,22 @@ class _ProfileScreenState extends State<ProfileScreen> {
           label: 'Notifications',
           onTap: () {},
           trailing: Switch(
-            value: (_data['notifications'] as bool?) ?? true,
+            value: (_data['notif_cal'] as bool?) ?? true,
             activeColor: AppTheme.primaryDark,
             onChanged: (v) async {
               await UserPrefsService.saveNotifCal(v);
-              setState(() => _data['notifications'] = v);
+              setState(() => _data['notif_cal'] = v);
+              if (v) {
+                await NotificationService.schedulePersonalized(
+                  name:             (_data['name']     as String?) ?? 'chef',
+                  proteinGoal:      (_data['protein_goal'] as int?) ?? 120,
+                  proteinConsumed:  (_data['protein_consumed'] as int?) ?? 0,
+                  streak:           (_data['streak']   as int?) ?? 0,
+                  lastCookedName:   (_data['last_cooked_name'] as String?) ?? '',
+                );
+              } else {
+                await NotificationService.disableMealReminders();
+              }
             },
           ),
         ),
@@ -553,6 +565,13 @@ class _ProfileScreenState extends State<ProfileScreen> {
                   (_) => false);
             }
           },
+        ),
+        _divider(),
+        _settingsTile(
+          icon: LucideIcons.trash2,
+          label: 'Delete Account',
+          danger: true,
+          onTap: _showDeleteAccount,
         ),
       ]),
     );
@@ -596,34 +615,45 @@ class _ProfileScreenState extends State<ProfileScreen> {
     return ValueListenableBuilder<ThemeMode>(
       valueListenable: themeNotifier,
       builder: (_, mode, __) {
-        return Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-          Padding(
-            padding: const EdgeInsets.fromLTRB(18, 14, 18, 10),
-            child: Row(children: [
-              Container(
-                width: 36, height: 36,
-                decoration: BoxDecoration(
-                  color: AppTheme.primaryDark.withValues(alpha: 0.08),
-                  borderRadius: BorderRadius.circular(10),
-                ),
-                child: const Icon(LucideIcons.sunMoon, color: AppTheme.primaryDark, size: 17),
+        return Padding(
+          padding: const EdgeInsets.fromLTRB(18, 14, 18, 14),
+          child: Row(children: [
+            Container(
+              width: 36, height: 36,
+              decoration: BoxDecoration(
+                color: AppTheme.primaryDark.withValues(alpha: 0.08),
+                borderRadius: BorderRadius.circular(10),
               ),
-              const SizedBox(width: 14),
-              Text('Display', style: TextStyle(
+              child: const Icon(LucideIcons.sunMoon, color: AppTheme.primaryDark, size: 17),
+            ),
+            const SizedBox(width: 14),
+            Expanded(
+              child: Text('Display', style: TextStyle(
                   color: AppTheme.textPrimary(context),
                   fontSize: 14, fontFamily: 'DM Sans', fontWeight: FontWeight.w600)),
-            ]),
-          ),
-          _themeRow(icon: LucideIcons.sun,     label: 'Light',  value: ThemeMode.light,  current: mode),
-          _themeRow(icon: LucideIcons.moon,    label: 'Dark',   value: ThemeMode.dark,   current: mode),
-          _themeRow(icon: LucideIcons.monitor, label: 'System', value: ThemeMode.system, current: mode),
-          const SizedBox(height: 4),
-        ]);
+            ),
+            // Compact segmented control -- Light / Dark / System
+            Container(
+              height: 36,
+              padding: const EdgeInsets.all(3),
+              decoration: BoxDecoration(
+                color: AppTheme.cardAltBg(context),
+                borderRadius: BorderRadius.circular(10),
+                border: Border.all(color: AppTheme.border(context)),
+              ),
+              child: Row(mainAxisSize: MainAxisSize.min, children: [
+                _themeSegment(icon: LucideIcons.sun,     label: 'Light',  value: ThemeMode.light,  current: mode),
+                _themeSegment(icon: LucideIcons.moon,    label: 'Dark',   value: ThemeMode.dark,   current: mode),
+                _themeSegment(icon: LucideIcons.monitor, label: 'System', value: ThemeMode.system, current: mode),
+              ]),
+            ),
+          ]),
+        );
       },
     );
   }
 
-  Widget _themeRow({
+  Widget _themeSegment({
     required IconData icon,
     required String label,
     required ThemeMode value,
@@ -638,25 +668,20 @@ class _ProfileScreenState extends State<ProfileScreen> {
       },
       child: AnimatedContainer(
         duration: const Duration(milliseconds: 160),
-        margin: const EdgeInsets.fromLTRB(18, 0, 18, 4),
-        padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
+        padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
         decoration: BoxDecoration(
-          color: active ? AppTheme.primaryDark.withValues(alpha: 0.06) : Colors.transparent,
-          borderRadius: BorderRadius.circular(10),
-          border: Border.all(
-            color: active ? AppTheme.primaryDark.withValues(alpha: 0.25) : Colors.transparent,
-          ),
+          color: active ? AppTheme.primaryDark : Colors.transparent,
+          borderRadius: BorderRadius.circular(7),
         ),
-        child: Row(children: [
-          Icon(icon, size: 16, color: active ? AppTheme.primaryDark : AppTheme.textMuted(context)),
-          const SizedBox(width: 12),
-          Expanded(child: Text(label, style: TextStyle(
-            color: active ? AppTheme.textPrimary(context) : AppTheme.textMuted(context),
-            fontSize: 13, fontFamily: 'DM Sans',
+        child: Row(mainAxisSize: MainAxisSize.min, children: [
+          Icon(icon, size: 13,
+              color: active ? Colors.white : AppTheme.textMuted(context)),
+          const SizedBox(width: 4),
+          Text(label, style: TextStyle(
+            color: active ? Colors.white : AppTheme.textMuted(context),
+            fontSize: 12, fontFamily: 'DM Sans',
             fontWeight: active ? FontWeight.w700 : FontWeight.w400,
-          ))),
-          if (active)
-            const Icon(LucideIcons.check, size: 14, color: AppTheme.green),
+          )),
         ]),
       ),
     );
@@ -746,7 +771,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
                     title: 'AI & Data Processing',
                     body: 'Recipe generation and chat are powered by OpenRouter '
                         '(google/gemma-3-27b-it). Ingredient scan uses Gemma Vision. '
-                        'Only your ingredient list and preferences are sent — no personally '
+                        'Only your ingredient list and preferences are sent -- no personally '
                         'identifiable information is included in AI requests.',
                   ),
                   const SizedBox(height: 16),
@@ -992,6 +1017,121 @@ class _ProfileScreenState extends State<ProfileScreen> {
         );
       }),
     );
+  }
+
+  // ── Delete Account ─────────────────────────────────────────────────────────
+  void _showDeleteAccount() {
+    final pwCtrl = TextEditingController();
+    bool loading = false;
+
+    showModalBottomSheet(
+      context: context,
+      isScrollControlled: true,
+      backgroundColor: Colors.transparent,
+      builder: (ctx) => StatefulBuilder(builder: (ctx, setSt) {
+        return Padding(
+          padding: EdgeInsets.only(bottom: MediaQuery.of(ctx).viewInsets.bottom),
+          child: Container(
+            decoration: BoxDecoration(
+              color: AppTheme.cardBg(context),
+              borderRadius: const BorderRadius.vertical(top: Radius.circular(24)),
+            ),
+            padding: const EdgeInsets.fromLTRB(20, 16, 20, 32),
+            child: Column(mainAxisSize: MainAxisSize.min, children: [
+              Container(width: 40, height: 4,
+                  decoration: BoxDecoration(color: AppTheme.border(context),
+                      borderRadius: BorderRadius.circular(2))),
+              const SizedBox(height: 18),
+              Container(
+                width: 52, height: 52,
+                decoration: BoxDecoration(
+                  color: const Color(0xFFD14444).withValues(alpha: 0.1),
+                  shape: BoxShape.circle,
+                ),
+                child: const Icon(LucideIcons.trash2, color: Color(0xFFD14444), size: 22),
+              ),
+              const SizedBox(height: 14),
+              Text('Delete Account', style: TextStyle(color: AppTheme.textPrimary(context),
+                  fontSize: 18, fontFamily: 'DM Sans', fontWeight: FontWeight.w800)),
+              const SizedBox(height: 8),
+              Text(
+                'This permanently deletes your history, favorites, and all data. This cannot be undone.',
+                textAlign: TextAlign.center,
+                style: TextStyle(color: AppTheme.textMuted(context),
+                    fontSize: 13, fontFamily: 'DM Sans', height: 1.5),
+              ),
+              const SizedBox(height: 20),
+              _pwField(ctrl: pwCtrl, label: 'Confirm your password'),
+              const SizedBox(height: 20),
+              TapScale(
+                onTap: loading ? null : () async {
+                  final messenger = ScaffoldMessenger.of(context);
+                  final nav = Navigator.of(ctx);
+                  final rootNav = Navigator.of(context);
+                  if (pwCtrl.text.isEmpty) {
+                    messenger.showSnackBar(const SnackBar(
+                      content: Text('Enter your password to confirm'),
+                      backgroundColor: Color(0xFFD14444),
+                      behavior: SnackBarBehavior.floating,
+                    ));
+                    return;
+                  }
+                  setSt(() => loading = true);
+                  try {
+                    final email = (_data['email'] as String?) ?? '';
+                    await AuthService.changePassword(
+                      email: email,
+                      currentPassword: pwCtrl.text,
+                      newPassword: pwCtrl.text,
+                    );
+                    await ApiService.deleteAllUserData();
+                    await UserPrefsService.clearAll();
+                    await FirebaseAuth.instance.currentUser?.delete();
+                    if (!mounted) return;
+                    nav.pop();
+                    rootNav.pushAndRemoveUntil(
+                      MaterialPageRoute(builder: (_) => const LoginScreen()),
+                      (_) => false,
+                    );
+                  } catch (e) {
+                    setSt(() => loading = false);
+                    if (!mounted) return;
+                    messenger.showSnackBar(SnackBar(
+                      content: Text(e.toString().replaceAll('Exception: ', ''),
+                          style: const TextStyle(fontFamily: 'DM Sans')),
+                      backgroundColor: const Color(0xFFD14444),
+                      behavior: SnackBarBehavior.floating,
+                    ));
+                  }
+                },
+                child: Container(
+                  width: double.infinity, height: 50,
+                  decoration: BoxDecoration(
+                    color: const Color(0xFFD14444),
+                    borderRadius: BorderRadius.circular(14),
+                  ),
+                  child: Center(child: loading
+                    ? const SizedBox(width: 20, height: 20,
+                        child: CircularProgressIndicator(color: Colors.white, strokeWidth: 2))
+                    : const Text('Delete My Account', style: TextStyle(color: Colors.white,
+                        fontSize: 15, fontFamily: 'DM Sans', fontWeight: FontWeight.w700))),
+                ),
+              ),
+              const SizedBox(height: 10),
+              TapScale(
+                onTap: () => Navigator.pop(ctx),
+                child: SizedBox(
+                  width: double.infinity, height: 44,
+                  child: Center(child: Text('Cancel',
+                      style: TextStyle(color: AppTheme.textMuted(context),
+                          fontSize: 14, fontFamily: 'DM Sans', fontWeight: FontWeight.w600))),
+                ),
+              ),
+            ]),
+          ),
+        );
+      }),
+    ).then((_) => pwCtrl.dispose());
   }
 }
 

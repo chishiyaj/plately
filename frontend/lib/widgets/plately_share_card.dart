@@ -1,15 +1,17 @@
 import 'package:flutter/material.dart';
+import 'package:cached_network_image/cached_network_image.dart';
 import 'package:lucide_icons_flutter/lucide_icons.dart';
 import '../theme/app_theme.dart';
 import 'plately_logo.dart';
 
-/// Standalone share card for post-cook sharing.
-/// Rendered via ScreenshotController then shared as PNG.
+/// Post-cook share card -- screenshot-able via ScreenshotController.
+/// Design: recipe image hero at top, cream card body, colored macro pills, Plately footer.
 class PlatelyShareCard extends StatelessWidget {
   final String dishName;
   final int calories;
   final int protein;
   final int streak;
+  final String? imageUrl;
 
   const PlatelyShareCard({
     super.key,
@@ -17,160 +19,145 @@ class PlatelyShareCard extends StatelessWidget {
     required this.calories,
     required this.protein,
     required this.streak,
+    this.imageUrl,
   });
 
   @override
   Widget build(BuildContext context) {
     return Container(
-      width: 280,
-      height: 498, // ~9:16 portrait
+      width: 300,
       decoration: BoxDecoration(
-        color: AppTheme.primaryDark,
-        borderRadius: BorderRadius.circular(24),
+        color: const Color(0xFFF0EEE9), // creamBg -- always light
+        borderRadius: BorderRadius.circular(20),
+        boxShadow: [
+          BoxShadow(
+            color: Colors.black.withValues(alpha: 0.10),
+            blurRadius: 20,
+            offset: const Offset(0, 6),
+          ),
+        ],
       ),
       clipBehavior: Clip.antiAlias,
-      child: Stack(
+      child: Column(
+        mainAxisSize: MainAxisSize.min,
+        crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          // Radial green glow top-right
-          Positioned(
-            top: -50,
-            right: -50,
-            child: Container(
-              width: 200,
-              height: 200,
-              decoration: BoxDecoration(
-                shape: BoxShape.circle,
-                gradient: RadialGradient(colors: [
-                  AppTheme.green.withValues(alpha: 0.20),
-                  Colors.transparent,
-                ]),
-              ),
-            ),
-          ),
-          // Bottom glow
-          Positioned(
-            bottom: -60,
-            left: -40,
-            child: Container(
-              width: 180,
-              height: 180,
-              decoration: BoxDecoration(
-                shape: BoxShape.circle,
-                gradient: RadialGradient(colors: [
-                  AppTheme.primaryDark.withValues(alpha: 0.0),
-                  Colors.transparent,
-                ]),
-              ),
-            ),
-          ),
+          // ── Recipe image hero ──────────────────────────────────────────
+          _imageHero(),
 
+          // ── Card body ─────────────────────────────────────────────────
           Padding(
-            padding: const EdgeInsets.all(28),
+            padding: const EdgeInsets.fromLTRB(20, 18, 20, 0),
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                // Logo
-                const PlatelyLogo(
-                  iconSize: 34,
-                  wordmarkSize: 15,
-                  theme: PlatelyLogoTheme.onDark,
-                ),
-
-                const SizedBox(height: 36),
-
-                // "just cooked" label
+                // "just cooked" eyebrow
                 Text(
-                  'just cooked',
+                  'JUST COOKED',
                   style: TextStyle(
                     fontFamily: 'DM Sans',
-                    fontSize: 13,
-                    color: Colors.white.withValues(alpha: 0.5),
-                    letterSpacing: 1.2,
+                    fontSize: 10,
+                    fontWeight: FontWeight.w700,
+                    letterSpacing: 1.4,
+                    color: AppTheme.primaryDark.withValues(alpha: 0.45),
                   ),
                 ),
-                const SizedBox(height: 6),
+                const SizedBox(height: 5),
 
                 // Dish name
                 Text(
                   dishName,
                   style: const TextStyle(
                     fontFamily: 'Nunito',
-                    fontSize: 28,
+                    fontSize: 22,
                     fontWeight: FontWeight.w800,
-                    color: Colors.white,
+                    color: AppTheme.primaryDark,
                     height: 1.15,
                   ),
                   maxLines: 3,
                   overflow: TextOverflow.ellipsis,
                 ),
 
-                const SizedBox(height: 24),
+                const SizedBox(height: 14),
 
                 // Macro pills
                 Row(
                   children: [
-                    _MacroPill(label: '$calories kcal', icon: LucideIcons.flame),
-                    const SizedBox(width: 10),
-                    _MacroPill(label: '${protein}g protein', icon: LucideIcons.dumbbell),
+                    _MacroPill(
+                      label: '$calories kcal',
+                      icon: LucideIcons.flame,
+                      bg: AppTheme.green.withValues(alpha: 0.12),
+                      border: AppTheme.green.withValues(alpha: 0.30),
+                      iconColor: AppTheme.green,
+                      textColor: const Color(0xFF2A6010),
+                    ),
+                    const SizedBox(width: 8),
+                    _MacroPill(
+                      label: '${protein}g protein',
+                      icon: LucideIcons.dumbbell,
+                      bg: const Color(0xFFBA5CCC).withValues(alpha: 0.10),
+                      border: const Color(0xFFBA5CCC).withValues(alpha: 0.28),
+                      iconColor: const Color(0xFFBA5CCC),
+                      textColor: const Color(0xFF7A2E8A),
+                    ),
                   ],
                 ),
 
-                const SizedBox(height: 20),
-
-                // Streak badge
-                if (streak >= 2)
+                // Streak badge (if ≥ 2)
+                if (streak >= 2) ...[
+                  const SizedBox(height: 10),
                   Container(
-                    padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 8),
+                    padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
                     decoration: BoxDecoration(
-                      color: AppTheme.yellow.withValues(alpha: 0.15),
+                      color: const Color(0xFFEABA1C).withValues(alpha: 0.12),
                       borderRadius: BorderRadius.circular(20),
                       border: Border.all(
-                        color: AppTheme.yellow.withValues(alpha: 0.35),
-                        width: 1,
+                        color: const Color(0xFFEABA1C).withValues(alpha: 0.35),
                       ),
                     ),
                     child: Row(
                       mainAxisSize: MainAxisSize.min,
                       children: [
-                        const Text('🔥', style: TextStyle(fontSize: 15)),
-                        const SizedBox(width: 7),
+                        const Text('🔥', style: TextStyle(fontSize: 13)),
+                        const SizedBox(width: 5),
                         Text(
                           '$streak day streak',
                           style: const TextStyle(
                             fontFamily: 'DM Sans',
-                            fontSize: 13,
+                            fontSize: 12,
                             fontWeight: FontWeight.w700,
-                            color: AppTheme.orange,
+                            color: Color(0xFFB07C00),
                           ),
                         ),
                       ],
                     ),
                   ),
+                ],
 
-                const Spacer(),
+                const SizedBox(height: 16),
+              ],
+            ),
+          ),
 
-                // Divider
-                Container(
-                  height: 1,
-                  color: Colors.white.withValues(alpha: 0.08),
+          // ── Footer ────────────────────────────────────────────────────
+          Container(
+            color: AppTheme.primaryDark,
+            padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 13),
+            child: Row(
+              children: [
+                const PlatelyLogo(
+                  theme: PlatelyLogoTheme.onDark,
+                  iconSize: 22,
+                  wordmarkSize: 11,
                 ),
-                const SizedBox(height: 14),
-
-                // Footer
-                Row(
-                  children: [
-                    const Icon(LucideIcons.trendingUp, color: AppTheme.green, size: 14),
-                    const SizedBox(width: 7),
-                    Text(
-                      'track yours → plately.app',
-                      style: TextStyle(
-                        fontFamily: 'DM Sans',
-                        fontSize: 12,
-                        color: Colors.white.withValues(alpha: 0.4),
-                        letterSpacing: 0.2,
-                      ),
-                    ),
-                  ],
+                const Spacer(),
+                Text(
+                  'Know your macros before you cook',
+                  style: TextStyle(
+                    fontFamily: 'DM Sans',
+                    fontSize: 10,
+                    color: Colors.white.withValues(alpha: 0.45),
+                  ),
                 ),
               ],
             ),
@@ -179,38 +166,84 @@ class PlatelyShareCard extends StatelessWidget {
       ),
     );
   }
+
+  Widget _imageHero() {
+    const height = 170.0;
+    if (imageUrl != null && imageUrl!.isNotEmpty) {
+      return SizedBox(
+        height: height,
+        width: double.infinity,
+        child: CachedNetworkImage(
+          imageUrl: imageUrl!,
+          fit: BoxFit.cover,
+          placeholder: (_, __) => _placeholderHero(height),
+          errorWidget: (_, __, ___) => _placeholderHero(height),
+        ),
+      );
+    }
+    return _placeholderHero(height);
+  }
+
+  Widget _placeholderHero(double height) {
+    return Container(
+      height: height,
+      width: double.infinity,
+      decoration: const BoxDecoration(
+        gradient: LinearGradient(
+          begin: Alignment.topLeft,
+          end: Alignment.bottomRight,
+          colors: [Color(0xFF043B3C), Color(0xFF0A5A5B)],
+        ),
+      ),
+      child: Center(
+        child: Icon(
+          LucideIcons.utensils,
+          size: 42,
+          color: Colors.white.withValues(alpha: 0.25),
+        ),
+      ),
+    );
+  }
 }
 
 class _MacroPill extends StatelessWidget {
   final String label;
   final IconData icon;
+  final Color bg;
+  final Color border;
+  final Color iconColor;
+  final Color textColor;
 
-  const _MacroPill({required this.label, required this.icon});
+  const _MacroPill({
+    required this.label,
+    required this.icon,
+    required this.bg,
+    required this.border,
+    required this.iconColor,
+    required this.textColor,
+  });
 
   @override
   Widget build(BuildContext context) {
     return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+      padding: const EdgeInsets.symmetric(horizontal: 11, vertical: 7),
       decoration: BoxDecoration(
-        color: AppTheme.green.withValues(alpha: 0.15),
+        color: bg,
         borderRadius: BorderRadius.circular(20),
-        border: Border.all(
-          color: AppTheme.green.withValues(alpha: 0.4),
-          width: 1,
-        ),
+        border: Border.all(color: border),
       ),
       child: Row(
         mainAxisSize: MainAxisSize.min,
         children: [
-          Icon(icon, size: 13, color: AppTheme.green),
-          const SizedBox(width: 6),
+          Icon(icon, size: 12, color: iconColor),
+          const SizedBox(width: 5),
           Text(
             label,
-            style: const TextStyle(
+            style: TextStyle(
               fontFamily: 'DM Sans',
-              fontSize: 13,
+              fontSize: 12,
               fontWeight: FontWeight.w700,
-              color: AppTheme.green,
+              color: textColor,
             ),
           ),
         ],

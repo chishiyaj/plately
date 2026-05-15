@@ -4,13 +4,13 @@ import 'package:shared_preferences/shared_preferences.dart';
 /// Local CRUD for user profile, goals, daily tracking, and preferences.
 /// ALL keys are prefixed with the Firebase UID so each account has isolated data.
 class UserPrefsService {
-  // ── Key builder — every key is namespaced per UID ─────────────────────────
+  // ── Key builder -- every key is namespaced per UID ─────────────────────────
   static String _uid() =>
       FirebaseAuth.instance.currentUser?.uid ?? 'anonymous';
 
   static String _k(String key) => '${_uid()}:$key';
 
-  // ── Raw key names (no prefix — prefix added via _k()) ─────────────────────
+  // ── Raw key names (no prefix -- prefix added via _k()) ─────────────────────
   static const _kName            = 'user_name';
   static const _kEmail           = 'user_email';
   static const _kCalGoal         = 'cal_goal';
@@ -78,35 +78,35 @@ class UserPrefsService {
     return '${now.year}-${now.month.toString().padLeft(2,'0')}-${now.day.toString().padLeft(2,'0')}';
   }
 
-  // ── WRITE — profile ───────────────────────────────────────────────────────
+  // ── WRITE -- profile ───────────────────────────────────────────────────────
   static Future<void> saveName(String v)  async => (await _p()).setString(_k(_kName), v);
   static Future<void> saveEmail(String v) async => (await _p()).setString(_k(_kEmail), v);
 
-  // ── WRITE — goals ─────────────────────────────────────────────────────────
+  // ── WRITE -- goals ─────────────────────────────────────────────────────────
   static Future<void> saveCalGoal(int v)     async => (await _p()).setInt(_k(_kCalGoal), v);
   static Future<void> saveProteinGoal(int v) async => (await _p()).setInt(_k(_kProteinGoal), v);
 
-  // ── WRITE — body stats ────────────────────────────────────────────────────
+  // ── WRITE -- body stats ────────────────────────────────────────────────────
   static Future<void> saveWeight(double v) async => (await _p()).setDouble(_k(_kWeight), v);
   static Future<void> saveHeight(double v) async => (await _p()).setDouble(_k(_kHeight), v);
   static Future<void> saveAge(int v)       async => (await _p()).setInt(_k(_kAge), v);
   static Future<void> saveSex(String v)    async => (await _p()).setString(_k(_kSex), v);
 
-  // ── WRITE — daily tracking ────────────────────────────────────────────────
+  // ── WRITE -- daily tracking ────────────────────────────────────────────────
   static Future<void> saveCalConsumed(int v)     async => (await _p()).setInt(_k(_kCalConsumed), v);
   static Future<void> saveProteinConsumed(int v) async => (await _p()).setInt(_k(_kProteinConsumed), v);
 
-  // ── WRITE — dietary prefs ─────────────────────────────────────────────────
+  // ── WRITE -- dietary prefs ─────────────────────────────────────────────────
   static Future<void> savePrefVeg(bool v)    async => (await _p()).setBool(_k(_kPrefVeg), v);
   static Future<void> savePrefGluten(bool v) async => (await _p()).setBool(_k(_kPrefGluten), v);
   static Future<void> savePrefDairy(bool v)  async => (await _p()).setBool(_k(_kPrefDairy), v);
   static Future<void> savePrefHiPro(bool v)  async => (await _p()).setBool(_k(_kPrefHiPro), v);
   static Future<void> saveGoal(String v)     async => (await _p()).setString(_k(_kGoal), v);
 
-  // ── WRITE — notifications ─────────────────────────────────────────────────
+  // ── WRITE -- notifications ─────────────────────────────────────────────────
   static Future<void> saveNotifCal(bool v) async => (await _p()).setBool(_k(_kNotifCal), v);
 
-  // ── WRITE — stats ─────────────────────────────────────────────────────────
+  // ── WRITE -- stats ─────────────────────────────────────────────────────────
   static Future<void> incrementRecipeCount() async {
     final p = await _p();
     p.setInt(_k(_kRecipeCount), (p.getInt(_k(_kRecipeCount)) ?? 0) + 1);
@@ -171,28 +171,36 @@ class UserPrefsService {
     await p.setString(_k(_kLastCookDate), today);
   }
 
-  // ── WRITE — streak milestones ─────────────────────────────────────────────
+  // ── WRITE -- streak milestones ─────────────────────────────────────────────
   static Future<bool> hasSeenStreakMilestone(int n) async =>
       (await _p()).getBool(_k('streak_milestone_$n')) ?? false;
 
   static Future<void> markStreakMilestoneSeen(int n) async =>
       (await _p()).setBool(_k('streak_milestone_$n'), true);
 
-  // ── WRITE — last cooked name (for notifications) ──────────────────────────
+  // ── WRITE -- last cooked name (for notifications) ──────────────────────────
   static Future<String?> getLastCookedName() async =>
       (await _p()).getString(_k('last_cooked_name'));
 
   static Future<void> saveLastCookedName(String name) async =>
       (await _p()).setString(_k('last_cooked_name'), name);
 
-  // ── WRITE — onboarding ────────────────────────────────────────────────────
+  // ── WRITE -- last serving size per recipe (Cook Again pre-scale) ───────────
+  /// Key: 'serving_recipe_<id>' -- stores the last used serving multiplier.
+  static Future<double?> getLastServing(int recipeId) async =>
+      (await _p()).getDouble(_k('serving_recipe_$recipeId'));
+
+  static Future<void> saveLastServing(int recipeId, double serving) async =>
+      (await _p()).setDouble(_k('serving_recipe_$recipeId'), serving);
+
+  // ── WRITE -- onboarding ────────────────────────────────────────────────────
   static Future<void> setOnboardingDone() async =>
       (await _p()).setBool(_k(_kOnboardingDone), true);
 
   static Future<bool> isOnboardingDone() async =>
       (await _p()).getBool(_k(_kOnboardingDone)) ?? false;
 
-  // ── DELETE — only clears THIS user's keys ─────────────────────────────────
+  // ── DELETE -- only clears THIS user's keys ─────────────────────────────────
   static Future<void> clearAll() async {
     final p      = await _p();
     final prefix = '${_uid()}:';

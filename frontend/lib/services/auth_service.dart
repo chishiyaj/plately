@@ -4,7 +4,7 @@ import 'package:flutter/services.dart';
 import 'package:google_sign_in/google_sign_in.dart';
 
 /// Wraps Firebase Auth. All methods return [AuthResult].
-/// UI never touches FirebaseAuth directly — only calls this service.
+/// UI never touches FirebaseAuth directly -- only calls this service.
 class AuthService {
   static final _auth = FirebaseAuth.instance;
 
@@ -81,7 +81,7 @@ class AuthService {
       return AuthResult.error(_emailError(e.code));
     } on PlatformException catch (e) {
       // Surface the actual platform error code so it's visible in logs/debugger.
-      debugPrint('Google Sign-In PlatformException: ${e.code} — ${e.message}');
+      debugPrint('Google Sign-In PlatformException: ${e.code} -- ${e.message}');
       if (e.code == 'sign_in_canceled' || e.code == 'sign_in_cancelled') {
         return AuthResult.error('Sign-in cancelled.');
       }
@@ -172,7 +172,7 @@ class AuthService {
   };
 }
 
-/// Result wrapper — avoids try/catch in UI code.
+/// Result wrapper -- avoids try/catch in UI code.
 class AuthResult {
   final bool success;
   final String? error;

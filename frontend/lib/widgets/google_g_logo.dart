@@ -2,7 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_svg/flutter_svg.dart';
 
 // ─── GoogleGLogo ──────────────────────────────────────────────────────────────
-// Official Google G mark — embedded inline so it never fails to load.
+// Official Google G mark -- embedded inline so it never fails to load.
 // Usage: GoogleGLogo()  or  GoogleGLogo(size: 24)
 
 class GoogleGLogo extends StatelessWidget {

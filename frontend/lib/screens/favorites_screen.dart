@@ -110,30 +110,17 @@ class _FavoritesScreenState extends State<FavoritesScreen> {
   }
 
   Widget _buildSearchBar() {
-    return Container(
-      margin: const EdgeInsets.symmetric(horizontal: 24),
-      height: 50,
-      decoration: BoxDecoration(
-        color: AppTheme.cardBg(context),
-        borderRadius: BorderRadius.circular(14),
-        border: Border.all(color: AppTheme.border(context)),
-        boxShadow: const [BoxShadow(color: Color(0x06000000), blurRadius: 8, offset: Offset(0, 2))],
-      ),
+    return Padding(
+      padding: const EdgeInsets.symmetric(horizontal: 24),
       child: TextField(
         controller: _searchCtrl,
         onChanged: (v) => setState(() => _query = v),
         style: TextStyle(fontSize: 14, fontFamily: 'DM Sans', color: AppTheme.textPrimary(context)),
-        decoration: InputDecoration(
-          hintText: 'Search saved recipes...',
-          hintStyle: TextStyle(color: AppTheme.textMuted(context), fontSize: 14, fontFamily: 'DM Sans'),
-          prefixIcon: Padding(
-            padding: const EdgeInsets.all(14),
-            child: Icon(LucideIcons.search, size: 18, color: AppTheme.textMuted(context)),
-          ),
-          contentPadding: const EdgeInsets.symmetric(vertical: 15),
-          border: InputBorder.none,
-          enabledBorder: InputBorder.none,
-          focusedBorder: InputBorder.none,
+        decoration: AppTheme.inputDecoration(
+          context: context,
+          hint: 'Search saved recipes...',
+          prefixIcon: Icon(LucideIcons.search, size: 18, color: AppTheme.textMuted(context)),
+          contentPadding: const EdgeInsets.symmetric(horizontal: 14, vertical: 15),
         ),
       ),
     ).animate().fadeIn(delay: 80.ms, duration: 300.ms);
@@ -204,19 +191,23 @@ class _FavoritesScreenState extends State<FavoritesScreen> {
           child: Column(
             mainAxisAlignment: MainAxisAlignment.center,
             children: [
-              // Illustrated icon stack — plate + heart
+              // Illustrated icon stack -- plate + heart
               SizedBox(
                 width: 100, height: 100,
                 child: Stack(alignment: Alignment.center, children: [
                   Container(
                     width: 100, height: 100,
                     decoration: BoxDecoration(
-                      color: AppTheme.primaryDark.withValues(alpha: 0.06),
+                      color: AppTheme.isDark(context)
+                          ? AppTheme.primaryDark.withValues(alpha: 0.35)
+                          : AppTheme.primaryDark.withValues(alpha: 0.06),
                       shape: BoxShape.circle,
                     ),
                   ),
                   Icon(LucideIcons.utensils, size: 44,
-                      color: AppTheme.primaryDark.withValues(alpha: 0.18)),
+                      color: AppTheme.isDark(context)
+                          ? AppTheme.primaryDark.withValues(alpha: 0.7)
+                          : AppTheme.primaryDark.withValues(alpha: 0.18)),
                   Positioned(
                     bottom: 14, right: 14,
                     child: Container(

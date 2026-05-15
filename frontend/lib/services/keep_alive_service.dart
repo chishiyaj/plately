@@ -2,7 +2,7 @@ import 'dart:async';
 import 'api_service.dart';
 
 /// Keeps the Railway/Render backend awake by pinging /api/health every 9 minutes.
-/// Free-tier services sleep after 15 min of inactivity — this prevents cold starts
+/// Free-tier services sleep after 15 min of inactivity -- this prevents cold starts
 /// without needing an external service like UptimeRobot.
 ///
 /// Call KeepAliveService.start() once in main() after Firebase init.

@@ -12,6 +12,7 @@ class AppTheme {
   static const Color greenDark    = Color(0xFF3D7B20);
   static const Color purple       = Color(0xFFBA5CCC);
   static const Color yellow       = Color(0xFFEABA1C);
+  static const Color yellowDark   = Color(0xFFB8920D);
   static const Color borderGray   = Color(0xFFDADADA);
   static const Color lightGray    = Color(0xFFD9D9D9);
   static const Color scanGreen    = Color(0xFFC0DCB3);
@@ -109,7 +110,7 @@ class AppTheme {
     );
   }
 
-  // ── Dynamic text styles (use these in screens — they respect dark mode) ──
+  // ── Dynamic text styles (use these in screens -- they respect dark mode) ──
   static TextStyle headingLargeStyle(BuildContext context) => TextStyle(
     color: textPrimary(context), fontSize: 24,
     fontFamily: 'DM Sans', fontWeight: FontWeight.w800,
@@ -135,7 +136,7 @@ class AppTheme {
     fontFamily: 'DM Sans', fontWeight: FontWeight.w500,
   );
 
-  // ── Static text styles (light-mode only — use on dark backgrounds / teal cards)
+  // ── Static text styles (light-mode only -- use on dark backgrounds / teal cards)
   static const TextStyle logoStyle = TextStyle(
     color: primaryDark, fontSize: 24, fontFamily: 'Nunito', fontWeight: FontWeight.w800,
   );

@@ -2,8 +2,10 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:lucide_icons_flutter/lucide_icons.dart';
 import 'package:flutter_animate/flutter_animate.dart';
+import 'package:cached_network_image/cached_network_image.dart';
 import '../theme/app_theme.dart';
 import '../widgets/tap_scale.dart';
+import '../widgets/recipe_card.dart' show recipeImageUrl;
 import '../services/api_service.dart';
 import '../services/user_prefs_service.dart';
 import '../main_shell.dart';
@@ -19,6 +21,7 @@ class HistoryScreen extends StatefulWidget {
 class _HistoryScreenState extends State<HistoryScreen> {
   List<Map<String, dynamic>> _history = [];
   bool _loading = true;
+  int _calGoal     = 2200;
   int _proteinGoal = 120;
 
   // Weekly calendar navigation: 0 = this week, -1 = last week, etc.
@@ -42,6 +45,7 @@ class _HistoryScreenState extends State<HistoryScreen> {
       if (mounted) {
         setState(() {
           _history = data;
+          _calGoal     = (prefs['cal_goal']     as int?) ?? 2200;
           _proteinGoal = (prefs['protein_goal'] as int?) ?? 120;
           _loading = false;
         });
@@ -53,8 +57,137 @@ class _HistoryScreenState extends State<HistoryScreen> {
 
   Future<void> _deleteEntry(int id) async {
     HapticFeedback.mediumImpact();
+    // AE-5: API call first, then update UI only on success (rollback on failure)
+    final entry = _history.firstWhere((h) => h['id'] == id, orElse: () => {});
+    try {
+      await ApiService.deleteHistory(id);
+    } catch (_) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(const SnackBar(
+          content: Text('Could not delete entry. Try again.',
+              style: TextStyle(fontFamily: 'DM Sans')),
+          backgroundColor: AppTheme.red,
+          behavior: SnackBarBehavior.floating,
+        ));
+      }
+      return; // Don't update UI on failure
+    }
+    // Success: update UI and subtract macros if today's entry
     setState(() => _history.removeWhere((h) => h['id'] == id));
-    await ApiService.deleteHistory(id);
+    if (entry.isNotEmpty) {
+      try {
+        final ts = entry['timestamp'] as String? ?? '';
+        if (ts.isNotEmpty) {
+          final dt = DateTime.parse(ts).toLocal();
+          final now = DateTime.now();
+          final isToday = dt.year == now.year && dt.month == now.month && dt.day == now.day;
+          if (isToday) {
+            final cal     = (entry['calories_logged'] as int?) ?? 0;
+            final protein = (entry['protein_logged']  as int?) ?? 0;
+            if (cal > 0 || protein > 0) {
+              final prefs = await UserPrefsService.load();
+              final newCal     = ((prefs['cal_consumed']     as int?) ?? 0) - cal;
+              final newProtein = ((prefs['protein_consumed'] as int?) ?? 0) - protein;
+              await Future.wait([
+                UserPrefsService.saveCalConsumed(newCal.clamp(0, 99999)),
+                UserPrefsService.saveProteinConsumed(newProtein.clamp(0, 9999)),
+              ]);
+            }
+          }
+        }
+      } catch (_) {}
+    }
+  }
+
+  // ── Manual macro edit ──────────────────────────────────────────────────────
+  Future<void> _showMacroEdit(Map<String, dynamic> h) async {
+    final calCtrl = TextEditingController(text: '${(h['calories_logged'] as int?) ?? 0}');
+    final proCtrl = TextEditingController(text: '${(h['protein_logged']  as int?) ?? 0}');
+    final result = await showDialog<Map<String, int>>(
+      context: context,
+      builder: (dCtx) => AlertDialog(
+        backgroundColor: AppTheme.cardBg(dCtx),
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
+        title: Text('Edit Macros', style: TextStyle(fontFamily: 'DM Sans',
+            fontWeight: FontWeight.w800, color: AppTheme.textPrimary(dCtx))),
+        content: Column(mainAxisSize: MainAxisSize.min, children: [
+          Text('Adjust the logged macros for this entry.',
+              style: TextStyle(fontFamily: 'DM Sans', fontSize: 13, color: AppTheme.textMuted(dCtx))),
+          const SizedBox(height: 16),
+          TextField(
+            controller: calCtrl,
+            keyboardType: TextInputType.number,
+            style: TextStyle(fontFamily: 'DM Sans', color: AppTheme.textPrimary(dCtx)),
+            decoration: AppTheme.inputDecoration(
+              context: dCtx,
+              label: 'Calories (kcal)',
+              prefixIcon: Icon(LucideIcons.flame, size: 16,
+                  color: AppTheme.yellow.withValues(alpha: 0.8)),
+              contentPadding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
+            ),
+          ),
+          const SizedBox(height: 12),
+          TextField(
+            controller: proCtrl,
+            keyboardType: TextInputType.number,
+            style: TextStyle(fontFamily: 'DM Sans', color: AppTheme.textPrimary(dCtx)),
+            decoration: AppTheme.inputDecoration(
+              context: dCtx,
+              label: 'Protein (g)',
+              prefixIcon: Icon(LucideIcons.dumbbell, size: 16,
+                  color: AppTheme.green.withValues(alpha: 0.9)),
+              contentPadding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
+            ),
+          ),
+        ]),
+        actions: [
+          TextButton(onPressed: () => Navigator.pop(dCtx),
+              child: Text('Cancel', style: TextStyle(fontFamily: 'DM Sans',
+                  color: AppTheme.textMuted(dCtx)))),
+          TextButton(
+            onPressed: () {
+              final cal = int.tryParse(calCtrl.text.trim()) ?? 0;
+              final pro = int.tryParse(proCtrl.text.trim()) ?? 0;
+              Navigator.pop(dCtx, {'cal': cal.clamp(0, 9999), 'pro': pro.clamp(0, 999)});
+            },
+            child: const Text('Save', style: TextStyle(fontFamily: 'DM Sans',
+                color: AppTheme.primaryDark, fontWeight: FontWeight.w700)),
+          ),
+        ],
+      ),
+    );
+    calCtrl.dispose();
+    proCtrl.dispose();
+    if (result == null || !mounted) return;
+    final oldCal = (h['calories_logged'] as int?) ?? 0;
+    final oldPro = (h['protein_logged']  as int?) ?? 0;
+    final newCal = result['cal']!;
+    final newPro = result['pro']!;
+    // Update local list
+    setState(() {
+      final idx = _history.indexWhere((e) => e['id'] == h['id']);
+      if (idx >= 0) {
+        _history[idx] = {..._history[idx], 'calories_logged': newCal, 'protein_logged': newPro};
+      }
+    });
+    // Adjust today's running total if this entry was today
+    try {
+      final ts = h['timestamp'] as String? ?? '';
+      if (ts.isNotEmpty) {
+        final dt = DateTime.parse(ts).toLocal();
+        final now = DateTime.now();
+        final isToday = dt.year == now.year && dt.month == now.month && dt.day == now.day;
+        if (isToday) {
+          final prefs = await UserPrefsService.load();
+          final curCal = (prefs['cal_consumed']     as int?) ?? 0;
+          final curPro = (prefs['protein_consumed'] as int?) ?? 0;
+          await Future.wait([
+            UserPrefsService.saveCalConsumed((curCal - oldCal + newCal).clamp(0, 99999)),
+            UserPrefsService.saveProteinConsumed((curPro - oldPro + newPro).clamp(0, 9999)),
+          ]);
+        }
+      }
+    } catch (_) {}
   }
 
   Future<void> _clearAll() async {
@@ -77,8 +210,49 @@ class _HistoryScreenState extends State<HistoryScreen> {
       ),
     );
     if (confirm == true) {
-      setState(() => _history.clear());
-      await ApiService.clearHistory();
+      // AF-C fix: API call FIRST, subtract macros ONLY on success.
+      bool apiOk = false;
+      try {
+        await ApiService.clearHistory();
+        apiOk = true;
+      } catch (_) {}
+      if (!mounted) return;
+      if (apiOk) {
+        // API succeeded: now subtract today's macros, then clear UI
+        try {
+          final now = DateTime.now();
+          int todayCal = 0, todayPro = 0;
+          for (final h in _history) {
+            final ts = h['timestamp'] as String? ?? '';
+            if (ts.isEmpty) continue;
+            try {
+              final dt = DateTime.parse(ts).toLocal();
+              if (dt.year == now.year && dt.month == now.month && dt.day == now.day) {
+                todayCal += (h['calories_logged'] as int?) ?? 0;
+                todayPro += (h['protein_logged']  as int?) ?? 0;
+              }
+            } catch (_) {}
+          }
+          if (todayCal > 0 || todayPro > 0) {
+            final prefs = await UserPrefsService.load();
+            await Future.wait([
+              UserPrefsService.saveCalConsumed(
+                  (((prefs['cal_consumed'] as int?) ?? 0) - todayCal).clamp(0, 99999)),
+              UserPrefsService.saveProteinConsumed(
+                  (((prefs['protein_consumed'] as int?) ?? 0) - todayPro).clamp(0, 9999)),
+            ]);
+          }
+        } catch (_) {}
+        if (mounted) setState(() => _history.clear());
+      } else {
+        // API failed: macros are untouched, history unchanged -- just show error
+        ScaffoldMessenger.of(context).showSnackBar(const SnackBar(
+          content: Text('Could not clear history. Try again.',
+              style: TextStyle(fontFamily: 'DM Sans')),
+          backgroundColor: AppTheme.red,
+          behavior: SnackBarBehavior.floating,
+        ));
+      }
     }
   }
 
@@ -132,7 +306,7 @@ class _HistoryScreenState extends State<HistoryScreen> {
     final weekStart = monday.add(Duration(days: weekOffset * 7));
     final weekEnd = weekStart.add(const Duration(days: 6));
     final months = ['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'];
-    return '${months[weekStart.month - 1]} ${weekStart.day} – ${months[weekEnd.month - 1]} ${weekEnd.day}';
+    return '${months[weekStart.month - 1]} ${weekStart.day} - ${months[weekEnd.month - 1]} ${weekEnd.day}';
   }
 
   // ── Grouped history ───────────────────────────────────────────────────────
@@ -156,13 +330,31 @@ class _HistoryScreenState extends State<HistoryScreen> {
     return groups;
   }
 
-  int get _thisWeek => _history.where((h) {
-    try { return DateTime.now().difference(DateTime.parse(h['timestamp'] ?? '')).inDays <= 7; }
-    catch (_) { return false; }
-  }).length;
-  int get _totalRecipes => _history.fold(0, (s, h) => s + ((h['recipe_count'] as int?) ?? 1));
+  int get _thisWeek {
+    final now = DateTime.now();
+    final monday = now.subtract(Duration(days: now.weekday - 1));
+    final weekStart = DateTime(monday.year, monday.month, monday.day);
+    return _history.where((h) {
+      try {
+        final dt = DateTime.parse(h['timestamp'] ?? '').toLocal();
+        return !dt.isBefore(weekStart);
+      } catch (_) { return false; }
+    }).length;
+  }
 
-  // Human-friendly timestamp — Session E fix
+  // Count distinct dish names (recipe_name if set, else ingredient_names)
+  int get _uniqueDishes {
+    final names = <String>{};
+    for (final h in _history) {
+      final name = (h['recipe_name'] as String? ?? '').trim();
+      if (name.isNotEmpty) {
+        names.add(name.toLowerCase());
+      }
+    }
+    return names.length;
+  }
+
+  // Human-friendly timestamp -- Session E fix
   String _formatTimestamp(String ts, String group) {
     try {
       final dt = DateTime.parse(ts).toLocal();
@@ -408,6 +600,7 @@ class _HistoryScreenState extends State<HistoryScreen> {
                   recipeCount: recipeCount,
                   actionType: h['action_type'] as String? ?? 'cooked',
                   onTap: () => _openHistoryEntry(h),
+                  onLongPress: () => _showMacroEdit(h),
                   onCookAgain: (h['recipe_id'] as int? ?? -1) > 0
                       ? () => _openHistoryEntry(h)
                       : null,
@@ -425,11 +618,11 @@ class _HistoryScreenState extends State<HistoryScreen> {
     decoration: BoxDecoration(gradient: AppTheme.tealGradient, borderRadius: BorderRadius.circular(24),
         boxShadow: const [BoxShadow(color: Color(0x40043B3C), blurRadius: 20, offset: Offset(0, 8))]),
     child: Row(children: [
-      _StatCol(icon: LucideIcons.flame,        bg: AppTheme.scanGreen,    value: '$_thisWeek',         label: 'Sessions\nThis Week'),
+      _StatCol(icon: LucideIcons.flame,        bg: AppTheme.scanGreen,    value: '$_thisWeek',      label: 'This\nWeek'),
       _Divider(),
-      _StatCol(icon: LucideIcons.calendarDays, bg: AppTheme.typeBlue,     value: '${_history.length}', label: 'Total\nSessions'),
+      _StatCol(icon: LucideIcons.calendarDays, bg: AppTheme.typeBlue,     value: '${_history.length}', label: 'Total\nCooks'),
       _Divider(),
-      _StatCol(icon: LucideIcons.chefHat,      bg: AppTheme.browseYellow, value: '$_totalRecipes',     label: 'Recipes\nCooked'),
+      _StatCol(icon: LucideIcons.bookOpen,     bg: AppTheme.browseYellow, value: '$_uniqueDishes',  label: 'Unique\nDishes'),
     ]),
   );
 
@@ -441,7 +634,6 @@ class _HistoryScreenState extends State<HistoryScreen> {
     final totalPro = days.where((d) => !d.isFuture).fold(0, (s, d) => s + d.protein);
     final avgCal = activeDays > 0 ? (totalCal / activeDays).round() : 0;
     final avgPro = activeDays > 0 ? (totalPro / activeDays).round() : 0;
-    final maxCal = days.map((d) => d.cal).fold(1, (a, b) => a > b ? a : b);
 
     final canGoForward = _weekOffset < 0;
 
@@ -479,7 +671,7 @@ class _HistoryScreenState extends State<HistoryScreen> {
             style: TextStyle(color: AppTheme.textMuted(context), fontSize: 11,
                 fontFamily: 'DM Sans', fontWeight: FontWeight.w600)),
           const SizedBox(width: 8),
-          // Next week — disabled if current week
+          // Next week -- disabled if current week
           TapScale(
             onTap: canGoForward ? () => setState(() => _weekOffset++) : null,
             child: AnimatedOpacity(
@@ -498,11 +690,24 @@ class _HistoryScreenState extends State<HistoryScreen> {
           ),
         ]),
         const SizedBox(height: 20),
-        // Day columns Mon–Sun
+        // Day columns Mon-Sun
         Row(
           crossAxisAlignment: CrossAxisAlignment.end,
-          children: days.map((d) => Expanded(child: _dayColumn(d, maxCal))).toList(),
+          children: days.map((d) => Expanded(child: _dayColumn(d, _calGoal, _proteinGoal))).toList(),
         ),
+        const SizedBox(height: 12),
+        // Legend
+        Row(mainAxisAlignment: MainAxisAlignment.center, children: [
+          Container(width: 10, height: 10, decoration: BoxDecoration(
+            color: AppTheme.primaryDark, borderRadius: BorderRadius.circular(3))),
+          const SizedBox(width: 5),
+          Text('Calories', style: TextStyle(color: AppTheme.textMuted(context), fontSize: 10, fontFamily: 'DM Sans')),
+          const SizedBox(width: 14),
+          Container(width: 10, height: 10, decoration: BoxDecoration(
+            color: AppTheme.green, borderRadius: BorderRadius.circular(3))),
+          const SizedBox(width: 5),
+          Text('Protein', style: TextStyle(color: AppTheme.textMuted(context), fontSize: 10, fontFamily: 'DM Sans')),
+        ]),
         const SizedBox(height: 16),
         // Summary row
         Container(
@@ -523,47 +728,70 @@ class _HistoryScreenState extends State<HistoryScreen> {
     );
   }
 
-  Widget _dayColumn(_DayData d, int maxCal) {
-    const barMaxHeight = 72.0;
-    final barH = maxCal > 0 && d.cal > 0 ? (d.cal / maxCal * barMaxHeight).clamp(4.0, barMaxHeight) : 0.0;
-    final proH = _proteinGoal > 0 && d.protein > 0
-        ? (d.protein / _proteinGoal * barMaxHeight * 0.65).clamp(4.0, barMaxHeight) : 0.0;
+  Widget _dayColumn(_DayData d, int calGoal, int proteinGoal) {
+    const barMaxH = 80.0;
+    const barW    = 20.0;
+
+    // --- Calorie fill (teal), clamped at 100% for bar height
+    final calPct    = calGoal > 0 && d.cal > 0 ? (d.cal / calGoal).clamp(0.0, 1.0) : 0.0;
+    final calH      = calPct * barMaxH;
+
+    // --- Protein fill (green), clamped to calorie fill height so it sits inside
+    final proPct    = proteinGoal > 0 && d.protein > 0 ? (d.protein / proteinGoal).clamp(0.0, 1.0) : 0.0;
+    final proH      = (proPct * barMaxH).clamp(0.0, calH > 4 ? calH : 4.0);
+
+    // --- Overflow: calories > goal
+    final calOverflow   = calGoal > 0 && d.cal > calGoal;
+
+    final isActive  = d.sessionCount > 0 && !d.isFuture;
+    final baseAlpha = d.isToday ? 1.0 : (isActive ? 0.55 : 0.18);
 
     return Column(children: [
-      // Protein bar (green, smaller)
-      if (proH > 0)
+      // Bar container
+      Stack(alignment: Alignment.bottomCenter, children: [
+        // Track (bg)
         Container(
-          height: proH,
-          margin: const EdgeInsets.symmetric(horizontal: 2),
+          width: barW,
+          height: barMaxH,
           decoration: BoxDecoration(
-            color: d.isFuture ? Colors.transparent
-                : d.isToday ? AppTheme.green : AppTheme.green.withValues(alpha: 0.35),
-            borderRadius: const BorderRadius.vertical(top: Radius.circular(4)),
-          ),
-        )
-      else
-        SizedBox(height: barMaxHeight * 0.65), // ignore: prefer_const_constructors
-      // Calorie bar (teal)
-      if (barH > 0)
-        Container(
-          height: barH,
-          margin: const EdgeInsets.symmetric(horizontal: 2),
-          decoration: BoxDecoration(
-            color: d.isFuture ? AppTheme.border(context)
-                : d.isToday ? AppTheme.primaryDark : AppTheme.primaryDark.withValues(alpha: 0.3),
-            borderRadius: d.cal > 0 && proH == 0
-                ? BorderRadius.circular(4) : const BorderRadius.vertical(bottom: Radius.circular(4)),
-          ),
-        )
-      else
-        Container(
-          height: barMaxHeight,
-          margin: const EdgeInsets.symmetric(horizontal: 2),
-          decoration: BoxDecoration(
-            color: d.isFuture ? Colors.transparent : AppTheme.border(context).withValues(alpha: 0.4),
-            borderRadius: BorderRadius.circular(4),
+            color: AppTheme.border(context).withValues(alpha: d.isFuture ? 0.12 : 0.25),
+            borderRadius: BorderRadius.circular(10),
           ),
         ),
+        // Calorie fill (teal)
+        if (calH > 2)
+          ClipRRect(
+            borderRadius: BorderRadius.circular(10),
+            child: Container(
+              width: barW,
+              height: calH,
+              color: AppTheme.primaryDark.withValues(alpha: baseAlpha),
+            ),
+          ),
+        // Protein fill (green), overlaid inside
+        if (proH > 2)
+          ClipRRect(
+            borderRadius: BorderRadius.circular(10),
+            child: Container(
+              width: barW,
+              height: proH,
+              color: AppTheme.green.withValues(alpha: d.isToday ? 1.0 : (isActive ? 0.7 : 0.3)),
+            ),
+          ),
+        // Overflow indicator -- small red dot on top
+        if (calOverflow && !d.isFuture)
+          Positioned(
+            top: 0,
+            child: Container(
+              width: 7, height: 7,
+              decoration: BoxDecoration(
+                color: AppTheme.red,
+                shape: BoxShape.circle,
+                border: Border.all(color: AppTheme.cardBg(context), width: 1),
+              ),
+            ),
+          ),
+      ]),
       const SizedBox(height: 6),
       // Date number
       Text('${d.dateNum}', style: TextStyle(
@@ -668,14 +896,18 @@ class _HistoryRow extends StatelessWidget {
   final String displayName, time, actionType;
   final int recipeCount;
   final VoidCallback onTap;
+  final VoidCallback? onLongPress;
   final VoidCallback? onCookAgain;
   const _HistoryRow({required this.displayName, required this.time,
       required this.recipeCount, required this.actionType, required this.onTap,
-      this.onCookAgain});
+      this.onLongPress, this.onCookAgain});
 
   @override
-  Widget build(BuildContext context) => TapScale(
+  Widget build(BuildContext context) {
+    final imageUrl = recipeImageUrl(displayName);
+    return TapScale(
     onTap: onTap,
+    onLongPress: onLongPress,
     child: Container(
       margin: const EdgeInsets.only(bottom: 10),
       padding: const EdgeInsets.all(14),
@@ -683,9 +915,19 @@ class _HistoryRow extends StatelessWidget {
           border: Border.all(color: AppTheme.border(context)),
           boxShadow: const [BoxShadow(color: Color(0x06000000), blurRadius: 6, offset: Offset(0, 2))]),
       child: Row(children: [
-        Container(width: 42, height: 42,
-          decoration: BoxDecoration(gradient: AppTheme.tealGradient, borderRadius: BorderRadius.circular(12)),
-          child: const Icon(LucideIcons.chefHat, color: Colors.white, size: 18)),
+        // Food image thumbnail
+        ClipRRect(
+          borderRadius: BorderRadius.circular(12),
+          child: SizedBox(
+            width: 42, height: 42,
+            child: CachedNetworkImage(
+              imageUrl: imageUrl,
+              fit: BoxFit.cover,
+              placeholder: (_, __) => const _FoodPlaceholder(),
+              errorWidget: (_, __, ___) => const _FoodPlaceholder(),
+            ),
+          ),
+        ),
         const SizedBox(width: 12),
         Expanded(child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
           Text(
@@ -738,5 +980,15 @@ class _HistoryRow extends StatelessWidget {
         ]),
       ]),
     ),
+    );
+  }
+}
+
+class _FoodPlaceholder extends StatelessWidget {
+  const _FoodPlaceholder();
+  @override
+  Widget build(BuildContext context) => Container(
+    decoration: const BoxDecoration(gradient: AppTheme.tealGradient),
+    child: const Icon(LucideIcons.utensils, color: Colors.white, size: 16),
   );
 }

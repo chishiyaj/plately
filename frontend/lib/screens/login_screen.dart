@@ -142,7 +142,7 @@ class _LoginScreenState extends State<LoginScreen> {
                       borderRadius: BorderRadius.circular(12),
                     ),
                     child: Text(
-                      'This resets your Plately password only — your Google account is not affected.',
+                      'This resets your Plately password only -- your Google account is not affected.',
                       textAlign: TextAlign.center,
                       style: TextStyle(color: AppTheme.textMuted(ctx), fontSize: 12, fontFamily: 'DM Sans', height: 1.4),
                     ),
@@ -165,7 +165,7 @@ class _LoginScreenState extends State<LoginScreen> {
                   fontFamily: 'DM Sans', fontWeight: FontWeight.w800,
                 )),
                 const SizedBox(height: 6),
-                Text("Enter your email — we'll send a reset link instantly.", style: TextStyle(
+                Text("Enter your email -- we'll send a reset link instantly.", style: TextStyle(
                   color: AppTheme.textMuted(ctx), fontSize: 14, fontFamily: 'DM Sans',
                 )),
                 const SizedBox(height: 24),
@@ -274,7 +274,7 @@ class _LoginScreenState extends State<LoginScreen> {
                         child: Padding(
                           padding: const EdgeInsets.only(right: 16),
                           child: Icon(_passVisible ? LucideIcons.eyeOff : LucideIcons.eye,
-                              size: 18, color: AppTheme.mutedText),
+                              size: 18, color: AppTheme.textMuted(context)),
                         ),
                       ),
                     ),
@@ -409,8 +409,9 @@ class _BrandPanel extends StatelessWidget {
   }
 }
 
-// ── AUTH FIELD — dark-mode-aware ──────────────────────────────────────────────
-// Single implementation. Adapts fill color, text color, border color to theme.
+// ── AUTH FIELD -- dark-mode-aware ──────────────────────────────────────────────
+// Uses AppTheme.inputDecoration() -- single border source of truth, no Container wrapper.
+// Focus animation is handled via focusedBorder in AppTheme.inputDecoration().
 class _AuthField extends StatelessWidget {
   final TextEditingController ctrl;
   final String hint;
@@ -430,44 +431,21 @@ class _AuthField extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final dark = AppTheme.isDark(context);
-    return AnimatedContainer(
-      duration: const Duration(milliseconds: 200),
-      height: 54,
-      decoration: BoxDecoration(
-        color: focused
-            ? AppTheme.cardBg(context)
-            : dark ? AppTheme.darkCardAlt : const Color(0xFFF9F8F6),
-        borderRadius: BorderRadius.circular(14),
-        border: Border.all(
-          color: focused ? AppTheme.primaryDark : AppTheme.border(context),
-          width: focused ? 1.8 : 1.0,
-        ),
-        boxShadow: focused
-            ? const [BoxShadow(color: Color(0x14043B3C), blurRadius: 12, offset: Offset(0, 3))]
-            : [],
+    return TextField(
+      controller: ctrl, obscureText: obscure,
+      keyboardType: keyboard, focusNode: focusNode,
+      style: TextStyle(
+        fontSize: 14, fontFamily: 'DM Sans',
+        color: AppTheme.textPrimary(context),
+        fontWeight: FontWeight.w500,
       ),
-      child: TextField(
-        controller: ctrl, obscureText: obscure,
-        keyboardType: keyboard, focusNode: focusNode,
-        style: TextStyle(
-          fontSize: 14, fontFamily: 'DM Sans',
-          color: AppTheme.textPrimary(context),
-          fontWeight: FontWeight.w500,
-        ),
-        decoration: InputDecoration(
-          hintText: hint,
-          hintStyle: TextStyle(
-            color: AppTheme.textMuted(context),
-            fontSize: 14, fontFamily: 'DM Sans', fontWeight: FontWeight.w400,
-          ),
-          prefixIcon: Icon(icon, size: 17,
-              color: focused ? AppTheme.primaryDark : AppTheme.textMuted(context)),
-          suffixIcon: suffix,
-          contentPadding: const EdgeInsets.symmetric(vertical: 17),
-          border: InputBorder.none,
-          filled: false,
-        ),
+      decoration: AppTheme.inputDecoration(
+        context: context,
+        hint: hint,
+        prefixIcon: Icon(icon, size: 17,
+            color: focused ? AppTheme.primaryDark : AppTheme.textMuted(context)),
+        suffixIcon: suffix,
+        contentPadding: const EdgeInsets.symmetric(horizontal: 14, vertical: 17),
       ),
     );
   }

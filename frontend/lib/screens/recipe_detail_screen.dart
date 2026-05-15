@@ -12,6 +12,7 @@ import '../services/api_service.dart';
 import '../services/user_prefs_service.dart';
 import '../services/notification_service.dart';
 import 'pantry_screen.dart' show deductPantryIngredients;
+import 'shopping_list_screen.dart';
 import '../models/recipe.dart';
 import '../widgets/tap_scale.dart';
 import '../widgets/ai_tip_card.dart';
@@ -21,7 +22,13 @@ import 'ai_chat_screen.dart';
 
 class RecipeDetailScreen extends StatefulWidget {
   final Recipe recipe;
-  const RecipeDetailScreen({required this.recipe, super.key});
+  /// Ingredients the user scanned/typed -- used to pre-check matching items.
+  final List<String> userIngredients;
+  const RecipeDetailScreen({
+    required this.recipe,
+    this.userIngredients = const [],
+    super.key,
+  });
   @override
   State<RecipeDetailScreen> createState() => _RecipeDetailScreenState();
 }
@@ -34,7 +41,9 @@ class _RecipeDetailScreenState extends State<RecipeDetailScreen> with TickerProv
   Recipe? _fetchedRecipe;
   late final AnimationController _heroCtrl;
   late final Animation<double> _heroFade;
-  final Set<int> _checked = {};
+  final Set<int> _checked = {};      // tracks UNCHECKED (removed) ingredients
+  /// Per-ingredient quantity overrides (index -> custom amount string).
+  final Map<int, String> _customAmounts = {};
   double _servings = 1.0;
   static const _servingOptions = [0.5, 1.0, 1.5, 2.0, 3.0];
 
@@ -47,14 +56,14 @@ class _RecipeDetailScreenState extends State<RecipeDetailScreen> with TickerProv
   // Step completion: tap a step row to mark it done (separate from timer done)
   final Set<int> _completedSteps = {};
 
-  // The active recipe — either the passed-in one or the fully-fetched version
+  // The active recipe -- either the passed-in one or the fully-fetched version
   Recipe get r => _fetchedRecipe ?? widget.recipe;
 
   List<String> get _steps {
     final raw = r.instructions;
     // Try newline split first (preferred format from AI and DB)
     var parts = raw.split('\n').map((s) => s.trim()).where((s) => s.isNotEmpty).toList();
-    // If only one part came back, the AI used ". " as delimiter — split on numbered pattern
+    // If only one part came back, the AI used ". " as delimiter -- split on numbered pattern
     if (parts.length == 1) {
       parts = raw.split(RegExp(r'(?=\d+\. )')).map((s) => s.trim()).where((s) => s.isNotEmpty).toList();
     }
@@ -68,9 +77,33 @@ class _RecipeDetailScreenState extends State<RecipeDetailScreen> with TickerProv
     _heroFade = CurvedAnimation(parent: _heroCtrl, curve: Curves.easeOut);
     _heroCtrl.forward();
     _loadFavoriteState();
+    _loadLastServing();
     // Fetch full recipe data when coming from browse-mode (ingredients not pre-loaded)
     final needsFetch = widget.recipe.id > 0 && widget.recipe.ingredients.isEmpty;
-    if (needsFetch) _fetchFullRecipe();
+    if (needsFetch) {
+      _fetchFullRecipe().then((_) => _preCheckUserIngredients());
+    } else {
+      _preCheckUserIngredients();
+    }
+  }
+
+  /// Initialize checks: all ingredients start active (none in _checked/unchecked set).
+  /// If user brought ingredients, those are highlighted but still all start checked.
+  /// _checked here means UNCHECKED/removed -- empty set = all ingredients active.
+  void _preCheckUserIngredients() {
+    // Nothing to pre-remove -- all start active. User taps to uncheck what they don't have.
+    if (mounted) setState(() {});
+  }
+
+  Future<void> _loadLastServing() async {
+    if (widget.recipe.id <= 0) return; // AI recipes have negative ids -- skip
+    final saved = await UserPrefsService.getLastServing(widget.recipe.id);
+    if (saved != null && mounted) {
+      // Snap to the nearest option (or just set directly if it matches one)
+      final snapped = _servingOptions.reduce((a, b) =>
+          (a - saved).abs() < (b - saved).abs() ? a : b);
+      setState(() => _servings = snapped);
+    }
   }
 
   Future<void> _fetchFullRecipe() async {
@@ -101,7 +134,7 @@ class _RecipeDetailScreenState extends State<RecipeDetailScreen> with TickerProv
   Future<void> _toggleFavorite() async {
     if (r.id < 0) {
       ScaffoldMessenger.of(context).showSnackBar(SnackBar(
-        content: const Text('Cook this recipe first — AI recipes can be saved after cooking.',
+        content: const Text('Cook this recipe first -- AI recipes can be saved after cooking.',
             style: TextStyle(fontFamily: 'DM Sans')),
         backgroundColor: AppTheme.primaryDark, behavior: SnackBarBehavior.floating,
         shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
@@ -110,7 +143,7 @@ class _RecipeDetailScreenState extends State<RecipeDetailScreen> with TickerProv
       ));
       return;
     }
-    // Optimistic update — feels instant
+    // Optimistic update -- feels instant
     final optimistic = !_isFavorited;
     setState(() => _isFavorited = optimistic);
     final newState = await ApiService.toggleFavorite(r.id);
@@ -150,7 +183,7 @@ class _RecipeDetailScreenState extends State<RecipeDetailScreen> with TickerProv
         _timerDeadlines.remove(stepIdx);
         HapticFeedback.heavyImpact();
         setState(() => _timerSeconds[stepIdx] = 0);
-        NotificationService.notifyCookingDone('Timer done — Step ${stepIdx + 1}');
+        NotificationService.notifyStepTimerDone(stepIdx + 1);
       } else {
         setState(() => _timerSeconds[stepIdx] = remaining);
       }
@@ -220,7 +253,7 @@ class _RecipeDetailScreenState extends State<RecipeDetailScreen> with TickerProv
             color: Colors.white.withValues(alpha: 0.08),
             borderRadius: BorderRadius.circular(12),
           ),
-          child: Text('Cooked with Plately — know your macros before you cook.',
+          child: Text('Cooked with Plately -- know your macros before you cook.',
             style: TextStyle(color: Colors.white.withValues(alpha: 0.7), fontSize: 11, fontFamily: 'DM Sans')),
         ),
       ]),
@@ -296,10 +329,10 @@ class _RecipeDetailScreenState extends State<RecipeDetailScreen> with TickerProv
   }
 
   String _aiTip() {
-    if (r.tags.contains('Asian'))       return 'For best stir-fry results, use high heat and keep ingredients moving — this gives that restaurant-style wok hei flavour.';
-    if (r.tags.contains('Italian'))     return 'Salt your pasta water generously — it should taste like the sea. This is the only chance to season the pasta itself.';
-    if (r.tags.contains('High-Protein')) return 'Let protein rest 2–3 min after cooking — it stays juicier and retains more nutrients.';
-    return 'Prep all ingredients before you start cooking — it makes the whole process faster and less stressful.';
+    if (r.tags.contains('Asian'))       return 'For best stir-fry results, use high heat and keep ingredients moving -- this gives that restaurant-style wok hei flavour.';
+    if (r.tags.contains('Italian'))     return 'Salt your pasta water generously -- it should taste like the sea. This is the only chance to season the pasta itself.';
+    if (r.tags.contains('High-Protein')) return 'Let protein rest 2-3 min after cooking -- it stays juicier and retains more nutrients.';
+    return 'Prep all ingredients before you start cooking -- it makes the whole process faster and less stressful.';
   }
 
   Widget _buildSkeleton(BuildContext context) {
@@ -400,7 +433,7 @@ class _RecipeDetailScreenState extends State<RecipeDetailScreen> with TickerProv
               ),
             ),
           ),
-          // Offline badge (shown when detail fetch failed — using cached data)
+          // Offline badge (shown when detail fetch failed -- using cached data)
           if (_isOffline)
             Positioned(
               top: 52, right: 62,
@@ -420,7 +453,7 @@ class _RecipeDetailScreenState extends State<RecipeDetailScreen> with TickerProv
                 ]),
               ),
             ),
-          // Favorite button — only icon color changes, not container bg
+          // Favorite button -- only icon color changes, not container bg
           Positioned(
             top: 48, right: 16,
             child: TapScale(
@@ -459,6 +492,67 @@ class _RecipeDetailScreenState extends State<RecipeDetailScreen> with TickerProv
     );
   }
 
+  /// Returns the effective amount for ingredient [i] -- custom override or original scaled.
+  String _effectiveAmount(int i) {
+    if (_customAmounts.containsKey(i)) return _customAmounts[i]!;
+    return _scaleAmount(r.ingredients[i].amount, _servings);
+  }
+
+  /// Show a small dialog to let the user override the quantity of ingredient [i].
+  void _showQuantityEditDialog(int i, String currentAmount) {
+    final ctrl = TextEditingController(text: currentAmount);
+    showDialog(
+      context: context,
+      builder: (dCtx) => AlertDialog(
+        backgroundColor: AppTheme.cardBg(dCtx),
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(18)),
+        title: Text(
+          r.ingredients[i].name,
+          style: TextStyle(
+            color: AppTheme.textPrimary(dCtx),
+            fontFamily: 'DM Sans',
+            fontWeight: FontWeight.w800,
+            fontSize: 16,
+          ),
+        ),
+        content: TextField(
+          controller: ctrl,
+          autofocus: true,
+          style: TextStyle(color: AppTheme.textPrimary(dCtx), fontFamily: 'DM Sans'),
+          decoration: AppTheme.inputDecoration(
+            context: dCtx,
+            hint: 'e.g. 2, 100g, 1/2 cup',
+          ),
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(dCtx),
+            child: Text('Cancel',
+                style: TextStyle(color: AppTheme.textMuted(dCtx), fontFamily: 'DM Sans')),
+          ),
+          TextButton(
+            onPressed: () {
+              final v = ctrl.text.trim();
+              setState(() {
+                if (v.isEmpty || v == _scaleAmount(r.ingredients[i].amount, _servings)) {
+                  _customAmounts.remove(i);
+                } else {
+                  _customAmounts[i] = v;
+                }
+              });
+              Navigator.pop(dCtx);
+            },
+            child: const Text('Save',
+                style: TextStyle(
+                    color: AppTheme.primaryDark,
+                    fontFamily: 'DM Sans',
+                    fontWeight: FontWeight.w700)),
+          ),
+        ],
+      ),
+    );
+  }
+
   Widget _buildIngredients() {
     final ings = r.ingredients;
     if (ings.isEmpty) {
@@ -471,11 +565,10 @@ class _RecipeDetailScreenState extends State<RecipeDetailScreen> with TickerProv
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        // Helper label — clarifies tap behaviour and pre-calc macros
         Padding(
           padding: const EdgeInsets.only(bottom: 10),
           child: Text(
-            'Tap to check off — macros are pre-calculated for the full recipe.',
+            'Uncheck ingredients you don\'t have -- nutrition updates automatically.',
             style: TextStyle(
               color: AppTheme.textMuted(context),
               fontSize: 12,
@@ -485,14 +578,33 @@ class _RecipeDetailScreenState extends State<RecipeDetailScreen> with TickerProv
         ),
         ...List.generate(ings.length, (i) {
           final ing = ings[i];
-          final scaledAmount = _scaleAmount(ing.amount, _servings);
+          final effectiveAmt = _effectiveAmount(i);
+          final isCustom = _customAmounts.containsKey(i);
+          // isActive = ingredient is included in nutrition. _checked = removed set.
+          final isActive = !_checked.contains(i);
+          // hasUserIngredient = user scanned/typed this ingredient (highlight it)
+          final userNorm = widget.userIngredients.map((s) => s.trim().toLowerCase()).toSet();
+          final isUserIng = userNorm.isNotEmpty &&
+              userNorm.any((u) {
+                final n = ing.name.toLowerCase();
+                return u == n || u.contains(n) || n.contains(u);
+              });
           return TapScale(
-            onTap: () => setState(() => _checked.contains(i) ? _checked.remove(i) : _checked.add(i)),
+            onTap: () => setState(() =>
+                _checked.contains(i) ? _checked.remove(i) : _checked.add(i)),
             child: Container(
               margin: const EdgeInsets.only(bottom: 8),
               padding: const EdgeInsets.all(14),
               decoration: BoxDecoration(
-                color: AppTheme.cardBg(context), borderRadius: BorderRadius.circular(14),
+                color: !isActive
+                    ? AppTheme.cardAltBg(context)
+                    : isUserIng
+                        ? AppTheme.green.withValues(alpha: 0.06)
+                        : AppTheme.cardBg(context),
+                borderRadius: BorderRadius.circular(14),
+                border: isUserIng && isActive
+                    ? Border.all(color: AppTheme.green.withValues(alpha: 0.3))
+                    : null,
                 boxShadow: const [BoxShadow(color: Color(0x06000000), blurRadius: 8, offset: Offset(0, 2))],
               ),
               child: Row(children: [
@@ -500,29 +612,82 @@ class _RecipeDetailScreenState extends State<RecipeDetailScreen> with TickerProv
                   duration: 200.ms,
                   width: 22, height: 22,
                   decoration: BoxDecoration(
-                    color: _checked.contains(i) ? AppTheme.green : Colors.transparent,
+                    color: isActive ? AppTheme.green : Colors.transparent,
                     borderRadius: BorderRadius.circular(6),
                     border: Border.all(
-                        color: _checked.contains(i) ? AppTheme.green : AppTheme.border(context), width: 1.5),
+                        color: isActive ? AppTheme.green : AppTheme.border(context), width: 1.5),
                   ),
-                  child: _checked.contains(i)
+                  child: isActive
                       ? const Icon(LucideIcons.check, color: Colors.white, size: 13) : null,
                 ),
                 const SizedBox(width: 12),
                 Expanded(child: Text(ing.name, style: TextStyle(
-                  color: _checked.contains(i) ? AppTheme.textMuted(context) : AppTheme.textPrimary(context),
+                  color: isActive ? AppTheme.textPrimary(context) : AppTheme.textMuted(context),
                   fontSize: 14, fontFamily: 'DM Sans', fontWeight: FontWeight.w500,
-                  decoration: _checked.contains(i) ? TextDecoration.lineThrough : null,
+                  decoration: !isActive ? TextDecoration.lineThrough : null,
                 ))),
-                Text(scaledAmount, style: TextStyle(
-                  color: _servings != 1.0 ? AppTheme.primaryDark : AppTheme.textMuted(context),
-                  fontSize: 13, fontFamily: 'DM Sans',
-                  fontWeight: _servings != 1.0 ? FontWeight.w700 : FontWeight.w500,
-                )),
+                Row(mainAxisSize: MainAxisSize.min, children: [
+                  Text(effectiveAmt, style: TextStyle(
+                    color: isCustom
+                        ? AppTheme.orange
+                        : (_servings != 1.0 ? AppTheme.primaryDark : AppTheme.textMuted(context)),
+                    fontSize: 13, fontFamily: 'DM Sans',
+                    fontWeight: (isCustom || _servings != 1.0) ? FontWeight.w700 : FontWeight.w500,
+                  )),
+                  const SizedBox(width: 6),
+                  TapScale(
+                    onTap: () => _showQuantityEditDialog(i, effectiveAmt),
+                    child: Container(
+                      width: 26, height: 26,
+                      decoration: BoxDecoration(
+                        color: isCustom
+                            ? AppTheme.orange.withValues(alpha: 0.12)
+                            : AppTheme.cardAltBg(context),
+                        borderRadius: BorderRadius.circular(7),
+                        border: Border.all(
+                          color: isCustom
+                              ? AppTheme.orange.withValues(alpha: 0.4)
+                              : AppTheme.border(context),
+                        ),
+                      ),
+                      child: Icon(LucideIcons.pencil, size: 11,
+                          color: isCustom ? AppTheme.orange : AppTheme.textMuted(context)),
+                    ),
+                  ),
+                ]),
               ]),
             ).animate(delay: (i * 40).ms).fadeIn(duration: 300.ms).slideX(begin: 0.04),
           );
         }),
+        const SizedBox(height: 16),
+        TapScale(
+          onTap: () => Navigator.push(
+            context,
+            AppTheme.slideUp(ShoppingListScreen(recipes: [r])),
+          ),
+          child: Container(
+            width: double.infinity,
+            padding: const EdgeInsets.symmetric(vertical: 14),
+            decoration: BoxDecoration(
+              color: AppTheme.primaryDark.withValues(alpha: AppTheme.isDark(context) ? 0.35 : 0.07),
+              borderRadius: BorderRadius.circular(14),
+              border: Border.all(
+                color: AppTheme.primaryDark.withValues(alpha: AppTheme.isDark(context) ? 0.55 : 0.18),
+              ),
+            ),
+            child: Row(mainAxisAlignment: MainAxisAlignment.center, children: [
+              Icon(LucideIcons.shoppingCart, size: 16,
+                  color: AppTheme.isDark(context) ? AppTheme.darkTextPrimary : AppTheme.primaryDark),
+              const SizedBox(width: 8),
+              Text('Add to Shopping List',
+                style: TextStyle(
+                  color: AppTheme.isDark(context) ? AppTheme.darkTextPrimary : AppTheme.primaryDark,
+                  fontSize: 14, fontFamily: 'DM Sans', fontWeight: FontWeight.w700,
+                ),
+              ),
+            ]),
+          ),
+        ).animate().fadeIn(duration: 300.ms, delay: 100.ms),
       ],
     );
   }
@@ -553,11 +718,26 @@ class _RecipeDetailScreenState extends State<RecipeDetailScreen> with TickerProv
     return '$formatted${unit.isNotEmpty ? ' $unit' : ''}';
   }
 
+  /// Extract numeric quantity from an amount string for proportional nutrition calc.
+  double _parseIngredientQty(String amount) {
+    if (amount.isEmpty || amount == 'to taste') return 1.0;
+    final match = RegExp(r'^([\d]+(?:[./][\d]+)?)\s*').firstMatch(amount.trim());
+    if (match == null) return 1.0;
+    final raw = match.group(1)!;
+    if (raw.contains('/')) {
+      final parts = raw.split('/');
+      final n = double.tryParse(parts[0]) ?? 1.0;
+      final d = double.tryParse(parts[1]) ?? 1.0;
+      return d == 0 ? 1.0 : n / d;
+    }
+    return double.tryParse(raw) ?? 1.0;
+  }
+
   Widget _buildSteps() {
     final steps = _steps;
     return Column(
       children: [
-        // Tappable hint — disappears once user taps first step
+        // Tappable hint -- disappears once user taps first step
         if (_completedSteps.isEmpty)
           Padding(
             padding: const EdgeInsets.only(bottom: 12),
@@ -614,34 +794,39 @@ class _RecipeDetailScreenState extends State<RecipeDetailScreen> with TickerProv
                     onTap: () {
                       if (timerRunning) { _stopTimer(i); } else { _startTimer(i, timerSecs); }
                     },
-                    child: AnimatedContainer(
-                      duration: const Duration(milliseconds: 200),
-                      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
-                      decoration: BoxDecoration(
-                        color: timerRunning
-                            ? (timerDone ? AppTheme.green : AppTheme.orange.withValues(alpha: 0.15))
-                            : AppTheme.primaryDark.withValues(alpha: 0.08),
-                        borderRadius: BorderRadius.circular(10),
-                        border: Border.all(
-                          color: timerRunning ? (timerDone ? AppTheme.green : AppTheme.orange) : AppTheme.primaryDark.withValues(alpha: 0.2),
-                        ),
-                      ),
-                      child: Row(mainAxisSize: MainAxisSize.min, children: [
-                        Icon(
-                          timerDone ? LucideIcons.checkCheck : (timerRunning ? LucideIcons.pause : LucideIcons.timer),
-                          size: 13,
-                          color: timerDone ? Colors.white : (timerRunning ? AppTheme.orange : AppTheme.primaryDark),
-                        ),
-                        const SizedBox(width: 5),
-                        Text(
-                          timerDone ? 'Done!' : (timerRunning ? _fmtTimer(timerRemaining) : _fmtTimer(timerSecs)),
-                          style: TextStyle(
-                            color: timerDone ? Colors.white : (timerRunning ? AppTheme.orange : AppTheme.primaryDark),
-                            fontSize: 11, fontFamily: 'DM Sans', fontWeight: FontWeight.w700,
+                    child: Builder(builder: (ctx) {
+                      final isDark = AppTheme.isDark(ctx);
+                      return AnimatedContainer(
+                        duration: const Duration(milliseconds: 200),
+                        padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+                        decoration: BoxDecoration(
+                          color: timerRunning
+                              ? (timerDone ? AppTheme.green : AppTheme.orange.withValues(alpha: 0.15))
+                              : (isDark ? AppTheme.primaryDark.withValues(alpha: 0.45) : AppTheme.primaryDark.withValues(alpha: 0.08)),
+                          borderRadius: BorderRadius.circular(10),
+                          border: Border.all(
+                            color: timerRunning
+                                ? (timerDone ? AppTheme.green : AppTheme.orange)
+                                : (isDark ? AppTheme.primaryDark.withValues(alpha: 0.8) : AppTheme.primaryDark.withValues(alpha: 0.2)),
                           ),
                         ),
-                      ]),
-                    ),
+                        child: Row(mainAxisSize: MainAxisSize.min, children: [
+                          Icon(
+                            timerDone ? LucideIcons.checkCheck : (timerRunning ? LucideIcons.pause : LucideIcons.timer),
+                            size: 13,
+                            color: timerDone ? Colors.white : (timerRunning ? AppTheme.orange : (isDark ? AppTheme.darkTextPrimary : AppTheme.primaryDark)),
+                          ),
+                          const SizedBox(width: 5),
+                          Text(
+                            timerDone ? 'Done!' : (timerRunning ? _fmtTimer(timerRemaining) : _fmtTimer(timerSecs)),
+                            style: TextStyle(
+                              color: timerDone ? Colors.white : (timerRunning ? AppTheme.orange : (isDark ? AppTheme.darkTextPrimary : AppTheme.primaryDark)),
+                              fontSize: 11, fontFamily: 'DM Sans', fontWeight: FontWeight.w700,
+                            ),
+                          ),
+                        ]),
+                      );
+                    }),
                   ),
                 ],
               ]),
@@ -654,11 +839,47 @@ class _RecipeDetailScreenState extends State<RecipeDetailScreen> with TickerProv
   }
 
   Widget _buildNutrition() {
-    // Scale all macros by serving multiplier
-    final cal  = (r.calories * _servings).round();
-    final pro  = (r.protein  * _servings).round();
-    final carb = (r.carbs    * _servings).round();
-    final fat  = (r.fat      * _servings).round();
+    // Base macros scaled by servings
+    final baseCal  = r.calories * _servings;
+    final basePro  = r.protein  * _servings;
+    final baseCarb = r.carbs    * _servings;
+    final baseFat  = r.fat      * _servings;
+
+    // If ingredients are loaded and some have been unchecked, scale proportionally.
+    // _checked = the REMOVED/unchecked set. Empty = all active = full nutrition.
+    double adjustFactor = 1.0;
+    final ings = r.ingredients;
+    if (ings.isNotEmpty && (_checked.isNotEmpty || _customAmounts.isNotEmpty)) {
+      double totalOriginal = 0;
+      double totalActive   = 0;
+      for (int i = 0; i < ings.length; i++) {
+        final origAmt = _parseIngredientQty(ings[i].amount) * _servings;
+        final origContrib = origAmt > 0 ? origAmt : 1.0;
+        totalOriginal += origContrib;
+
+        // Skip unchecked (removed) ingredients
+        if (_checked.contains(i)) continue;
+
+        // Use custom amount if set, otherwise original scaled
+        final customStr = _customAmounts[i];
+        if (customStr != null) {
+          final customQty = _parseIngredientQty(customStr);
+          totalActive += customQty > 0 ? customQty : 1.0;
+        } else {
+          totalActive += origContrib;
+        }
+      }
+      adjustFactor = totalOriginal > 0 ? (totalActive / totalOriginal) : 1.0;
+    }
+
+    // AE-6: clamp minimum to 0.1 so fully-unchecked state doesn't show all zeros
+    adjustFactor = adjustFactor.clamp(0.1, 5.0);
+    final cal  = (baseCal  * adjustFactor).round();
+    final pro  = (basePro  * adjustFactor).round();
+    final carb = (baseCarb * adjustFactor).round();
+    final fat  = (baseFat  * adjustFactor).round();
+
+    final isAdjusted = (adjustFactor - 1.0).abs() > 0.01;
 
     return Container(
       padding: const EdgeInsets.all(18),
@@ -724,9 +945,28 @@ class _RecipeDetailScreenState extends State<RecipeDetailScreen> with TickerProv
               borderRadius: BorderRadius.circular(10),
             ),
             child: Text(
-              'Scaled to ${_servings == 0.5 ? "½" : _servings.toString().replaceAll(".0", "")} serving${_servings == 0.5 ? "" : "s"} — ingredient amounts adjusted below.',
+              'Scaled to ${_servings == 0.5 ? "half" : _servings.toString().replaceAll(".0", "")} serving${_servings == 0.5 ? "" : "s"} -- ingredient amounts adjusted.',
               style: const TextStyle(
                 color: Color(0xFF2E6B29), fontSize: 11,
+                fontFamily: 'DM Sans', fontWeight: FontWeight.w500,
+              ),
+              textAlign: TextAlign.center,
+            ),
+          ),
+        ],
+        if (isAdjusted && _servings == 1.0) ...[
+          const SizedBox(height: 10),
+          Container(
+            width: double.infinity, padding: const EdgeInsets.all(10),
+            decoration: BoxDecoration(
+              color: AppTheme.orange.withValues(alpha: 0.08),
+              borderRadius: BorderRadius.circular(10),
+              border: Border.all(color: AppTheme.orange.withValues(alpha: 0.2)),
+            ),
+            child: const Text(
+              'Macros adjusted for your ingredient changes.',
+              style: TextStyle(
+                color: AppTheme.orange, fontSize: 11,
                 fontFamily: 'DM Sans', fontWeight: FontWeight.w500,
               ),
               textAlign: TextAlign.center,
@@ -798,16 +1038,23 @@ class _RecipeDetailScreenState extends State<RecipeDetailScreen> with TickerProv
       UserPrefsService.saveCalConsumed(calNow + scaledCal),
       UserPrefsService.saveProteinConsumed(proteinNow + scaledPro),
       UserPrefsService.incrementRecipeCount(),
+      // AE-12: incrementStreak already writes lastCookDate atomically -- don't call
+      // saveLastCookDate() separately in the same Future.wait (race condition).
       UserPrefsService.incrementStreak(),
-      UserPrefsService.saveLastCookDate(),
       UserPrefsService.saveLastCookedName(r.name),
-      NotificationService.notifyCookingDone(
-        r.name,
-        cal:      scaledCal,
-        protein:  scaledPro,
-        userName: (prefs['name'] as String?) ?? 'chef',
+      if (r.id > 0) UserPrefsService.saveLastServing(r.id, _servings),
+      if ((prefs['notif_cal'] as bool?) != false)
+        NotificationService.notifyCookingDone(
+          r.name,
+          cal:      scaledCal,
+          protein:  scaledPro,
+          streak:   ((prefs['streak'] as int?) ?? 0) + 1,
+          userName: (prefs['name'] as String?) ?? 'chef',
+        ),
+      deductPantryIngredients(
+        r.ingredients.map((i) => {'name': i.name, 'amount': i.amount}).toList(),
+        servings: _servings,
       ),
-      deductPantryIngredients(r.ingredients.map((i) => i.name).toList()),
     ]);
 
     if (!mounted) return;
@@ -834,7 +1081,7 @@ class _RecipeDetailScreenState extends State<RecipeDetailScreen> with TickerProv
     await Future.delayed(const Duration(milliseconds: 1200));
     if (!mounted) return;
     _showShareSheet(cal: scaledCal, protein: scaledPro, streak: currentStreak);
-    // Navigator.pop is now inside the share sheet's Done button — user controls dismissal
+    // Navigator.pop is now inside the share sheet's Done button -- user controls dismissal
   }
 
   // ── Post-cook share sheet ─────────────────────────────────────────────────
@@ -1039,6 +1286,7 @@ class _ShareBottomSheetState extends State<_ShareBottomSheet> {
             calories: widget.calories,
             protein: widget.protein,
             streak: widget.streak,
+            imageUrl: recipeImageUrl(widget.dishName),
           ),
         ),
         pixelRatio: 3.0,
@@ -1093,6 +1341,7 @@ class _ShareBottomSheetState extends State<_ShareBottomSheet> {
               calories: widget.calories,
               protein: widget.protein,
               streak: widget.streak,
+              imageUrl: recipeImageUrl(widget.dishName),
             ),
           ),
           const SizedBox(height: 24),

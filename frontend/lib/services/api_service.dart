@@ -58,7 +58,7 @@ class ApiService {
     }
   }
 
-  // ── SCAN ──────────────────────────────────────────────────────────────────
+  // -- SCAN ------------------------------------------------------------------
   static Future<ScanResult> scanImage(String base64Image) async {
     final res = await _post('/api/scan', {'image_base64': base64Image},
         timeout: const Duration(seconds: 40));
@@ -77,26 +77,27 @@ class ApiService {
     }
   }
 
-  // ── RECIPES ───────────────────────────────────────────────────────────────
+  // -- RECIPES ---------------------------------------------------------------
   // Returns RecipesResult which carries both the list and an optional ai_note.
   // Throws RecipeApiException when backend status == error.
   static Future<RecipesResult> getRecipesResult(List<String> ingredients) async {
-    Map<String, dynamic> prefs = {};
-    if (ingredients.isNotEmpty) {
-      final p = await UserPrefsService.load();
-      prefs = {
-        'goal':         p['goal']         ?? 'maintain',
-        'cal_goal':     p['cal_goal']     ?? 2200,
-        'protein_goal': p['protein_goal'] ?? 120,
-        'pref_veg':     p['pref_veg']     ?? false,
-        'pref_gluten':  p['pref_gluten']  ?? false,
-        'pref_dairy':   p['pref_dairy']   ?? false,
-        'pref_hipro':   p['pref_hipro']   ?? true,
-      };
-    }
+    // Always send prefs -- both browse mode and ingredient mode need them.
+    // Browse mode uses prefs to filter Vegetarian + sort High-Protein.
+    // Ingredient mode uses prefs for AI recipe generation constraints.
+    final p = await UserPrefsService.load();
+    final prefs = <String, dynamic>{
+      'goal':         p['goal']         ?? 'maintain',
+      'cal_goal':     p['cal_goal']     ?? 2200,
+      'protein_goal': p['protein_goal'] ?? 120,
+      'pref_veg':     p['pref_veg']     ?? false,
+      'pref_gluten':  p['pref_gluten']  ?? false,
+      'pref_dairy':   p['pref_dairy']   ?? false,
+      'pref_hipro':   p['pref_hipro']   ?? true,
+    };
+
     final res = await _post('/api/recipes', {
       'ingredients': ingredients,
-      if (prefs.isNotEmpty) 'prefs': prefs,
+      'prefs': prefs,
     }, timeout: const Duration(seconds: 40));
 
     if (res == null) {
@@ -119,7 +120,7 @@ class ApiService {
     return RecipesResult(recipes: list, aiNote: aiNote);
   }
 
-  // Legacy wrapper — returns plain list (offline fallback callers)
+  // Legacy wrapper -- returns plain list (offline fallback callers)
   static Future<List<Recipe>> getRecipes(List<String> ingredients) async {
     try {
       final result = await getRecipesResult(ingredients);
@@ -129,7 +130,7 @@ class ApiService {
     }
   }
 
-  // ── RECIPE DETAIL ─────────────────────────────────────────────────────────
+  // -- RECIPE DETAIL ---------------------------------------------------------
   static Future<Recipe?> getRecipeDetail(int id) async {
     final res = await _get('/api/recipe/$id');
     if (res == null) return null;
@@ -142,7 +143,7 @@ class ApiService {
     }
   }
 
-  // ── CHAT ──────────────────────────────────────────────────────────────────
+  // -- CHAT ------------------------------------------------------------------
   // Returns reply text. On error returns string prefixed 'ERROR:' for red bubble.
   static Future<String> sendChat(String message,
       {List<Map<String, String>>? history}) async {
@@ -167,7 +168,7 @@ class ApiService {
     }
   }
 
-  // ── GOALS ─────────────────────────────────────────────────────────────────
+  // -- GOALS -----------------------------------------------------------------
   static Future<Map<String, dynamic>?> setGoals({
     required double weight,
     required double height,
@@ -189,7 +190,7 @@ class ApiService {
     }
   }
 
-  // ── FAVORITES ─────────────────────────────────────────────────────────────
+  // -- FAVORITES -------------------------------------------------------------
   static Future<List<Recipe>> getFavorites() async {
     final res = await _get('/api/favorites?user_id=$_uid');
     if (res == null) return [];
@@ -231,7 +232,7 @@ class ApiService {
     }
   }
 
-  // ── HISTORY ───────────────────────────────────────────────────────────────
+  // -- HISTORY ---------------------------------------------------------------
   static Future<List<Map<String, dynamic>>> getHistory() async {
     final res = await _get('/api/history?user_id=$_uid');
     if (res == null) return [];
@@ -254,9 +255,10 @@ class ApiService {
       if (data['status'] == 'ok') {
         final d = data['data'] as Map<String, dynamic>;
         return {
-          'total_sessions':     d['total_sessions']     as int? ?? 0,
-          'total_recipes':      d['total_recipes']      as int? ?? 0,
-          'sessions_this_week': d['sessions_this_week'] as int? ?? 0,
+          'total_sessions':       d['total_sessions']       as int? ?? 0,
+          'total_recipes':        d['total_recipes']        as int? ?? 0,
+          'distinct_recipe_count': d['distinct_recipe_count'] as int? ?? 0,
+          'sessions_this_week':   d['sessions_this_week']   as int? ?? 0,
         };
       }
       return {};
@@ -279,12 +281,34 @@ class ApiService {
     return {'total_calories': 0, 'total_protein': 0, 'recipes': <String>[], 'meal_count': 0};
   }
 
-  static Future<void> deleteHistory(int id) async {
-    await _delete('/api/history/$id?user_id=$_uid');
+  static Future<bool> deleteHistory(int id) async {
+    final res = await _delete('/api/history/$id?user_id=$_uid');
+    if (res == null) return false;
+    try {
+      final data = jsonDecode(res.body) as Map<String, dynamic>;
+      return data['status'] == 'ok';
+    } catch (_) {
+      return false;
+    }
   }
 
-  static Future<void> clearHistory() async {
-    await _delete('/api/history?user_id=$_uid');
+  static Future<bool> clearHistory() async {
+    final res = await _delete('/api/history?user_id=$_uid');
+    if (res == null) return false;
+    try {
+      final data = jsonDecode(res.body) as Map<String, dynamic>;
+      return data['status'] == 'ok';
+    } catch (_) {
+      return false;
+    }
+  }
+
+  /// Wipes all server-side data for the current user (called on account deletion).
+  static Future<void> deleteAllUserData() async {
+    await Future.wait([
+      _delete('/api/history?user_id=$_uid'),
+      _delete('/api/favorites/all?user_id=$_uid'),
+    ]);
   }
 
   static Future<void> logHistory({
@@ -308,12 +332,12 @@ class ApiService {
     });
   }
 
-  // ── KEEP-ALIVE PING ───────────────────────────────────────────────────────
+  // -- KEEP-ALIVE PING -------------------------------------------------------
   static Future<void> ping() async {
     await _get('/api/health', timeout: const Duration(seconds: 10));
   }
 
-  // ── ONLINE CHECK ─────────────────────────────────────────────────────────
+  // -- ONLINE CHECK ----------------------------------------------------------
   /// Returns true if the backend is reachable. Times out after 3 seconds.
   static Future<bool> isOnline() async {
     final res = await _get('/api/health', timeout: const Duration(seconds: 3));
@@ -327,7 +351,7 @@ class ApiService {
   }
 }
 
-// ── Value types ───────────────────────────────────────────────────────────────
+// -- Value types --------------------------------------------------------------
 
 class ScanResult {
   final List<String> ingredients;
@@ -338,7 +362,7 @@ class ScanResult {
 
 class RecipesResult {
   final List<Recipe> recipes;
-  final String? aiNote;   // e.g. "AI busy — showing saved recipes instead"
+  final String? aiNote; // e.g. "AI busy -- showing saved recipes instead"
   final bool offline;
   const RecipesResult({required this.recipes, this.aiNote, this.offline = false});
 }

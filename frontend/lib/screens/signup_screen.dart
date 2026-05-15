@@ -95,7 +95,24 @@ class _SignupScreenState extends State<SignupScreen> {
         child: SingleChildScrollView(
           padding: const EdgeInsets.fromLTRB(28, 0, 28, 28),
           child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-            const SizedBox(height: 48),
+            const SizedBox(height: 16),
+            // Back button
+            if (Navigator.canPop(context))
+              TapScale(
+                onTap: () => Navigator.pop(context),
+                child: Container(
+                  width: 42, height: 42,
+                  decoration: BoxDecoration(
+                    color: AppTheme.cardBg(context),
+                    shape: BoxShape.circle,
+                    border: Border.all(color: AppTheme.border(context)),
+                  ),
+                  child: Icon(LucideIcons.arrowLeft, color: AppTheme.textPrimary(context), size: 18),
+                ),
+              )
+            else
+              const SizedBox(height: 32),
+            const SizedBox(height: 16),
             PlatelyLogo(
               theme: AppTheme.isDark(context) ? PlatelyLogoTheme.onDark : PlatelyLogoTheme.onLight,
               iconSize: 44, wordmarkSize: 22,
@@ -126,7 +143,7 @@ class _SignupScreenState extends State<SignupScreen> {
                   child: TapScale(
                     onTap: () => setState(() => _passVisible = !_passVisible),
                     child: Icon(_passVisible ? LucideIcons.eyeOff : LucideIcons.eye,
-                        size: 18, color: AppTheme.mutedText),
+                        size: 18, color: AppTheme.textMuted(context)),
                   ),
                 ),
               ),
@@ -141,7 +158,7 @@ class _SignupScreenState extends State<SignupScreen> {
                   child: TapScale(
                     onTap: () => setState(() => _confirmVisible = !_confirmVisible),
                     child: Icon(_confirmVisible ? LucideIcons.eyeOff : LucideIcons.eye,
-                        size: 18, color: AppTheme.mutedText),
+                        size: 18, color: AppTheme.textMuted(context)),
                   ),
                 ),
                 onChanged: (_) {
@@ -160,7 +177,7 @@ class _SignupScreenState extends State<SignupScreen> {
                   Icon(LucideIcons.info, size: 14, color: Color(0xFF2E6B29)),
                   SizedBox(width: 8),
                   Expanded(child: Text(
-                    'This password is for Plately only — it\'s separate from your email account password.',
+                    'This password is for Plately only -- it\'s separate from your email account password.',
                     style: TextStyle(color: Color(0xFF2E6B29), fontSize: 12,
                         fontFamily: 'DM Sans', height: 1.4),
                   )),
@@ -268,7 +285,8 @@ class _SignupScreenState extends State<SignupScreen> {
     );
   }
 
-  // ── Field builder — dark-mode-aware ─────────────────────────────────────────
+  // ── Field builder -- dark-mode-aware ─────────────────────────────────────────
+  // Uses AppTheme.inputDecoration() -- single border, fills correctly in both modes.
   Widget _field({
     required TextEditingController ctrl,
     required String hint,
@@ -281,37 +299,28 @@ class _SignupScreenState extends State<SignupScreen> {
   }) => Column(
     crossAxisAlignment: CrossAxisAlignment.start,
     children: [
-      Container(
-        height: 56,
-        decoration: BoxDecoration(
-          color: AppTheme.cardBg(context),
-          borderRadius: BorderRadius.circular(16),
-          border: Border.all(color: errorText != null ? AppTheme.red : AppTheme.border(context)),
-          boxShadow: const [BoxShadow(color: Color(0x06000000), blurRadius: 8, offset: Offset(0, 2))],
-        ),
-        child: TextField(
-          controller: ctrl, obscureText: obscure, keyboardType: keyboard,
-          onChanged: onChanged,
-          style: TextStyle(fontSize: 15, fontFamily: 'DM Sans', color: AppTheme.textPrimary(context)),
-          decoration: InputDecoration(
-            hintText: hint,
-            hintStyle: TextStyle(color: AppTheme.textMuted(context), fontSize: 14, fontFamily: 'DM Sans'),
-            prefixIcon: Icon(icon, size: 18, color: AppTheme.textMuted(context)),
-            suffixIcon: suffix != null
-                ? Padding(padding: const EdgeInsets.only(right: 14), child: suffix)
-                : null,
-            contentPadding: const EdgeInsets.symmetric(vertical: 18),
-            border: InputBorder.none,
-            filled: false,
+      TextField(
+        controller: ctrl, obscureText: obscure, keyboardType: keyboard,
+        onChanged: onChanged,
+        style: TextStyle(fontSize: 15, fontFamily: 'DM Sans', color: AppTheme.textPrimary(context)),
+        decoration: AppTheme.inputDecoration(
+          context: context,
+          hint: hint,
+          prefixIcon: Icon(icon, size: 18, color: AppTheme.textMuted(context)),
+          suffixIcon: suffix != null
+              ? Padding(padding: const EdgeInsets.only(right: 14), child: suffix)
+              : null,
+          contentPadding: const EdgeInsets.symmetric(horizontal: 14, vertical: 18),
+        ).copyWith(
+          errorText: errorText,
+          enabledBorder: OutlineInputBorder(
+            borderRadius: BorderRadius.circular(12),
+            borderSide: BorderSide(
+              color: errorText != null ? AppTheme.red : AppTheme.border(context),
+            ),
           ),
         ),
       ),
-      if (errorText != null)
-        Padding(
-          padding: const EdgeInsets.only(top: 6, left: 4),
-          child: Text(errorText, style: const TextStyle(
-            color: AppTheme.red, fontSize: 12, fontFamily: 'DM Sans')),
-        ),
     ],
   );
 }

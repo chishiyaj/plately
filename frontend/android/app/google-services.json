@@ -14,6 +14,14 @@
       },
       "oauth_client": [
         {
+          "client_id": "97643516725-34jg8u7erlojtsu8kb3j8nen6qg9dvtc.apps.googleusercontent.com",
+          "client_type": 1,
+          "android_info": {
+            "package_name": "com.plately.app",
+            "certificate_hash": "1d7dc6ddceaa20a55724d9893862a4a4124b48d1"
+          }
+        },
+        {
           "client_id": "97643516725-es8lc3s2p271ljgrdoe7os75bvdshgep.apps.googleusercontent.com",
           "client_type": 1,
           "android_info": {

@@ -9,12 +9,13 @@ import 'package:permission_handler/permission_handler.dart';
 import '../theme/app_theme.dart';
 import '../widgets/tap_scale.dart';
 import '../services/api_service.dart';
+import 'pantry_screen.dart' show getPantryItems;
 import 'recipe_results_screen.dart';
 
 // ─── IngredientEntryScreen ────────────────────────────────────────────────────
 // THE unified ingredient input. One screen, two modes via pill switcher.
-// Mode A — CAMERA: live viewfinder → shutter → AI scan → ingredient chips
-// Mode B — TYPE:   keyboard-first, comma-separated, instant add
+// Mode A -- CAMERA: live viewfinder → shutter → AI scan → ingredient chips
+// Mode B -- TYPE:   keyboard-first, comma-separated, instant add
 // UX: Hick's Law (1 entry point), Fitts's Law (big shutter), Jakob's Law
 
 enum _Mode { camera, type }
@@ -47,6 +48,9 @@ class _IngredientEntryScreenState extends State<IngredientEntryScreen>
   final _typeCtrl  = TextEditingController();
   final _typeFocus = FocusNode();
 
+  // Pantry items loaded when user switches to type mode
+  List<String> _pantryItems = [];
+
   @override
   void initState() {
     super.initState();
@@ -69,14 +73,14 @@ class _IngredientEntryScreenState extends State<IngredientEntryScreen>
     // Reset error state before retry
     if (mounted) setState(() { _camError = null; _camPermissionDenied = false; });
 
-    // 1 — Request permission explicitly first
+    // 1 -- Request permission explicitly first
     final status = await Permission.camera.request();
     if (!status.isGranted) {
       if (mounted) setState(() { _camPermissionDenied = true; _camError = 'Camera access denied. Tap below to grant permission.'; });
       return;
     }
 
-    // 2 — Enumerate cameras
+    // 2 -- Enumerate cameras
     try {
       _cameras = await availableCameras();
     } catch (e) {
@@ -89,7 +93,7 @@ class _IngredientEntryScreenState extends State<IngredientEntryScreen>
       return;
     }
 
-    // 3 — Initialize controller
+    // 3 -- Initialize controller
     try {
       final ctrl = CameraController(_cameras.first, ResolutionPreset.high,
           enableAudio: false, imageFormatGroup: ImageFormatGroup.jpeg);
@@ -119,7 +123,8 @@ class _IngredientEntryScreenState extends State<IngredientEntryScreen>
   Future<void> _capture() async {
     if (!_camReady || _capturing || _cam == null) return;
     HapticFeedback.mediumImpact();
-    setState(() { _capturing = true; _scanning = true; _ingredients = []; _scanError = null; _scanFailed = false; });
+    // AE-1: Do NOT clear _ingredients -- preserve manually typed items across scans.
+    setState(() { _capturing = true; _scanning = true; _scanError = null; _scanFailed = false; });
     try {
       final file = await _cam!.takePicture();
       _capturedPath = file.path;
@@ -128,18 +133,24 @@ class _IngredientEntryScreenState extends State<IngredientEntryScreen>
       if (mounted) {
         final empty = result.ingredients.isEmpty;
         setState(() {
-          _ingredients = result.ingredients;
+          if (!empty) {
+            // AE-1+7: Merge scan result with existing typed ingredients, deduplicate, cap at 15
+            final merged = List<String>.from(_ingredients);
+            for (final item in result.ingredients) {
+              if (!merged.contains(item) && merged.length < _maxIngredients) merged.add(item);
+            }
+            _ingredients = merged.take(_maxIngredients).toList();
+          }
+          // On empty scan: keep _ingredients unchanged (typed items survive)
           _scanning = false;
           _scanFailed = empty;
-          if (empty && result.message != null) {
-            _scanError = result.message;
-          }
+          if (empty && result.message != null) _scanError = result.message;
         });
         // Show SnackBar feedback
         final count = result.ingredients.length;
         final msg = count > 0
             ? '$count ingredient${count == 1 ? '' : 's'} found'
-            : 'No ingredients detected — try better lighting or add manually';
+            : 'No ingredients detected -- try better lighting or add manually';
         if (mounted) {
           ScaffoldMessenger.of(context).showSnackBar(SnackBar(
             content: Text(msg, style: const TextStyle(fontFamily: 'DM Sans', fontWeight: FontWeight.w500)),
@@ -152,7 +163,7 @@ class _IngredientEntryScreenState extends State<IngredientEntryScreen>
         }
       }
     } catch (_) {
-      if (mounted) setState(() { _scanning = false; _scanFailed = true; _scanError = 'Could not detect — add manually.'; });
+      if (mounted) setState(() { _scanning = false; _scanFailed = true; _scanError = 'Could not detect -- add manually.'; });
     } finally {
       if (mounted) setState(() => _capturing = false);
     }
@@ -185,7 +196,7 @@ class _IngredientEntryScreenState extends State<IngredientEntryScreen>
     final remaining = _maxIngredients - _ingredients.length;
     if (remaining <= 0) {
       ScaffoldMessenger.of(context).showSnackBar(SnackBar(
-        content: const Text('Maximum 15 ingredients — remove some first.',
+        content: const Text('Maximum 15 ingredients -- remove some first.',
             style: TextStyle(fontFamily: 'DM Sans')),
         backgroundColor: AppTheme.primaryDark,
         behavior: SnackBarBehavior.floating,
@@ -215,20 +226,38 @@ class _IngredientEntryScreenState extends State<IngredientEntryScreen>
       return;
     }
     // FIX: Use push (not pushReplacement) so back from RecipeResults returns here
-    // with ingredients intact — pushReplacement caused a black screen on back.
+    // with ingredients intact -- pushReplacement caused a black screen on back.
     Navigator.push(context, AppTheme.zoomIn(RecipeResultsScreen(ingredients: _ingredients)));
   }
 
   void _switchMode(_Mode m) {
     if (_mode == m) return;
     HapticFeedback.selectionClick();
-    // Do NOT reset _ingredients — both tabs share the same list
+    // Do NOT reset _ingredients -- both tabs share the same list
     setState(() { _mode = m; _scanError = null; _scanFailed = false; _capturedPath = null; });
     if (m == _Mode.type) {
+      // Pause the camera so it doesn't render behind the type UI
+      _cam?.pausePreview();
       WidgetsBinding.instance.addPostFrameCallback((_) => FocusScope.of(context).requestFocus(_typeFocus));
+      // AE-13: Always reload pantry when switching to type mode (user may have added items)
+      _loadPantry();
     } else {
       _typeFocus.unfocus();
+      // Resume camera when switching back
+      _cam?.resumePreview();
     }
+  }
+
+  Future<void> _loadPantry() async {
+    final items = await getPantryItems();
+    if (mounted) setState(() { _pantryItems = items; });
+  }
+
+  void _addFromPantry(String item) {
+    if (_ingredients.length >= _maxIngredients) return;
+    if (_ingredients.contains(item)) return;
+    HapticFeedback.selectionClick();
+    setState(() => _ingredients.add(item));
   }
 
   @override
@@ -251,22 +280,29 @@ class _IngredientEntryScreenState extends State<IngredientEntryScreen>
     return Scaffold(
       backgroundColor: _isDark ? Colors.black : AppTheme.scaffoldBg(context),
       body: Stack(children: [
-        // Camera layer — shows live feed OR frozen captured image
-        // FIX: wrap CameraPreview in AspectRatio to prevent stretching on devices
-        // where the sensor ratio doesn't match the screen ratio.
-        if (_cam != null && _cam!.value.isInitialized && _isDark)
+        // Solid bg for type mode -- covers camera so it doesn't bleed through
+        if (_mode == _Mode.type)
+          Positioned.fill(child: Container(color: AppTheme.scaffoldBg(context))),
+        // Camera layer -- shows live feed OR frozen captured image.
+        // ClipRect + FittedBox(cover) fills the screen edge-to-edge without
+        // distortion, regardless of the sensor's native aspect ratio.
+        if (_mode == _Mode.camera && _cam != null && _cam!.value.isInitialized)
           Positioned.fill(
             child: _capturedPath != null
                 ? Image.file(File(_capturedPath!), fit: BoxFit.cover)
-                : Center(
-                    child: AspectRatio(
-                      aspectRatio: _cam!.value.aspectRatio,
-                      child: CameraPreview(_cam!),
+                : ClipRect(
+                    child: FittedBox(
+                      fit: BoxFit.cover,
+                      child: SizedBox(
+                        width: _cam!.value.previewSize!.height,
+                        height: _cam!.value.previewSize!.width,
+                        child: CameraPreview(_cam!),
+                      ),
                     ),
                   ),
           ),
         // Vignette
-        if (_isDark && _cam != null && _cam!.value.isInitialized)
+        if (_mode == _Mode.camera && _isDark && _cam != null && _cam!.value.isInitialized)
           Positioned.fill(child: DecoratedBox(
             decoration: BoxDecoration(gradient: LinearGradient(
               begin: Alignment.topCenter, end: Alignment.bottomCenter,
@@ -277,7 +313,7 @@ class _IngredientEntryScreenState extends State<IngredientEntryScreen>
               stops: const [0.0, 0.22, 0.62, 1.0],
             )),
           )),
-        // Camera error overlay — shown when permission denied or init failed
+        // Camera error overlay -- shown when permission denied or init failed
         if (_mode == _Mode.camera && _camError != null)
           Positioned.fill(
             child: Container(
@@ -356,7 +392,7 @@ class _IngredientEntryScreenState extends State<IngredientEntryScreen>
             Expanded(child: _cameraContent()),
             if (_cam != null && _cam!.value.isInitialized) _shutterBar(),
           ] else if (_mode == _Mode.camera && !_camReady)
-            // Camera mode but not ready — show empty spacer so top bar stays visible
+            // Camera mode but not ready -- show empty spacer so top bar stays visible
             const Spacer()
           else
             Expanded(child: _typeContent()),
@@ -436,7 +472,7 @@ class _IngredientEntryScreenState extends State<IngredientEntryScreen>
       const _ScanningIndicator(),
     const Spacer(),
     if (_ingredients.isNotEmpty || _scanError != null || _scanFailed) _chipPanel(),
-    // NOTE: _addRow intentionally removed from camera mode — the "Type Instead"
+    // NOTE: _addRow intentionally removed from camera mode -- the "Type Instead"
     // button in _chipPanel() already handles manual entry after a scan failure.
     if (_capturedPath != null) ...[
       GestureDetector(
@@ -444,7 +480,7 @@ class _IngredientEntryScreenState extends State<IngredientEntryScreen>
           _capturedPath = null;
           _scanError = null;
           _scanFailed = false;
-          // _ingredients intentionally NOT cleared — user keeps manually added items
+          // _ingredients intentionally NOT cleared -- user keeps manually added items
         }),
         child: Padding(
           padding: const EdgeInsets.only(bottom: 8),
@@ -508,7 +544,7 @@ class _IngredientEntryScreenState extends State<IngredientEntryScreen>
             Row(children: [
               const Icon(LucideIcons.sparkles, color: AppTheme.green, size: 14),
               const SizedBox(width: 6),
-              Text(_scanError ?? '${_ingredients.length} detected — tap × to remove',
+              Text(_scanError ?? '${_ingredients.length} detected -- tap × to remove',
                   style: TextStyle(color: Colors.white.withValues(alpha: 0.65), fontSize: 12, fontFamily: 'DM Sans')),
             ]),
             if (_ingredients.isNotEmpty) ...[
@@ -537,13 +573,66 @@ class _IngredientEntryScreenState extends State<IngredientEntryScreen>
             Text('Type your ingredients', style: TextStyle(color: Colors.white, fontSize: 14,
                 fontFamily: 'DM Sans', fontWeight: FontWeight.w700)),
             SizedBox(height: 2),
-            Text('Separate with commas — e.g. chicken, garlic, rice',
+            Text('Separate with commas -- e.g. chicken, garlic, rice',
                 style: TextStyle(color: Colors.white60, fontSize: 12, fontFamily: 'DM Sans')),
           ])),
         ]),
       ).animate().fadeIn(duration: 300.ms).slideY(begin: 0.04),
       const SizedBox(height: 20),
       _addRow(dark: false),
+      // Pantry quick-add chips -- only shown when user has pantry items
+      if (_pantryItems.isNotEmpty) ...[
+        const SizedBox(height: 16),
+        Row(children: [
+          Icon(LucideIcons.refrigerator, size: 13, color: AppTheme.textMuted(context)),
+          const SizedBox(width: 6),
+          Text('From your fridge', style: TextStyle(
+            color: AppTheme.textMuted(context), fontSize: 12,
+            fontFamily: 'DM Sans', fontWeight: FontWeight.w600,
+          )),
+        ]),
+        const SizedBox(height: 8),
+        Wrap(
+          spacing: 8, runSpacing: 8,
+          children: _pantryItems.map((item) {
+            final alreadyAdded = _ingredients.contains(item);
+            return TapScale(
+              onTap: alreadyAdded ? null : () => _addFromPantry(item),
+              child: AnimatedOpacity(
+                duration: const Duration(milliseconds: 180),
+                opacity: alreadyAdded ? 0.45 : 1.0,
+                child: Container(
+                  padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 7),
+                  decoration: BoxDecoration(
+                    color: alreadyAdded
+                        ? AppTheme.green.withValues(alpha: 0.12)
+                        : AppTheme.cardBg(context),
+                    borderRadius: BorderRadius.circular(10),
+                    border: Border.all(
+                      color: alreadyAdded
+                          ? AppTheme.green.withValues(alpha: 0.4)
+                          : AppTheme.border(context),
+                    ),
+                  ),
+                  child: Row(mainAxisSize: MainAxisSize.min, children: [
+                    Icon(
+                      alreadyAdded ? LucideIcons.check : LucideIcons.plus,
+                      size: 11,
+                      color: alreadyAdded ? AppTheme.green : AppTheme.primaryDark,
+                    ),
+                    const SizedBox(width: 5),
+                    Text(item, style: TextStyle(
+                      color: alreadyAdded ? AppTheme.green : AppTheme.textPrimary(context),
+                      fontSize: 12, fontFamily: 'DM Sans',
+                      fontWeight: alreadyAdded ? FontWeight.w600 : FontWeight.w400,
+                    )),
+                  ]),
+                ),
+              ),
+            );
+          }).toList(),
+        ),
+      ],
       const SizedBox(height: 20),
       if (_ingredients.isNotEmpty) ...[
         Text('${_ingredients.length} ingredient${_ingredients.length == 1 ? '' : 's'} added',
@@ -599,12 +688,23 @@ class _IngredientEntryScreenState extends State<IngredientEntryScreen>
         const SizedBox(width: 16),
         TapScale(
           onTap: () async {
+            // AE-2+8: mounted checks after each await, try/catch, reset _camReady on failure
             if (_cameras.length < 2 || !_camReady) return;
             final nd = _cam!.description == _cameras.first ? _cameras.last : _cameras.first;
+            setState(() => _camReady = false); // mark not-ready before dispose
             await _cam!.dispose();
-            _cam = CameraController(nd, ResolutionPreset.high, enableAudio: false);
-            await _cam!.initialize();
-            if (mounted) setState(() {});
+            if (!mounted) return;
+            try {
+              final ctrl = CameraController(nd, ResolutionPreset.high, enableAudio: false);
+              _cam = ctrl;
+              await ctrl.initialize();
+              if (!mounted) { ctrl.dispose(); return; }
+              setState(() => _camReady = true);
+            } on CameraException catch (e) {
+              if (mounted) setState(() { _camError = 'Could not flip camera: ${e.description ?? e.code}'; });
+            } catch (e) {
+              if (mounted) setState(() { _camError = 'Could not flip camera. Try again.'; });
+            }
           },
           child: Container(
             width: 46, height: 46,
@@ -619,27 +719,19 @@ class _IngredientEntryScreenState extends State<IngredientEntryScreen>
 
   Widget _addRow({required bool dark}) => Row(children: [
     Expanded(
-      child: Container(
-        height: 50,
-        decoration: BoxDecoration(
-          color: dark ? Colors.black.withValues(alpha: 0.35) : AppTheme.cardBg(context),
-          borderRadius: BorderRadius.circular(16),
-          border: Border.all(color: dark ? Colors.white.withValues(alpha: 0.15) : AppTheme.border(context)),
+      child: TextField(
+        controller: _typeCtrl,
+        focusNode: !_isDark ? _typeFocus : null,
+        onSubmitted: (_) => _addManual(),
+        style: TextStyle(
+          fontSize: 14, fontFamily: 'DM Sans',
+          color: dark ? Colors.white : AppTheme.textPrimary(context),
         ),
-        child: TextField(
-          controller: _typeCtrl,
-          focusNode: !_isDark ? _typeFocus : null,
-          onSubmitted: (_) => _addManual(),
-          style: TextStyle(fontSize: 14, fontFamily: 'DM Sans', color: dark ? Colors.white : AppTheme.textPrimary(context)),
-          decoration: InputDecoration(
-            hintText: 'Add ingredient (e.g. garlic, rice)',
-            hintStyle: TextStyle(color: dark ? Colors.white38 : AppTheme.textMuted(context), fontSize: 14, fontFamily: 'DM Sans'),
-            prefixIcon: Icon(LucideIcons.plus, size: 16, color: dark ? Colors.white38 : AppTheme.textMuted(context)),
-            contentPadding: const EdgeInsets.symmetric(vertical: 16),
-            border: InputBorder.none,
-            enabledBorder: InputBorder.none,
-            focusedBorder: InputBorder.none,
-          ),
+        decoration: AppTheme.inputDecoration(
+          context: context,
+          hint: 'Add ingredient (e.g. garlic, rice)',
+          prefixIcon: Icon(LucideIcons.plus, size: 16, color: AppTheme.textMuted(context)),
+          contentPadding: const EdgeInsets.symmetric(horizontal: 14, vertical: 16),
         ),
       ),
     ),
@@ -654,33 +746,46 @@ class _IngredientEntryScreenState extends State<IngredientEntryScreen>
     ),
   ]).animate().fadeIn(duration: 300.ms, delay: 100.ms);
 
-  Widget _findBtn() => TapScale(
-    onTap: _findRecipes,
-    child: Container(
-      width: double.infinity, height: 56,
-      margin: const EdgeInsets.symmetric(horizontal: 20),
-      decoration: BoxDecoration(
-        gradient: LinearGradient(colors: _ingredients.isEmpty
-            ? [Colors.white.withValues(alpha: 0.1), Colors.white.withValues(alpha: 0.1)]
-            : [AppTheme.green, AppTheme.greenDark]),
-        borderRadius: BorderRadius.circular(18),
-        border: _ingredients.isEmpty ? Border.all(color: Colors.white.withValues(alpha: 0.12)) : null,
-        boxShadow: _ingredients.isEmpty ? [] : const [BoxShadow(color: Color(0x6076CC4F), blurRadius: 20, offset: Offset(0, 8))],
-      ),
-      child: Row(mainAxisAlignment: MainAxisAlignment.center, children: [
-        Icon(LucideIcons.chefHat, size: 20,
-            color: _ingredients.isEmpty ? Colors.white.withValues(alpha: 0.3) : Colors.white),
-        const SizedBox(width: 10),
-        Text(
-          _ingredients.isEmpty ? 'Add ingredients first' : 'Find Recipes (${_ingredients.length})',
-          style: TextStyle(
-            color: _ingredients.isEmpty ? Colors.white.withValues(alpha: 0.3) : Colors.white,
-            fontSize: 16, fontFamily: 'DM Sans', fontWeight: FontWeight.w800,
-          ),
+  Widget _findBtn() {
+    final empty = _ingredients.isEmpty;
+    // In camera dark mode: use white-tinted ghost. In type/light mode: use surface-aware border.
+    final emptyBgColor = _isDark
+        ? Colors.white.withValues(alpha: 0.08)
+        : AppTheme.cardBg(context);
+    final emptyBorderColor = _isDark
+        ? Colors.white.withValues(alpha: 0.12)
+        : AppTheme.border(context);
+    return TapScale(
+      onTap: _findRecipes,
+      child: Container(
+        width: double.infinity, height: 56,
+        margin: const EdgeInsets.symmetric(horizontal: 20),
+        decoration: BoxDecoration(
+          gradient: empty ? null : const LinearGradient(colors: [AppTheme.green, AppTheme.greenDark]),
+          color: empty ? emptyBgColor : null,
+          borderRadius: BorderRadius.circular(18),
+          border: empty ? Border.all(color: emptyBorderColor) : null,
+          boxShadow: empty ? [] : const [BoxShadow(color: Color(0x6076CC4F), blurRadius: 20, offset: Offset(0, 8))],
         ),
-      ]),
-    ),
-  );
+        child: Row(mainAxisAlignment: MainAxisAlignment.center, children: [
+          Icon(LucideIcons.chefHat, size: 20,
+              color: empty
+                  ? (_isDark ? Colors.white.withValues(alpha: 0.3) : AppTheme.textMuted(context))
+                  : Colors.white),
+          const SizedBox(width: 10),
+          Text(
+            empty ? 'Add ingredients first' : 'Find Recipes (${_ingredients.length})',
+            style: TextStyle(
+              color: empty
+                  ? (_isDark ? Colors.white.withValues(alpha: 0.3) : AppTheme.textMuted(context))
+                  : Colors.white,
+              fontSize: 16, fontFamily: 'DM Sans', fontWeight: FontWeight.w800,
+            ),
+          ),
+        ]),
+      ),
+    );
+  }
 }
 
 // ── Scanning indicator ─────────────────────────────────────────────────────────

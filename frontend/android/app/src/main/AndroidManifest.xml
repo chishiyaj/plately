@@ -31,6 +31,18 @@
                 <action android:name="android.intent.action.MAIN"/>
                 <category android:name="android.intent.category.LAUNCHER"/>
             </intent-filter>
+            <!-- Android App Links: Firebase email verification + password reset -->
+            <!-- Opens the app when user taps the link in their email client.    -->
+            <!-- Requires assetlinks.json at:                                    -->
+            <!--   https://chishiyaj.github.io/.well-known/assetlinks.json      -->
+            <intent-filter android:autoVerify="true">
+                <action android:name="android.intent.action.VIEW"/>
+                <category android:name="android.intent.category.DEFAULT"/>
+                <category android:name="android.intent.category.BROWSABLE"/>
+                <data android:scheme="https"
+                      android:host="chishiyaj.github.io"
+                      android:pathPrefix="/plately"/>
+            </intent-filter>
         </activity>
         <meta-data
             android:name="flutterEmbedding"

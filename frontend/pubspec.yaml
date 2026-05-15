@@ -1,7 +1,7 @@
 name: plately
 description: Plately — AI-powered high-protein meal planner for students.
 publish_to: 'none'
-version: 1.0.0+2
+version: 1.0.0+5
 
 environment:
   sdk: '>=3.0.0 <4.0.0'
@@ -61,6 +61,9 @@ dependencies:
 
   # Camera permission handling
   permission_handler: ^11.3.1
+
+  # Deep links -- Android App Links for email verification / password reset
+  app_links: ^6.3.2
 
   cupertino_icons: ^1.0.8
 

@@ -1,3 +1,4 @@
+import 'dart:math' as math;
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_animate/flutter_animate.dart';
@@ -9,89 +10,178 @@ import '../widgets/plately_logo.dart';
 import 'login_screen.dart';
 
 // ─── SPLASH SCREEN ────────────────────────────────────────────────────────────
-// Single branded splash → auto-routes after 1.8s.
-// - Returning users (onboarding_done=true): → LoginScreen
-// - First-time users: → OnboardingCarousel (carousel)
-// Industry standard: one splash, not three.
-
 class SplashScreen extends StatefulWidget {
   const SplashScreen({super.key});
   @override
   State<SplashScreen> createState() => _SplashScreenState();
 }
 
-class _SplashScreenState extends State<SplashScreen> {
+class _SplashScreenState extends State<SplashScreen>
+    with SingleTickerProviderStateMixin {
+  late AnimationController _bgCtrl;
+
   @override
   void initState() {
     super.initState();
     SystemChrome.setSystemUIOverlayStyle(SystemUiOverlayStyle.light);
+    _bgCtrl = AnimationController(vsync: this, duration: const Duration(seconds: 8))
+      ..repeat();
     _route();
   }
 
+  @override
+  void dispose() {
+    _bgCtrl.dispose();
+    super.dispose();
+  }
+
   Future<void> _route() async {
-    // Run timer + prefs check in parallel — whichever is longer wins
     final results = await Future.wait([
-      Future.delayed(const Duration(milliseconds: 1800)),
+      Future.delayed(const Duration(milliseconds: 2200)),
       SharedPreferences.getInstance(),
     ]);
     if (!mounted) return;
     final prefs = results[1] as SharedPreferences;
     final seen = prefs.getBool('onboarding_done') ?? false;
     if (seen) {
-      // Returning user → Login directly
       Navigator.pushReplacement(context, AppTheme.fadeScale(const LoginScreen()));
     } else {
-      // First-time user → show the onboarding carousel
       Navigator.pushReplacement(context, AppTheme.fadeScale(const OnboardingCarousel()));
     }
   }
 
   @override
   Widget build(BuildContext context) {
+    final size = MediaQuery.of(context).size;
     return Scaffold(
       backgroundColor: const Color(0xFF021A1B),
-      body: Center(
-        child: Column(
-          mainAxisAlignment: MainAxisAlignment.center,
-          children: [
-            // Logo mark
+      body: Stack(children: [
+        // Animated ambient orb -- slow rotation gives depth like Spotify/Claude
+        AnimatedBuilder(
+          animation: _bgCtrl,
+          builder: (_, __) {
+            final t = _bgCtrl.value;
+            return Stack(children: [
+              // Top-right green orb
+              Positioned(
+                top: -size.height * 0.08 + math.sin(t * math.pi * 2) * 18,
+                right: -size.width * 0.18 + math.cos(t * math.pi * 2) * 12,
+                child: Container(
+                  width: size.width * 0.7,
+                  height: size.width * 0.7,
+                  decoration: BoxDecoration(
+                    shape: BoxShape.circle,
+                    gradient: RadialGradient(colors: [
+                      const Color(0xFF76CC4F).withValues(alpha: 0.18),
+                      Colors.transparent,
+                    ]),
+                  ),
+                ),
+              ),
+              // Bottom-left teal orb
+              Positioned(
+                bottom: -size.height * 0.1 + math.cos(t * math.pi * 2 + 1.5) * 20,
+                left: -size.width * 0.2 + math.sin(t * math.pi * 2 + 1.5) * 10,
+                child: Container(
+                  width: size.width * 0.8,
+                  height: size.width * 0.8,
+                  decoration: BoxDecoration(
+                    shape: BoxShape.circle,
+                    gradient: RadialGradient(colors: [
+                      const Color(0xFF043B3C).withValues(alpha: 0.55),
+                      Colors.transparent,
+                    ]),
+                  ),
+                ),
+              ),
+            ]);
+          },
+        ),
+        // Centre content
+        Center(
+          child: Column(mainAxisAlignment: MainAxisAlignment.center, children: [
+            // Logo -- scale-in like Spotify/Claude
             const PlatelyLogo(
               theme: PlatelyLogoTheme.onDark,
               iconSize: 72,
               wordmarkSize: 32,
             )
                 .animate()
-                .fadeIn(duration: 500.ms, delay: 200.ms)
+                .fadeIn(duration: 480.ms, delay: 150.ms)
                 .scale(
-                    begin: const Offset(0.85, 0.85),
-                    duration: 600.ms,
-                    delay: 200.ms,
+                    begin: const Offset(0.75, 0.75),
+                    end: const Offset(1.0, 1.0),
+                    duration: 700.ms,
+                    delay: 150.ms,
                     curve: Curves.easeOutBack),
-            const SizedBox(height: 20),
-            // Tagline
+            const SizedBox(height: 16),
+            // Tagline -- fade up after logo settles
             Text(
-              'Eat smarter. Cook faster.',
+              'Cook smart. Hit your macros.',
               style: TextStyle(
-                color: Colors.white.withValues(alpha: 0.45),
-                fontSize: 15,
+                color: Colors.white.withValues(alpha: 0.42),
+                fontSize: 14,
                 fontFamily: 'DM Sans',
                 fontWeight: FontWeight.w400,
-                letterSpacing: 0.2,
+                letterSpacing: 0.3,
               ),
             )
                 .animate()
-                .fadeIn(duration: 400.ms, delay: 600.ms),
-          ],
+                .fadeIn(duration: 400.ms, delay: 700.ms)
+                .slideY(begin: 0.3, duration: 400.ms, delay: 700.ms, curve: Curves.easeOut),
+          ]),
         ),
-      ),
+        // Bottom wordmark -- like Spotify's "Made by Spotify" footer, minimal
+        Positioned(
+          bottom: MediaQuery.of(context).padding.bottom + 32,
+          left: 0,
+          right: 0,
+          child: Column(children: [
+            // Subtle loading indicator -- three animated dots
+            _LoadingDots(),
+          ]).animate().fadeIn(duration: 350.ms, delay: 1000.ms),
+        ),
+      ]),
     );
   }
 }
 
-// ─── ONBOARDING CAROUSEL ──────────────────────────────────────────────────────
-// Shown ONLY for first-time users. 3 editorial slides.
-// After "Get Started" or "Skip" → marks onboarding done → LoginScreen.
+class _LoadingDots extends StatefulWidget {
+  @override
+  State<_LoadingDots> createState() => _LoadingDotsState();
+}
 
+class _LoadingDotsState extends State<_LoadingDots>
+    with SingleTickerProviderStateMixin {
+  late AnimationController _ctrl;
+  @override
+  void initState() {
+    super.initState();
+    _ctrl = AnimationController(vsync: this, duration: const Duration(milliseconds: 1200))
+      ..repeat();
+  }
+  @override
+  void dispose() { _ctrl.dispose(); super.dispose(); }
+
+  @override
+  Widget build(BuildContext context) => AnimatedBuilder(
+    animation: _ctrl,
+    builder: (_, __) => Row(mainAxisAlignment: MainAxisAlignment.center, children: List.generate(3, (i) {
+      final phase = (_ctrl.value - i * 0.2).clamp(0.0, 1.0);
+      final alpha = (math.sin(phase * math.pi * 2) * 0.5 + 0.5).clamp(0.15, 0.7);
+      return Container(
+        margin: const EdgeInsets.symmetric(horizontal: 4),
+        width: 5, height: 5,
+        decoration: BoxDecoration(
+          color: const Color(0xFF76CC4F).withValues(alpha: alpha),
+          shape: BoxShape.circle,
+        ),
+      );
+    })),
+  );
+}
+
+// ─── ONBOARDING CAROUSEL ──────────────────────────────────────────────────────
 class OnboardingCarousel extends StatefulWidget {
   const OnboardingCarousel({super.key});
   @override
@@ -167,7 +257,6 @@ class _OnboardingCarouselState extends State<OnboardingCarousel> {
           onPageChanged: (i) => setState(() => _current = i),
           itemBuilder: (_, i) => _SlidePage(slide: _slides[i]),
         ),
-        // Skip button
         if (_current < 2)
           Positioned(
             top: MediaQuery.of(context).padding.top + 16,
@@ -194,7 +283,6 @@ class _OnboardingCarouselState extends State<OnboardingCarousel> {
               ),
             ).animate().fadeIn(duration: 600.ms, delay: 800.ms),
           ),
-        // Bottom controls
         Positioned(
           bottom: 0,
           left: 0,
@@ -210,7 +298,6 @@ class _OnboardingCarouselState extends State<OnboardingCarousel> {
   }
 }
 
-// ── DATA MODEL ─────────────────────────────────────────────────────────────────
 class _Slide {
   final int index;
   final String tag, headline;
@@ -225,7 +312,6 @@ class _Slide {
   });
 }
 
-// ── CATEGORY TAG ───────────────────────────────────────────────────────────────
 class _CategoryTag extends StatelessWidget {
   final _Slide slide;
   const _CategoryTag({required this.slide});
@@ -235,25 +321,19 @@ class _CategoryTag extends StatelessWidget {
         mainAxisSize: MainAxisSize.min,
         children: [
           Container(
-            width: 6,
-            height: 6,
-            decoration:
-                BoxDecoration(color: slide.accentA, shape: BoxShape.circle),
+            width: 6, height: 6,
+            decoration: BoxDecoration(color: slide.accentA, shape: BoxShape.circle),
           ),
           const SizedBox(width: 8),
           Text(slide.tag,
               style: TextStyle(
-                color: slide.accentA,
-                fontSize: 11,
-                fontFamily: 'DM Sans',
-                fontWeight: FontWeight.w700,
-                letterSpacing: 2.2,
+                color: slide.accentA, fontSize: 11, fontFamily: 'DM Sans',
+                fontWeight: FontWeight.w700, letterSpacing: 2.2,
               )),
         ],
       );
 }
 
-// ── SLIDE PAGE ─────────────────────────────────────────────────────────────────
 class _SlidePage extends StatelessWidget {
   final _Slide slide;
   const _SlidePage({required this.slide});
@@ -285,12 +365,8 @@ class _SlidePage extends StatelessWidget {
               Text(
                 slide.headline,
                 style: const TextStyle(
-                  color: Colors.white,
-                  fontSize: 52,
-                  fontFamily: 'DM Sans',
-                  fontWeight: FontWeight.w800,
-                  height: 1.05,
-                  letterSpacing: -1.5,
+                  color: Colors.white, fontSize: 52, fontFamily: 'DM Sans',
+                  fontWeight: FontWeight.w800, height: 1.05, letterSpacing: -1.5,
                 ),
               )
                   .animate(key: ValueKey('h_${slide.index}'))
@@ -310,22 +386,16 @@ class _SlidePage extends StatelessWidget {
 
   Widget _buildPreview(_Slide slide) {
     switch (slide.index) {
-      case 0:
-        return _IngredientChipsPreview(accent: slide.accentA);
-      case 1:
-        return _RecipeCardPreview(
-            accentA: slide.accentA, accentB: slide.accentB);
-      default:
-        return _MacroBarPreview(accent: slide.accentA);
+      case 0:  return _IngredientChipsPreview(accent: slide.accentA);
+      case 1:  return _RecipeCardPreview(accentA: slide.accentA, accentB: slide.accentB);
+      default: return _MacroBarPreview(accent: slide.accentA);
     }
   }
 }
 
-// ── SLIDE 1 PREVIEW: Ingredient chips ─────────────────────────────────────────
 class _IngredientChipsPreview extends StatelessWidget {
   final Color accent;
   const _IngredientChipsPreview({required this.accent});
-
   static const _chips = ['Chicken', 'Garlic', 'Rice', 'Onion'];
 
   @override
@@ -335,244 +405,146 @@ class _IngredientChipsPreview extends StatelessWidget {
       decoration: BoxDecoration(
         color: Colors.white.withValues(alpha: 0.05),
         borderRadius: BorderRadius.circular(20),
-        border: Border.all(
-            color: Colors.white.withValues(alpha: 0.08), width: 1.0),
+        border: Border.all(color: Colors.white.withValues(alpha: 0.08), width: 1.0),
       ),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Row(children: [
-            Icon(LucideIcons.scanLine, color: accent, size: 13),
-            const SizedBox(width: 7),
-            Text('Detected in your fridge',
-                style: TextStyle(
-                  color: accent,
-                  fontSize: 11,
-                  fontFamily: 'DM Sans',
-                  fontWeight: FontWeight.w600,
-                  letterSpacing: 0.3,
-                )),
-            const Spacer(),
-            Container(
-              width: 8,
-              height: 8,
-              decoration:
-                  BoxDecoration(color: accent, shape: BoxShape.circle),
-            )
-                .animate(onPlay: (c) => c.repeat())
-                .fadeIn(duration: 600.ms)
-                .then()
-                .fadeOut(duration: 600.ms),
-          ]),
-          const SizedBox(height: 14),
-          Wrap(
-            spacing: 10,
-            runSpacing: 10,
-            children: _chips
-                .asMap()
-                .entries
-                .map((e) => _IngredientChip(
-                    label: e.value, accent: accent, delay: e.key * 70))
-                .toList(),
-          ),
-        ],
-      ),
+      child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+        Row(children: [
+          Icon(LucideIcons.scanLine, color: accent, size: 13),
+          const SizedBox(width: 7),
+          Text('Detected in your fridge',
+              style: TextStyle(color: accent, fontSize: 11, fontFamily: 'DM Sans',
+                  fontWeight: FontWeight.w600, letterSpacing: 0.3)),
+          const Spacer(),
+          Container(width: 8, height: 8, decoration: BoxDecoration(color: accent, shape: BoxShape.circle))
+              .animate(onPlay: (c) => c.repeat())
+              .fadeIn(duration: 600.ms).then().fadeOut(duration: 600.ms),
+        ]),
+        const SizedBox(height: 14),
+        Wrap(
+          spacing: 10, runSpacing: 10,
+          children: _chips.asMap().entries
+              .map((e) => _IngredientChip(label: e.value, accent: accent, delay: e.key * 70))
+              .toList(),
+        ),
+      ]),
     );
   }
 }
 
 class _IngredientChip extends StatelessWidget {
-  final String label;
-  final Color accent;
-  final int delay;
-  const _IngredientChip(
-      {required this.label, required this.accent, required this.delay});
-
+  final String label; final Color accent; final int delay;
+  const _IngredientChip({required this.label, required this.accent, required this.delay});
   @override
-  Widget build(BuildContext context) {
-    return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 8),
-      decoration: BoxDecoration(
-        color: Colors.white.withValues(alpha: 0.07),
-        borderRadius: BorderRadius.circular(24),
-        border:
-            Border.all(color: accent.withValues(alpha: 0.35), width: 1.2),
-      ),
-      child: Row(mainAxisSize: MainAxisSize.min, children: [
-        Container(
-            width: 6,
-            height: 6,
-            decoration:
-                BoxDecoration(color: accent, shape: BoxShape.circle)),
-        const SizedBox(width: 7),
-        Text(label,
-            style: const TextStyle(
-              color: Colors.white,
-              fontSize: 13,
-              fontFamily: 'DM Sans',
-              fontWeight: FontWeight.w600,
-            )),
-      ]),
-    ).animate().fadeIn(duration: 350.ms, delay: (280 + delay).ms).slideX(begin: 0.08);
-  }
+  Widget build(BuildContext context) => Container(
+    padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 8),
+    decoration: BoxDecoration(
+      color: Colors.white.withValues(alpha: 0.07),
+      borderRadius: BorderRadius.circular(24),
+      border: Border.all(color: accent.withValues(alpha: 0.35), width: 1.2),
+    ),
+    child: Row(mainAxisSize: MainAxisSize.min, children: [
+      Container(width: 6, height: 6, decoration: BoxDecoration(color: accent, shape: BoxShape.circle)),
+      const SizedBox(width: 7),
+      Text(label, style: const TextStyle(color: Colors.white, fontSize: 13,
+          fontFamily: 'DM Sans', fontWeight: FontWeight.w600)),
+    ]),
+  ).animate().fadeIn(duration: 350.ms, delay: (280 + delay).ms).slideX(begin: 0.08);
 }
 
-// ── SLIDE 2 PREVIEW: Recipe card ───────────────────────────────────────────────
 class _RecipeCardPreview extends StatelessWidget {
   final Color accentA, accentB;
-  const _RecipeCardPreview(
-      {required this.accentA, required this.accentB});
-
+  const _RecipeCardPreview({required this.accentA, required this.accentB});
   @override
-  Widget build(BuildContext context) {
-    return Container(
-      padding: const EdgeInsets.all(18),
-      decoration: BoxDecoration(
-        color: Colors.white.withValues(alpha: 0.07),
-        borderRadius: BorderRadius.circular(20),
-        border: Border.all(
-            color: Colors.white.withValues(alpha: 0.10), width: 1.0),
-      ),
-      child: Row(children: [
-        Container(
-          width: 56,
-          height: 56,
-          decoration: BoxDecoration(
-            gradient: LinearGradient(
-              colors: [accentA, accentB],
-              begin: Alignment.topLeft,
-              end: Alignment.bottomRight,
-            ),
-            borderRadius: BorderRadius.circular(16),
-          ),
-          child:
-              const Icon(LucideIcons.chefHat, color: Colors.white, size: 24),
+  Widget build(BuildContext context) => Container(
+    padding: const EdgeInsets.all(18),
+    decoration: BoxDecoration(
+      color: Colors.white.withValues(alpha: 0.07),
+      borderRadius: BorderRadius.circular(20),
+      border: Border.all(color: Colors.white.withValues(alpha: 0.10), width: 1.0),
+    ),
+    child: Row(children: [
+      Container(
+        width: 56, height: 56,
+        decoration: BoxDecoration(
+          gradient: LinearGradient(colors: [accentA, accentB],
+              begin: Alignment.topLeft, end: Alignment.bottomRight),
+          borderRadius: BorderRadius.circular(16),
         ),
-        const SizedBox(width: 16),
-        Expanded(
-            child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-              const Text('Chicken Stir Fry',
-                  style: TextStyle(
-                    color: Colors.white,
-                    fontSize: 16,
-                    fontFamily: 'DM Sans',
-                    fontWeight: FontWeight.w800,
-                  )),
-              const SizedBox(height: 8),
-              Row(children: [
-                _Badge(
-                    icon: LucideIcons.clock3,
-                    label: '15 min',
-                    color: accentA),
-                const SizedBox(width: 8),
-                _Badge(
-                    icon: LucideIcons.dumbbell,
-                    label: '38g protein',
-                    color: accentA),
-              ]),
-            ])),
-      ]),
-    );
-  }
+        child: const Icon(LucideIcons.chefHat, color: Colors.white, size: 24),
+      ),
+      const SizedBox(width: 16),
+      Expanded(child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+        const Text('Chicken Stir Fry',
+            style: TextStyle(color: Colors.white, fontSize: 16,
+                fontFamily: 'DM Sans', fontWeight: FontWeight.w800)),
+        const SizedBox(height: 8),
+        Row(children: [
+          _Badge(icon: LucideIcons.clock3, label: '15 min', color: accentA),
+          const SizedBox(width: 8),
+          _Badge(icon: LucideIcons.dumbbell, label: '38g protein', color: accentA),
+        ]),
+      ])),
+    ]),
+  );
 }
 
 class _Badge extends StatelessWidget {
-  final IconData icon;
-  final String label;
-  final Color color;
-  const _Badge(
-      {required this.icon, required this.label, required this.color});
-
+  final IconData icon; final String label; final Color color;
+  const _Badge({required this.icon, required this.label, required this.color});
   @override
   Widget build(BuildContext context) => Container(
-        padding:
-            const EdgeInsets.symmetric(horizontal: 9, vertical: 4),
-        decoration: BoxDecoration(
-          color: color.withValues(alpha: 0.15),
-          borderRadius: BorderRadius.circular(12),
-        ),
-        child: Row(mainAxisSize: MainAxisSize.min, children: [
-          Icon(icon, size: 11, color: color),
-          const SizedBox(width: 4),
-          Text(label,
-              style: TextStyle(
-                color: color,
-                fontSize: 11,
-                fontFamily: 'DM Sans',
-                fontWeight: FontWeight.w700,
-              )),
-        ]),
-      );
+    padding: const EdgeInsets.symmetric(horizontal: 9, vertical: 4),
+    decoration: BoxDecoration(
+      color: color.withValues(alpha: 0.15), borderRadius: BorderRadius.circular(12)),
+    child: Row(mainAxisSize: MainAxisSize.min, children: [
+      Icon(icon, size: 11, color: color),
+      const SizedBox(width: 4),
+      Text(label, style: TextStyle(color: color, fontSize: 11,
+          fontFamily: 'DM Sans', fontWeight: FontWeight.w700)),
+    ]),
+  );
 }
 
-// ── SLIDE 3 PREVIEW: Macro progress bar ────────────────────────────────────────
 class _MacroBarPreview extends StatelessWidget {
   final Color accent;
   const _MacroBarPreview({required this.accent});
-
   @override
   Widget build(BuildContext context) {
-    const current = 87;
-    const goal = 120;
+    const current = 87; const goal = 120;
     const pct = current / goal;
-
     return Container(
       padding: const EdgeInsets.all(20),
       decoration: BoxDecoration(
         color: Colors.white.withValues(alpha: 0.07),
         borderRadius: BorderRadius.circular(20),
-        border: Border.all(
-            color: Colors.white.withValues(alpha: 0.10), width: 1.0),
+        border: Border.all(color: Colors.white.withValues(alpha: 0.10), width: 1.0),
       ),
       child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
         Row(mainAxisAlignment: MainAxisAlignment.spaceBetween, children: [
           Row(children: [
             Icon(LucideIcons.dumbbell, size: 15, color: accent),
             const SizedBox(width: 7),
-            const Text('Protein',
-                style: TextStyle(
-                  color: Colors.white70,
-                  fontSize: 13,
-                  fontFamily: 'DM Sans',
-                  fontWeight: FontWeight.w600,
-                )),
+            const Text('Protein', style: TextStyle(color: Colors.white70, fontSize: 13,
+                fontFamily: 'DM Sans', fontWeight: FontWeight.w600)),
           ]),
-          RichText(
-              text: TextSpan(children: [
-            TextSpan(
-                text: '${current}g',
-                style: TextStyle(
-                  color: accent,
-                  fontSize: 15,
-                  fontFamily: 'DM Sans',
-                  fontWeight: FontWeight.w800,
-                )),
-            const TextSpan(
-                text: ' / ${goal}g',
-                style: TextStyle(
-                  color: Colors.white38,
-                  fontSize: 13,
-                  fontFamily: 'DM Sans',
-                )),
+          RichText(text: TextSpan(children: [
+            TextSpan(text: '${current}g',
+                style: TextStyle(color: accent, fontSize: 15, fontFamily: 'DM Sans', fontWeight: FontWeight.w800)),
+            const TextSpan(text: ' / ${goal}g',
+                style: TextStyle(color: Colors.white38, fontSize: 13, fontFamily: 'DM Sans')),
           ])),
         ]),
         const SizedBox(height: 14),
         ClipRRect(
           borderRadius: BorderRadius.circular(6),
           child: Stack(children: [
-            Container(
-                height: 10,
-                color: Colors.white.withValues(alpha: 0.08)),
+            Container(height: 10, color: Colors.white.withValues(alpha: 0.08)),
             FractionallySizedBox(
               widthFactor: pct,
               child: Container(
                 height: 10,
                 decoration: BoxDecoration(
-                  gradient: LinearGradient(
-                    colors: [accent, accent.withValues(alpha: 0.6)],
-                  ),
+                  gradient: LinearGradient(colors: [accent, accent.withValues(alpha: 0.6)]),
                   borderRadius: BorderRadius.circular(6),
                 ),
               ),
@@ -580,38 +552,26 @@ class _MacroBarPreview extends StatelessWidget {
           ]),
         ),
         const SizedBox(height: 10),
-        Text(
-          '${((pct) * 100).round()}% of daily goal',
-          style: TextStyle(
-            color: Colors.white.withValues(alpha: 0.4),
-            fontSize: 11,
-            fontFamily: 'DM Sans',
-          ),
-        ),
+        Text('${((pct) * 100).round()}% of daily goal',
+            style: TextStyle(color: Colors.white.withValues(alpha: 0.4), fontSize: 11, fontFamily: 'DM Sans')),
       ]),
     );
   }
 }
 
-// ── BOTTOM CONTROLS ────────────────────────────────────────────────────────────
 class _BottomControls extends StatelessWidget {
   final int current;
   final VoidCallback onNext;
   final _Slide slide;
-  const _BottomControls(
-      {required this.current,
-      required this.onNext,
-      required this.slide});
+  const _BottomControls({required this.current, required this.onNext, required this.slide});
 
   @override
   Widget build(BuildContext context) {
     final isLast = current == 2;
     return Container(
-      padding: EdgeInsets.fromLTRB(
-          28, 24, 28, MediaQuery.of(context).padding.bottom + 32),
+      padding: EdgeInsets.fromLTRB(28, 24, 28, MediaQuery.of(context).padding.bottom + 32),
       child: Row(children: [
-        Row(
-            children: List.generate(3, (i) {
+        Row(children: List.generate(3, (i) {
           final active = i == current;
           final past = i < current;
           return AnimatedContainer(
@@ -635,36 +595,19 @@ class _BottomControls extends StatelessWidget {
           onTap: onNext,
           child: AnimatedContainer(
             duration: const Duration(milliseconds: 350),
-            padding: EdgeInsets.symmetric(
-              horizontal: isLast ? 32 : 26,
-              vertical: 16,
-            ),
+            padding: EdgeInsets.symmetric(horizontal: isLast ? 32 : 26, vertical: 16),
             decoration: BoxDecoration(
-              gradient: LinearGradient(
-                  colors: [slide.accentA, slide.accentB]),
+              gradient: LinearGradient(colors: [slide.accentA, slide.accentB]),
               borderRadius: BorderRadius.circular(50),
-              boxShadow: [
-                BoxShadow(
-                  color: slide.accentA.withValues(alpha: 0.4),
-                  blurRadius: 20,
-                  offset: const Offset(0, 6),
-                ),
-              ],
+              boxShadow: [BoxShadow(
+                color: slide.accentA.withValues(alpha: 0.4), blurRadius: 20, offset: const Offset(0, 6))],
             ),
             child: Row(mainAxisSize: MainAxisSize.min, children: [
-              Text(
-                isLast ? 'Get Started' : 'Continue',
-                style: const TextStyle(
-                  color: Colors.white,
-                  fontSize: 15,
-                  fontFamily: 'DM Sans',
-                  fontWeight: FontWeight.w800,
-                  letterSpacing: 0.1,
-                ),
-              ),
+              Text(isLast ? 'Get Started' : 'Continue',
+                  style: const TextStyle(color: Colors.white, fontSize: 15,
+                      fontFamily: 'DM Sans', fontWeight: FontWeight.w800, letterSpacing: 0.1)),
               const SizedBox(width: 8),
-              const Icon(LucideIcons.arrowRight,
-                  color: Colors.white, size: 16),
+              const Icon(LucideIcons.arrowRight, color: Colors.white, size: 16),
             ]),
           ),
         ),

@@ -67,7 +67,7 @@ class _PantryScreenState extends State<PantryScreen> {
   static const _kBase = 'pantry_items_v2';
   static const _units = ['pcs', 'g', 'kg', 'ml', 'L', 'cups', 'tbsp', 'tsp', ''];
 
-  /// UID-namespaced key — matches UserPrefsService convention.
+  /// UID-namespaced key -- matches UserPrefsService convention.
   static String _pantryKey() {
     final uid = FirebaseAuth.instance.currentUser?.uid ?? 'anonymous';
     return '$uid:$_kBase';
@@ -318,16 +318,34 @@ class _PantryScreenState extends State<PantryScreen> {
         Text('Track what you have at home',
             style: TextStyle(color: AppTheme.textMuted(context), fontSize: 11, fontFamily: 'DM Sans')),
       ])),
-      if (!_loading) Container(
-        padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
-        decoration: BoxDecoration(
-          color: AppTheme.primaryDark.withValues(alpha: 0.08),
-          borderRadius: BorderRadius.circular(10),
-        ),
-        child: Text('${_items.length} items',
-            style: const TextStyle(color: AppTheme.primaryDark, fontSize: 12,
-                fontFamily: 'DM Sans', fontWeight: FontWeight.w600)),
-      ),
+      if (!_loading) Builder(builder: (ctx) {
+        final inFridge  = _items.where((i) => !i.alwaysStocked).length;
+        final alwaysCount = _items.where((i) => i.alwaysStocked).length;
+        return Row(mainAxisSize: MainAxisSize.min, children: [
+          Container(
+            padding: const EdgeInsets.symmetric(horizontal: 9, vertical: 5),
+            decoration: BoxDecoration(
+              color: AppTheme.primaryDark.withValues(alpha: 0.08),
+              borderRadius: BorderRadius.circular(10),
+            ),
+            child: Text('$inFridge in fridge',
+                style: TextStyle(
+                    color: AppTheme.isDark(ctx) ? AppTheme.darkTextPrimary : AppTheme.primaryDark,
+                    fontSize: 11, fontFamily: 'DM Sans', fontWeight: FontWeight.w600)),
+          ),
+          const SizedBox(width: 6),
+          Container(
+            padding: const EdgeInsets.symmetric(horizontal: 9, vertical: 5),
+            decoration: BoxDecoration(
+              color: const Color(0xFFEABA1C).withValues(alpha: 0.12),
+              borderRadius: BorderRadius.circular(10),
+            ),
+            child: Text('$alwaysCount always',
+                style: const TextStyle(color: Color(0xFFB8920D), fontSize: 11,
+                    fontFamily: 'DM Sans', fontWeight: FontWeight.w600)),
+          ),
+        ]);
+      }),
     ]),
   ).animate().fadeIn(duration: 280.ms);
 
@@ -393,7 +411,7 @@ class _PantryScreenState extends State<PantryScreen> {
     ),
     padding: const EdgeInsets.fromLTRB(16, 12, 16, 12),
     child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-      // Name field — uses shared inputDecoration helper for light/dark consistency
+      // Name field -- uses shared inputDecoration helper for light/dark consistency
       TextField(
         controller: _nameCtrl,
         focusNode: _nameFocus,
@@ -595,8 +613,9 @@ class _PantryScreenState extends State<PantryScreen> {
                   borderRadius: BorderRadius.circular(6),
                 ),
                 child: Text(item.displayQty,
-                    style: const TextStyle(color: AppTheme.primaryDark, fontSize: 11,
-                        fontFamily: 'DM Sans', fontWeight: FontWeight.w600)),
+                    style: TextStyle(
+                        color: AppTheme.isDark(context) ? AppTheme.darkTextPrimary : AppTheme.primaryDark,
+                        fontSize: 11, fontFamily: 'DM Sans', fontWeight: FontWeight.w600)),
               ),
               if (item.alwaysStocked) ...[
                 const SizedBox(width: 6),
@@ -688,24 +707,70 @@ Future<List<String>> getAlwaysStocked() async {
   return items.where((i) => i.alwaysStocked).map((i) => i.name).toList();
 }
 
-/// Deduct 1 unit per ingredient after cooking. Skips always-stocked. Removes at 0.
-Future<void> deductPantryIngredients(List<String> ingredientNames) async {
+/// Parse the leading number from an amount string like "3 cups", "200g", "1/2 tbsp".
+/// Returns 1.0 if nothing parseable found.
+double _parseAmount(String amount) {
+  final s = amount.trim();
+  if (s.isEmpty || s == 'to taste') return 1.0;
+  final match = RegExp(r'^([\d]+(?:[./][\d]+)?)\s*').firstMatch(s);
+  if (match == null) return 1.0;
+  final raw = match.group(1)!;
+  if (raw.contains('/')) {
+    final parts = raw.split('/');
+    final num = double.tryParse(parts[0]) ?? 1.0;
+    final den = double.tryParse(parts[1]) ?? 1.0;
+    return den == 0 ? 1.0 : num / den;
+  }
+  return double.tryParse(raw) ?? 1.0;
+}
+
+/// Deduct recipe ingredient amounts from pantry after cooking.
+/// [ingredients] is a list of maps with 'name' and 'amount' keys.
+/// [servings] multiplies the deducted quantity (e.g. 2.0 = double the recipe).
+/// Skips always-stocked items. Removes items that reach 0.
+/// Unit mismatches (e.g. grams vs pcs) are handled gracefully: if pantry unit
+/// and ingredient unit differ, deduct 1 unit as a best-effort fallback.
+Future<void> deductPantryIngredients(
+  List<Map<String, String>> ingredients, {
+  double servings = 1.0,
+}) async {
   final p   = await SharedPreferences.getInstance();
   final key = _pantryKeyForCurrentUser();
   final raw = p.getString(key) ?? '[]';
   final items = (jsonDecode(raw) as List)
       .map((e) => PantryItem.fromJson(e as Map<String, dynamic>)).toList();
 
-  for (final ing in ingredientNames) {
-    final normalized = ing.trim().toLowerCase();
+  for (final ing in ingredients) {
+    final name   = (ing['name']   ?? '').trim().toLowerCase();
+    final amount = (ing['amount'] ?? '').trim();
+    if (name.isEmpty) continue;
+
     final idx = items.indexWhere((i) =>
-        i.name == normalized ||
-        normalized.contains(i.name) ||
-        i.name.contains(normalized));
+        i.name == name ||
+        name.contains(i.name) ||
+        i.name.contains(name));
     if (idx == -1) continue;
+
     final item = items[idx];
     if (item.alwaysStocked) continue;
-    final newQty = item.quantity - 1;
+
+    // Parse how much the recipe needs (scaled by servings)
+    final needed = _parseAmount(amount) * servings;
+
+    // Unit compatibility: only do precise deduction if units look compatible.
+    // Compatible = both are weight (g/kg), both are volume (ml/L/cups/tbsp/tsp),
+    // or both are pieces/pcs/none. Otherwise fall back to 1 unit.
+    final ingUnit   = amount.replaceAll(RegExp(r'^[\d./\s]+'), '').trim().toLowerCase();
+    final pantryUnit = item.unit.toLowerCase();
+    final compatible = ingUnit.isEmpty ||
+        ingUnit == pantryUnit ||
+        ingUnit == 'pcs' ||
+        pantryUnit == 'pcs' ||
+        pantryUnit.isEmpty;
+
+    final deduct = compatible ? needed : 1.0;
+    final newQty = item.quantity - deduct;
+
     if (newQty <= 0) {
       items.removeAt(idx);
     } else {

@@ -9,7 +9,6 @@ import '../services/api_service.dart';
 import '../services/offline_recipe_service.dart';
 import '../models/recipe.dart';
 import 'recipe_detail_screen.dart';
-import 'shopping_list_screen.dart';
 
 class RecipeResultsScreen extends StatefulWidget {
   final List<String> ingredients;
@@ -108,7 +107,7 @@ class _RecipeResultsScreenState extends State<RecipeResultsScreen> {
     if (!mounted) return;
 
     if (result.offline) {
-      // Network unreachable — try cache for browse mode
+      // Network unreachable -- try cache for browse mode
       if (widget.ingredients.isEmpty) {
         final cached = await OfflineRecipeService.getCachedRecipes();
         if (!mounted) return;
@@ -134,32 +133,6 @@ class _RecipeResultsScreenState extends State<RecipeResultsScreen> {
   Widget build(BuildContext context) {
     return Scaffold(
       backgroundColor: AppTheme.scaffoldBg(context),
-      extendBody: true,
-      floatingActionButton: (!_loading && _filtered.isNotEmpty && !_fromCache)
-          ? Padding(
-              padding: const EdgeInsets.only(bottom: 16),
-              child: TapScale(
-                onTap: () => Navigator.push(context,
-                    AppTheme.slideUp(ShoppingListScreen(recipes: _filtered))),
-                child: Container(
-                  padding: const EdgeInsets.symmetric(horizontal: 18, vertical: 12),
-                  decoration: BoxDecoration(
-                    gradient: AppTheme.tealGradient,
-                    borderRadius: BorderRadius.circular(20),
-                    boxShadow: const [BoxShadow(color: Color(0x55043B3C), blurRadius: 14, offset: Offset(0, 5))],
-                  ),
-                  child: const Row(mainAxisSize: MainAxisSize.min, children: [
-                    Icon(LucideIcons.shoppingCart, color: Colors.white, size: 16),
-                    SizedBox(width: 8),
-                    Text('Shopping List', style: TextStyle(
-                        color: Colors.white, fontSize: 13,
-                        fontFamily: 'DM Sans', fontWeight: FontWeight.w700)),
-                  ]),
-                ),
-              ),
-            )
-          : null,
-      floatingActionButtonLocation: FloatingActionButtonLocation.centerFloat,
       body: SafeArea(
         child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
           _buildHeader(context),
@@ -192,7 +165,7 @@ class _RecipeResultsScreenState extends State<RecipeResultsScreen> {
         const SizedBox(width: 8),
         const Expanded(
           child: Text(
-            'Offline mode — showing saved recipes',
+            'Offline mode -- showing saved recipes',
             style: TextStyle(
               color: AppTheme.yellow, fontSize: 12,
               fontFamily: 'DM Sans', fontWeight: FontWeight.w600,
@@ -213,28 +186,20 @@ class _RecipeResultsScreenState extends State<RecipeResultsScreen> {
   Widget _buildSearchBar() {
     return Padding(
       padding: const EdgeInsets.fromLTRB(16, 8, 16, 0),
-      child: Container(
-        decoration: BoxDecoration(
-          color: AppTheme.cardBg(context),
-          borderRadius: BorderRadius.circular(12),
-          border: Border.all(color: AppTheme.border(context)),
-        ),
-        child: TextField(
-          controller: _searchCtrl,
-          style: TextStyle(fontFamily: 'DM Sans', fontSize: 14, color: AppTheme.textPrimary(context)),
-          decoration: InputDecoration(
-            hintText: 'Search recipes…',
-            hintStyle: TextStyle(fontFamily: 'DM Sans', fontSize: 14, color: AppTheme.textMuted(context)),
-            prefixIcon: Icon(LucideIcons.search, size: 16, color: AppTheme.textMuted(context)),
-            suffixIcon: _searchQuery.isNotEmpty
-                ? IconButton(
-                    icon: Icon(LucideIcons.x, size: 16, color: AppTheme.textMuted(context)),
-                    onPressed: () { _searchCtrl.clear(); },
-                  )
-                : null,
-            border: InputBorder.none,
-            contentPadding: const EdgeInsets.symmetric(horizontal: 12, vertical: 12),
-          ),
+      child: TextField(
+        controller: _searchCtrl,
+        style: TextStyle(fontFamily: 'DM Sans', fontSize: 14, color: AppTheme.textPrimary(context)),
+        decoration: AppTheme.inputDecoration(
+          context: context,
+          hint: 'Search recipes...',
+          prefixIcon: Icon(LucideIcons.search, size: 16, color: AppTheme.textMuted(context)),
+          suffixIcon: _searchQuery.isNotEmpty
+              ? IconButton(
+                  icon: Icon(LucideIcons.x, size: 16, color: AppTheme.textMuted(context)),
+                  onPressed: () { _searchCtrl.clear(); },
+                )
+              : null,
+          contentPadding: const EdgeInsets.symmetric(horizontal: 12, vertical: 12),
         ),
       ),
     );
@@ -264,7 +229,7 @@ class _RecipeResultsScreenState extends State<RecipeResultsScreen> {
             const SizedBox(width: 14, height: 14,
               child: CircularProgressIndicator(strokeWidth: 2, color: AppTheme.primaryDark)),
             const SizedBox(width: 10),
-            Text('AI is generating personalised recipes…',
+            Text('AI is generating personalised recipes...',
               style: TextStyle(color: AppTheme.textMuted(context), fontSize: 12,
                   fontFamily: 'DM Sans', fontWeight: FontWeight.w500)),
           ]),
@@ -308,7 +273,7 @@ class _RecipeResultsScreenState extends State<RecipeResultsScreen> {
               fontSize: 17, color: AppTheme.textPrimary(context)))),
         const SizedBox(height: 8),
         Center(child: Text(
-          isBusy ? 'Showing saved recipes instead — try again in a moment.' : msg,
+          isBusy ? 'Showing saved recipes instead -- try again in a moment.' : msg,
           textAlign: TextAlign.center,
           style: TextStyle(fontFamily: 'DM Sans', fontSize: 13, color: AppTheme.textMuted(context)))),
         const SizedBox(height: 28),
@@ -342,7 +307,7 @@ class _RecipeResultsScreenState extends State<RecipeResultsScreen> {
             style: TextStyle(fontFamily: 'DM Sans', fontWeight: FontWeight.w700,
                 fontSize: 17, color: AppTheme.textPrimary(context)))),
         const SizedBox(height: 8),
-        Center(child: Text('Connect once to load recipes — they\'ll be saved for offline use.',
+        Center(child: Text('Connect once to load recipes -- they\'ll be saved for offline use.',
             textAlign: TextAlign.center,
             style: TextStyle(fontFamily: 'DM Sans', fontSize: 13, color: AppTheme.textMuted(context)))),
         const SizedBox(height: 28),
@@ -449,7 +414,10 @@ class _RecipeResultsScreenState extends State<RecipeResultsScreen> {
                   imageUrl: r.imageUrl,
                   costPhp: r.costPhp,
                   onTap: () => Navigator.push(context,
-                      AppTheme.slideUp(RecipeDetailScreen(recipe: r))),
+                      AppTheme.slideUp(RecipeDetailScreen(
+                        recipe: r,
+                        userIngredients: widget.ingredients,
+                      ))),
                 );
               },
               childCount: visible.length,

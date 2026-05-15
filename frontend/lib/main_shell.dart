@@ -12,9 +12,9 @@ import 'screens/ingredient_entry_screen.dart';
 
 // ─── MainShell ────────────────────────────────────────────────────────────────
 // Single root widget owning the bottom nav + all 4 tab bodies.
-// IndexedStack keeps every tab alive — no rebuilds on switch.
+// IndexedStack keeps every tab alive -- no rebuilds on switch.
 // FAB center navigates to IngredientEntryScreen (full-screen push).
-// Profile avatar on HomeScreen calls MainShell.switchTab(3) — no duplicate push.
+// Profile avatar on HomeScreen calls MainShell.switchTab(3) -- no duplicate push.
 
 class MainShell extends StatefulWidget {
   const MainShell({super.key});
@@ -216,7 +216,7 @@ class _NavItem extends StatelessWidget {
   }
 }
 
-// FAB — sits above nav bar, unclipped via Stack(clipBehavior: Clip.none)
+// FAB -- sits above nav bar, unclipped via Stack(clipBehavior: Clip.none)
 class _ScanFab extends StatelessWidget {
   final VoidCallback onTap;
   const _ScanFab({required this.onTap});

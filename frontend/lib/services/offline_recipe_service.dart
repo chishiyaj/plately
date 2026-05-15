@@ -7,7 +7,7 @@ import '../models/recipe.dart' show Recipe, RecipeIngredient;
 /// browse all recipes with zero internet connection.
 ///
 /// Only used for the browse catalogue (empty ingredients).
-/// AI-generated recipes (custom ingredients) are not cached — they are
+/// AI-generated recipes (custom ingredients) are not cached -- they are
 /// personalised and require a live connection by design.
 class OfflineRecipeService {
   static Database? _db;
@@ -40,7 +40,7 @@ class OfflineRecipeService {
     return _db!;
   }
 
-  /// Cache a full list of recipes — INSERT OR REPLACE so we always have
+  /// Cache a full list of recipes -- INSERT OR REPLACE so we always have
   /// the latest server data locally.
   static Future<void> cacheRecipes(List<Recipe> recipes) async {
     if (recipes.isEmpty) return;

@@ -1,4 +1,3 @@
-import 'dart:math' as math;
 import 'package:flutter/material.dart';
 import '../theme/app_theme.dart';
 
@@ -22,7 +21,6 @@ class PlatelyLogo extends StatelessWidget {
   Widget build(BuildContext context) {
     final isOnDark = theme == PlatelyLogoTheme.onDark;
     final wordmarkColor = isOnDark ? Colors.white : AppTheme.primaryDark;
-    // Never show background box when placed on a scaffold/appbar — only for launcher icon
     const showBg = false;
 
     return Row(
@@ -81,7 +79,7 @@ class _RingMarkPainter extends CustomPainter {
     final cy = sz.height / 2;
     final r = sz.width / 2;
 
-    // ── Background tile (only on dark backgrounds) ───────────────────────
+    // ── Background tile (only for launcher icon) ──────────────────────────
     if (showBackground) {
       final bgPaint = Paint()
         ..shader = const LinearGradient(
@@ -89,7 +87,6 @@ class _RingMarkPainter extends CustomPainter {
           end: Alignment.bottomRight,
           colors: [Color(0xFF031212), Color(0xFF043B3C)],
         ).createShader(Rect.fromLTWH(0, 0, sz.width, sz.height));
-
       final rrect = RRect.fromRectAndRadius(
         Rect.fromLTWH(0, 0, sz.width, sz.height),
         Radius.circular(r * 0.28),
@@ -97,50 +94,29 @@ class _RingMarkPainter extends CustomPainter {
       canvas.drawRRect(rrect, bgPaint);
     }
 
-    // ── Outer track ring ─────────────────────────────────────────────────
-    final trackR = r * 0.72;
-    // On light bg: use a teal-tinted track; on dark bg: white ghost track
-    final trackColor = showBackground
-        ? Colors.white.withValues(alpha: 0.10)
-        : const Color(0xFF043B3C).withValues(alpha: 0.12);
-    final trackPaint = Paint()
-      ..color = trackColor
+    // ── Full 360deg ring — clean solid green, no accent gap ───────────────
+    final trackR  = r * 0.72;
+    final strokeW = size * 0.095; // slightly thicker = more premium
+
+    // Single full circle — no white accent, no visible seam
+    final ringPaint = Paint()
+      ..color = const Color(0xFF76CC4F)
       ..style = PaintingStyle.stroke
-      ..strokeWidth = size * 0.07
-      ..strokeCap = StrokeCap.round;
-    canvas.drawCircle(Offset(cx, cy), trackR, trackPaint);
+      ..strokeWidth = strokeW
+      ..strokeCap = StrokeCap.butt;
+    canvas.drawCircle(Offset(cx, cy), trackR, ringPaint);
 
-    final arcRect = Rect.fromCircle(center: Offset(cx, cy), radius: trackR);
-
-    // ── White/teal arc — short segment (top-right quarter, ~25%) ─────────
-    final accentArcPaint = Paint()
-      ..color = showBackground
-          ? Colors.white.withValues(alpha: 0.80)
-          : const Color(0xFF043B3C).withValues(alpha: 0.55)
-      ..style = PaintingStyle.stroke
-      ..strokeWidth = size * 0.07
-      ..strokeCap = StrokeCap.round;
-    canvas.drawArc(arcRect, -math.pi / 2, math.pi * 0.5, false, accentArcPaint);
-
-    // ── Green arc — majority ~75% ─────────────────────────────────────────
-    final greenArcPaint = Paint()
-      ..shader = const LinearGradient(
-        colors: [Color(0xFF76CC4F), Color(0xFF3D7B20)],
-        begin: Alignment.topCenter,
-        end: Alignment.bottomCenter,
-      ).createShader(Rect.fromCircle(center: Offset(cx, cy), radius: trackR + size * 0.07))
-      ..style = PaintingStyle.stroke
-      ..strokeWidth = size * 0.07
-      ..strokeCap = StrokeCap.round;
-    canvas.drawArc(arcRect, -math.pi / 2 + math.pi * 0.5, math.pi * 1.5, false, greenArcPaint);
-
-    // ── Centre dot ────────────────────────────────────────────────────────
+    // ── Centre target dot — white outer + green inner ─────────────────────
+    // Outer dot: white (or teal on light backgrounds)
+    final dotColor = showBackground
+        ? Colors.white
+        : const Color(0xFF043B3C);
     canvas.drawCircle(
       Offset(cx, cy),
       size * 0.115,
-      Paint()
-        ..color = showBackground ? Colors.white : const Color(0xFF043B3C),
+      Paint()..color = dotColor,
     );
+    // Inner dot: green core
     canvas.drawCircle(
       Offset(cx, cy),
       size * 0.055,

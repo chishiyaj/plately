@@ -1,0 +1,43 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+  Plately launcher icon foreground — clean full circle ring.
+  Ring centre: 54,54. Ring radius: 22dp. Stroke: 9dp.
+  Full circle = two 180deg semicircle arcs (closed path trick for vector drawables).
+  No white accent arc — pure solid green ring with centre dot.
+  Matches _RingMarkPainter in plately_logo.dart.
+-->
+<vector xmlns:android="http://schemas.android.com/apk/res/android"
+    android:width="108dp"
+    android:height="108dp"
+    android:viewportWidth="108"
+    android:viewportHeight="108">
+
+  <!-- Full circle ring — upper half (top arc: left to right) -->
+  <path
+      android:pathData="M32,54 A22,22 0 0,1 76,54"
+      android:strokeColor="#76CC4F"
+      android:strokeWidth="9"
+      android:strokeLineCap="butt"
+      android:fillColor="@android:color/transparent"/>
+
+  <!-- Full circle ring — lower half (bottom arc: right to left) -->
+  <path
+      android:pathData="M76,54 A22,22 0 0,1 32,54"
+      android:strokeColor="#76CC4F"
+      android:strokeWidth="9"
+      android:strokeLineCap="butt"
+      android:fillColor="@android:color/transparent"/>
+
+  <!-- Centre dot — white outer ring -->
+  <path
+      android:pathData="M54,47.5 A6.5,6.5 0 1,1 53.999,47.5 Z"
+      android:fillColor="#FFFFFF"
+      android:strokeColor="@android:color/transparent"/>
+
+  <!-- Centre dot — green inner core -->
+  <path
+      android:pathData="M54,51 A3,3 0 1,1 53.999,51 Z"
+      android:fillColor="#76CC4F"
+      android:strokeColor="@android:color/transparent"/>
+
+</vector>

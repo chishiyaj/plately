@@ -40,23 +40,24 @@ class _HomeScreenState extends State<HomeScreen> {
   String _name = 'User';
   List<Recipe> _suggested = [];
   List<Map<String, dynamic>> _allHistory = [];
-  List<Map<String, dynamic>> _recentHistory = [];
   bool _loadingRecipes = true;
   bool _loadingHistory = true;
+  bool _historyError = false;
   bool _offline = false;
   bool _wakingUp = false;
+  bool _didInit = false; // AE-3: skip didChangeDependencies on first build
   Timer? _wakeTimer;
   int _calGoal = 2200;
   int _proteinGoal = 120;
   int _calConsumed = 0;
   int _proteinConsumed = 0;
   int _streak = 0;
-  // Calendar state â€” _selectedDay defaults to today; sheet manages the picker
+  // Calendar state â€" _selectedDay defaults to today; sheet manages the picker
   DateTime _selectedDay = DateTime(DateTime.now().year, DateTime.now().month, DateTime.now().day);
   Map<String, dynamic> _selectedDayData = {};
   bool _loadingDayData = false;
 
-  // â”€â”€ Update checker â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+  // â"€â"€ Update checker â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€
   UpdateInfo? _updateInfo;
   bool _updateDismissed = false;
 
@@ -88,7 +89,12 @@ class _HomeScreenState extends State<HomeScreen> {
   @override
   void didChangeDependencies() {
     super.didChangeDependencies();
+    // AE-3: Skip the very first call (fires right after initState, would double-load)
+    if (!_didInit) { _didInit = true; return; }
+    // Reload macros and recent activity every time the home tab becomes active
+    // (e.g. returning from recipe detail after cooking).
     _loadPrefs();
+    _loadHistory();
   }
 
   Future<void> _loadPrefs() async {
@@ -106,17 +112,20 @@ class _HomeScreenState extends State<HomeScreen> {
       });
       _checkStreakMilestones(_streak);
       final lastCooked = await UserPrefsService.getLastCookedName() ?? '';
+      // Read top pantry items for personalised notification copy
+      final pantryNames = await _loadPantryNames();
       NotificationService.schedulePersonalized(
         name: name,
         proteinGoal: (data['protein_goal'] as int?) ?? 120,
         proteinConsumed: (data['protein_consumed'] as int?) ?? 0,
         streak: _streak,
         lastCookedName: lastCooked,
+        pantryItems: pantryNames,
       );
     }
   }
 
-  // â”€â”€ Streak milestone popups â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+  // â"€â"€ Streak milestone popups â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€
   Future<void> _checkStreakMilestones(int streak) async {
     const milestones = [3, 7, 14, 30];
     if (!milestones.contains(streak)) return;
@@ -125,6 +134,34 @@ class _HomeScreenState extends State<HomeScreen> {
     await UserPrefsService.markStreakMilestoneSeen(streak);
     if (!mounted) return;
     _showMilestoneDialog(streak);
+  }
+
+  /// Returns up to 5 pantry item names for the current user (non-stocked items first).
+  Future<List<String>> _loadPantryNames() async {
+    try {
+      final uid = FirebaseAuth.instance.currentUser?.uid ?? 'anonymous';
+      final key = '$uid:pantry_items_v2';
+      final p   = await SharedPreferences.getInstance();
+      final raw = p.getString(key) ?? '[]';
+      final list = (jsonDecode(raw) as List).cast<Map<String, dynamic>>();
+      // Prefer non-always-stocked items (more likely to be relevant)
+      final names = list
+          .where((e) => !(e['alwaysStocked'] as bool? ?? false))
+          .map((e) => e['name'] as String? ?? '')
+          .where((s) => s.isNotEmpty)
+          .take(5)
+          .toList();
+      if (names.isEmpty) {
+        return list
+            .map((e) => e['name'] as String? ?? '')
+            .where((s) => s.isNotEmpty)
+            .take(5)
+            .toList();
+      }
+      return names;
+    } catch (_) {
+      return [];
+    }
   }
 
   static Map<String, String> _milestoneData(int streak) {
@@ -220,7 +257,7 @@ class _HomeScreenState extends State<HomeScreen> {
       );
       await Share.shareXFiles(
         [XFile.fromData(bytes, mimeType: 'image/png', name: 'plately_streak.png')],
-        text: '$streak days cooking with Plately â€” Pre-cook macro tracking hits different. #Plately #NoCap',
+        text: '$streak days cooking with Plately â€" Pre-cook macro tracking hits different. #Plately #NoCap',
       );
     } catch (_) {}
   }
@@ -261,13 +298,142 @@ class _HomeScreenState extends State<HomeScreen> {
       if (mounted) {
         setState(() {
           _allHistory = history;
-          _recentHistory = history.take(2).toList();
+          // AE-14: _recentHistory field removed; _buildActivity() uses _allHistory.take(2) inline
           _loadingHistory = false;
+          _historyError = false;
         });
       }
     } catch (_) {
-      if (mounted) setState(() { _loadingHistory = false; });
+      if (mounted) setState(() { _loadingHistory = false; _historyError = true; });
     }
+  }
+
+  /// Manual macro entry dialog -- lets user log food eaten outside the app.
+  Future<void> _showManualMacroDialog() async {
+    HapticFeedback.selectionClick();
+    final calCtrl = TextEditingController();
+    final proCtrl = TextEditingController();
+
+    // AE-4: await showDialog so we can dispose controllers after it closes
+    await showDialog(
+      context: context,
+      builder: (dCtx) => AlertDialog(
+        backgroundColor: AppTheme.cardBg(dCtx),
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
+        title: Row(children: [
+          Container(
+            width: 36, height: 36,
+            decoration: BoxDecoration(
+              gradient: AppTheme.tealGradient,
+              borderRadius: BorderRadius.circular(10),
+            ),
+            child: const Icon(LucideIcons.pencil, color: Colors.white, size: 16),
+          ),
+          const SizedBox(width: 12),
+          Text('Log food manually',
+              style: TextStyle(
+                color: AppTheme.textPrimary(dCtx),
+                fontFamily: 'DM Sans', fontWeight: FontWeight.w800, fontSize: 16,
+              )),
+        ]),
+        content: Column(mainAxisSize: MainAxisSize.min, children: [
+          Text(
+            'Ate outside? Add your macros here.',
+            style: TextStyle(color: AppTheme.textMuted(dCtx), fontSize: 13, fontFamily: 'DM Sans'),
+          ),
+          const SizedBox(height: 16),
+          TextField(
+            controller: calCtrl,
+            autofocus: true,
+            keyboardType: TextInputType.number,
+            style: TextStyle(color: AppTheme.textPrimary(dCtx), fontFamily: 'DM Sans'),
+            decoration: AppTheme.inputDecoration(
+              context: dCtx,
+              label: 'Calories (kcal)',
+              prefixIcon: Container(
+                margin: const EdgeInsets.all(10),
+                width: 8, height: 8,
+                decoration: const BoxDecoration(color: AppTheme.orange, shape: BoxShape.circle),
+              ),
+            ),
+          ),
+          const SizedBox(height: 12),
+          TextField(
+            controller: proCtrl,
+            keyboardType: TextInputType.number,
+            style: TextStyle(color: AppTheme.textPrimary(dCtx), fontFamily: 'DM Sans'),
+            decoration: AppTheme.inputDecoration(
+              context: dCtx,
+              label: 'Protein (g)',
+              prefixIcon: Container(
+                margin: const EdgeInsets.all(10),
+                width: 8, height: 8,
+                decoration: const BoxDecoration(color: AppTheme.green, shape: BoxShape.circle),
+              ),
+            ),
+          ),
+        ]),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(dCtx),
+            child: Text('Cancel',
+                style: TextStyle(color: AppTheme.textMuted(dCtx), fontFamily: 'DM Sans')),
+          ),
+          TextButton(
+            onPressed: () async {
+              final cal = int.tryParse(calCtrl.text.trim()) ?? 0;
+              final pro = int.tryParse(proCtrl.text.trim()) ?? 0;
+              if (cal <= 0 && pro <= 0) { Navigator.pop(dCtx); return; }
+              Navigator.pop(dCtx);
+              // AE-4: mounted check immediately after pop, before any await
+              if (!mounted) return;
+              final prefs = await UserPrefsService.load();
+              if (!mounted) return;
+              final calNow = (prefs['cal_consumed'] as int?) ?? 0;
+              final proNow = (prefs['protein_consumed'] as int?) ?? 0;
+              await Future.wait([
+                UserPrefsService.saveCalConsumed(calNow + cal),
+                UserPrefsService.saveProteinConsumed(proNow + pro),
+                ApiService.logHistory(
+                  ingredientNames: 'Manual entry',
+                  actionType: 'manual',
+                  recipeCount: 0,
+                  caloriesLogged: cal,
+                  proteinLogged: pro,
+                  recipeId: 0,
+                  recipeName: 'Manual entry',
+                ),
+              ]);
+              if (!mounted) return;
+              _loadPrefs();
+              ScaffoldMessenger.of(context).showSnackBar(SnackBar(
+                content: Row(children: [
+                  const Icon(LucideIcons.circleCheck, color: Colors.white, size: 16),
+                  const SizedBox(width: 8),
+                  Text(
+                    '${cal > 0 ? '+$cal kcal' : ''}${cal > 0 && pro > 0 ? ' · ' : ''}${pro > 0 ? '+${pro}g protein' : ''} logged!',
+                    style: const TextStyle(fontFamily: 'DM Sans', fontWeight: FontWeight.w600),
+                  ),
+                ]),
+                backgroundColor: AppTheme.primaryDark,
+                behavior: SnackBarBehavior.floating,
+                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                margin: const EdgeInsets.fromLTRB(16, 0, 16, 80),
+                duration: const Duration(seconds: 3),
+              ));
+            },
+            child: const Text('Log it',
+                style: TextStyle(
+                    color: AppTheme.primaryDark,
+                    fontFamily: 'DM Sans',
+                    fontWeight: FontWeight.w700)),
+          ),
+        ],
+      ),
+    );
+    // AE-4: Dispose controllers after dialog closes (whether saved or cancelled)
+    calCtrl.dispose();
+    proCtrl.dispose();
   }
 
   Future<void> _selectDay(DateTime day) async {
@@ -285,7 +451,7 @@ class _HomeScreenState extends State<HomeScreen> {
   }
 
   String _getUid() {
-    // MUST match ApiService._uid — Firebase UID, not email.
+    // MUST match ApiService._uid -- Firebase UID, not email.
     // History is written with the UID, so lookups must use the UID too.
     return FirebaseAuth.instance.currentUser?.uid ?? 'anonymous';
   }
@@ -383,7 +549,7 @@ class _HomeScreenState extends State<HomeScreen> {
     );
   }
 
-  // â”€â”€ Update banner â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+  // â"€â"€ Update banner â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€
   Widget _buildUpdateBanner() {
     final info = _updateInfo!;
     return Container(
@@ -398,7 +564,7 @@ class _HomeScreenState extends State<HomeScreen> {
         const SizedBox(width: 10),
         Expanded(
           child: Text(
-            'New update just dropped â€” ${info.message}',
+            'New update just dropped â€" ${info.message}',
             style: const TextStyle(
               color: Colors.white, fontSize: 12,
               fontFamily: 'DM Sans', fontWeight: FontWeight.w500,
@@ -444,7 +610,7 @@ class _HomeScreenState extends State<HomeScreen> {
         child: CircularProgressIndicator(strokeWidth: 2, color: AppTheme.primaryDark)),
       SizedBox(width: 10),
       Expanded(child: Text(
-        'Waking up serverâ€¦ first load may take 30â€“60s',
+        'Waking up serverâ€¦ first load may take 30â€"60s',
         style: TextStyle(color: AppTheme.primaryDark, fontSize: 12,
             fontFamily: 'DM Sans', fontWeight: FontWeight.w500),
       )),
@@ -463,7 +629,7 @@ class _HomeScreenState extends State<HomeScreen> {
       Icon(LucideIcons.wifiOff, size: 14, color: Color(0xFF8B6914)),
       SizedBox(width: 10),
       Expanded(child: Text(
-        'No internet connection â€” showing cached data',
+        'No internet connection â€" showing cached data',
         style: TextStyle(color: Color(0xFF8B6914), fontSize: 12,
             fontFamily: 'DM Sans', fontWeight: FontWeight.w500),
       )),
@@ -554,7 +720,7 @@ class _HomeScreenState extends State<HomeScreen> {
                   fontFamily: 'DM Sans', fontWeight: FontWeight.w800,
                 )),
                 const SizedBox(height: 3),
-                Text('Scan or type â€” get recipes instantly', style: TextStyle(
+                Text('Scan or type â€" get recipes instantly', style: TextStyle(
                   color: Colors.white.withValues(alpha: 0.6), fontSize: 13, fontFamily: 'DM Sans',
                 )),
               ])),
@@ -577,8 +743,8 @@ class _HomeScreenState extends State<HomeScreen> {
     );
   }
 
-  // â”€â”€ Unified macro + date card â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
-  // Date label at top-center â€” tap opens calendar bottom sheet picker.
+  // â"€â"€ Unified macro + date card â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€
+  // Date label at top-center â€" tap opens calendar bottom sheet picker.
   // Macro rings always show. Day detail appears below rings when day != today
   // or when today has data.
   Widget _buildMacroCard() {
@@ -598,7 +764,11 @@ class _HomeScreenState extends State<HomeScreen> {
           final dt = DateTime.parse(h['timestamp'] as String? ?? '');
           return DateTime(dt.year, dt.month, dt.day) == today;
         } catch (_) { return false; }
-      }).map((h) => h['ingredient_names'] as String? ?? '').where((s) => s.isNotEmpty).take(3).toList();
+      }).map((h) {
+        // AE-9: Show recipe_name (dish name) not ingredient_names
+        final name = (h['recipe_name'] as String?)?.trim() ?? '';
+        return name.isNotEmpty ? name : (h['ingredient_names'] as String? ?? '');
+      }).where((s) => s.isNotEmpty).take(3).toList();
     } else {
       displayCal     = (_selectedDayData['total_calories'] as int?) ?? 0;
       displayProtein = (_selectedDayData['total_protein']  as int?) ?? 0;
@@ -628,30 +798,36 @@ class _HomeScreenState extends State<HomeScreen> {
           boxShadow: const [BoxShadow(color: Color(0x06000000), blurRadius: 8, offset: Offset(0, 2))],
         ),
         child: Column(children: [
-          // â”€â”€ Date label â€” tappable, opens calendar sheet â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+          // â"€â"€ Date label â€" tappable, opens calendar sheet â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€
           TapScale(
             onTap: _showCalendarSheet,
             child: Container(
               padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 7),
               decoration: BoxDecoration(
-                color: AppTheme.primaryDark.withValues(alpha: 0.06),
+                color: AppTheme.isDark(context)
+                    ? AppTheme.primaryDark.withValues(alpha: 0.35)
+                    : AppTheme.primaryDark.withValues(alpha: 0.06),
                 borderRadius: BorderRadius.circular(20),
-                border: Border.all(color: AppTheme.primaryDark.withValues(alpha: 0.15)),
+                border: Border.all(
+                  color: AppTheme.isDark(context)
+                      ? AppTheme.primaryDark.withValues(alpha: 0.6)
+                      : AppTheme.primaryDark.withValues(alpha: 0.15),
+                ),
               ),
               child: Row(mainAxisSize: MainAxisSize.min, children: [
-                const Icon(LucideIcons.calendarDays, color: AppTheme.primaryDark, size: 13),
+                Icon(LucideIcons.calendarDays, color: AppTheme.textPrimary(context), size: 13),
                 const SizedBox(width: 6),
-                Text(dateLabel, style: const TextStyle(
-                  color: AppTheme.primaryDark, fontSize: 13,
+                Text(dateLabel, style: TextStyle(
+                  color: AppTheme.textPrimary(context), fontSize: 13,
                   fontFamily: 'DM Sans', fontWeight: FontWeight.w700,
                 )),
                 const SizedBox(width: 4),
-                const Icon(LucideIcons.chevronDown, color: AppTheme.primaryDark, size: 12),
+                Icon(LucideIcons.chevronDown, color: AppTheme.textPrimary(context), size: 12),
               ]),
             ),
           ),
           const SizedBox(height: 16),
-          // â”€â”€ Macro rings row â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+          // â"€â"€ Macro rings row â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€
           Row(children: [
             SizedBox(
               width: 72, height: 72,
@@ -687,7 +863,26 @@ class _HomeScreenState extends State<HomeScreen> {
                     style: TextStyle(color: AppTheme.textMuted(context), fontSize: 12, fontFamily: 'DM Sans')),
               ]),
             ])),
-            Column(children: [
+            Column(mainAxisSize: MainAxisSize.min, children: [
+              // Log food manually -- only visible for today
+              if (isToday)
+                TapScale(
+                  onTap: _showManualMacroDialog,
+                  child: Container(
+                    width: 38, height: 38,
+                    margin: const EdgeInsets.only(bottom: 6),
+                    decoration: BoxDecoration(
+                      color: AppTheme.primaryDark.withValues(alpha: AppTheme.isDark(context) ? 0.35 : 0.08),
+                      borderRadius: BorderRadius.circular(12),
+                      border: Border.all(
+                        color: AppTheme.primaryDark.withValues(alpha: AppTheme.isDark(context) ? 0.6 : 0.18),
+                      ),
+                    ),
+                    child: Icon(LucideIcons.plus,
+                        color: AppTheme.isDark(context) ? AppTheme.darkTextPrimary : AppTheme.primaryDark,
+                        size: 16),
+                  ),
+                ),
               Container(
                 width: 44, height: 44,
                 decoration: BoxDecoration(
@@ -705,7 +900,7 @@ class _HomeScreenState extends State<HomeScreen> {
                   )),
             ]),
           ]),
-          // â”€â”€ Day detail â€” loading / data / empty â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+          // â"€â"€ Day detail â€" loading / data / empty â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€
           const SizedBox(height: 12),
           if (_loadingDayData)
             Container(
@@ -738,18 +933,6 @@ class _HomeScreenState extends State<HomeScreen> {
                   _macroChip(displayCal, 'kcal', AppTheme.primaryDark),
                   const SizedBox(width: 8),
                   _macroChip(displayProtein, 'g protein', AppTheme.green),
-                  if (isToday) ...[
-                    const Spacer(),
-                    Container(
-                      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
-                      decoration: BoxDecoration(
-                        color: AppTheme.primaryDark.withValues(alpha: 0.08),
-                        borderRadius: BorderRadius.circular(6),
-                      ),
-                      child: const Text('Today', style: TextStyle(color: AppTheme.primaryDark,
-                          fontSize: 10, fontFamily: 'DM Sans', fontWeight: FontWeight.w700)),
-                    ),
-                  ],
                 ]),
                 if (displayRecipes.isNotEmpty) ...[
                   const SizedBox(height: 8),
@@ -759,8 +942,8 @@ class _HomeScreenState extends State<HomeScreen> {
                       color: AppTheme.green.withValues(alpha: 0.1),
                       borderRadius: BorderRadius.circular(6),
                     ),
-                    child: Text(_trimIngredientNames(r), style: const TextStyle(
-                      color: AppTheme.primaryDark, fontSize: 11,
+                    child: Text(_trimIngredientNames(r), style: TextStyle(
+                      color: AppTheme.textPrimary(context), fontSize: 11,
                       fontFamily: 'DM Sans', fontWeight: FontWeight.w600,
                     )),
                   )).toList()),
@@ -789,7 +972,7 @@ class _HomeScreenState extends State<HomeScreen> {
     );
   }
 
-  // â”€â”€ Calendar bottom sheet â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+  // â"€â"€ Calendar bottom sheet â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€
   void _showCalendarSheet() {
     HapticFeedback.selectionClick();
     // Sheet has its own month state so scrolling months doesn't affect main screen
@@ -942,20 +1125,27 @@ class _HomeScreenState extends State<HomeScreen> {
     );
   }
 
-  Widget _macroChip(int value, String unit, Color color) => Container(
-    padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
-    decoration: BoxDecoration(
-      color: color.withValues(alpha: 0.1),
-      borderRadius: BorderRadius.circular(8),
-    ),
-    child: Row(mainAxisSize: MainAxisSize.min, children: [
-      Container(width: 6, height: 6, decoration: BoxDecoration(color: color, shape: BoxShape.circle)),
-      const SizedBox(width: 5),
-      Text('$value $unit', style: TextStyle(
-        color: color, fontSize: 12, fontFamily: 'DM Sans', fontWeight: FontWeight.w700,
-      )),
-    ]),
-  );
+  Widget _macroChip(int value, String unit, Color color) {
+    // In dark mode, AppTheme.primaryDark (#043B3C) on a dark card is invisible.
+    // Use a brighter colour when the chip color is primaryDark and we're in dark mode.
+    final effectiveColor = (color == AppTheme.primaryDark && AppTheme.isDark(context))
+        ? AppTheme.darkTextPrimary
+        : color;
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+      decoration: BoxDecoration(
+        color: effectiveColor.withValues(alpha: AppTheme.isDark(context) ? 0.15 : 0.10),
+        borderRadius: BorderRadius.circular(8),
+      ),
+      child: Row(mainAxisSize: MainAxisSize.min, children: [
+        Container(width: 6, height: 6, decoration: BoxDecoration(color: effectiveColor, shape: BoxShape.circle)),
+        const SizedBox(width: 5),
+        Text('$value $unit', style: TextStyle(
+          color: effectiveColor, fontSize: 12, fontFamily: 'DM Sans', fontWeight: FontWeight.w700,
+        )),
+      ]),
+    );
+  }
 
   Widget _buildActionRow() {
     const actions = [
@@ -1106,7 +1296,28 @@ class _HomeScreenState extends State<HomeScreen> {
          .shimmer(duration: 1200.ms, color: Colors.white.withValues(alpha: 0.6)))),
       );
     }
-    if (_recentHistory.isEmpty) {
+    if (_historyError) {
+      return Padding(
+        padding: const EdgeInsets.fromLTRB(20, 14, 20, 0),
+        child: Container(
+          padding: const EdgeInsets.all(20),
+          decoration: BoxDecoration(
+            color: AppTheme.cardBg(context),
+            borderRadius: BorderRadius.circular(16),
+            border: Border.all(color: AppTheme.border(context)),
+          ),
+          child: Row(children: [
+            Icon(LucideIcons.wifiOff, color: AppTheme.textMuted(context), size: 20),
+            const SizedBox(width: 12),
+            Expanded(
+              child: Text("Couldn't load activity. Pull down to retry.",
+                  style: TextStyle(color: AppTheme.textMuted(context), fontSize: 13, fontFamily: 'DM Sans')),
+            ),
+          ]),
+        ),
+      );
+    }
+    if (_allHistory.take(2).isEmpty) {
       return Padding(
         padding: const EdgeInsets.fromLTRB(20, 14, 20, 0),
         child: Container(
@@ -1128,12 +1339,14 @@ class _HomeScreenState extends State<HomeScreen> {
     return Padding(
       padding: const EdgeInsets.fromLTRB(20, 14, 20, 0),
       child: Column(
-        children: _recentHistory.asMap().entries.map((e) {
+        children: _allHistory.take(2).toList().asMap().entries.map((e) {
           final i = e.key;
           final h = e.value;
           final ts = h['timestamp'] as String? ?? '';
           return ActivityRow(
-            recipeName: _trimIngredientNames(h['ingredient_names'] as String? ?? 'Cooking session'),
+            recipeName: (h['recipe_name'] as String? ?? '').isNotEmpty
+                ? h['recipe_name'] as String
+                : _trimIngredientNames(h['ingredient_names'] as String? ?? 'Cooking session'),
             ingredients: h['action_type'] as String? ?? 'cooked',
             time: _formatTimestamp(ts),
             onTap: () => Navigator.push(context, AppTheme.slideUp(const HistoryScreen())),
@@ -1162,7 +1375,7 @@ class _HomeScreenState extends State<HomeScreen> {
   }
 }
 
-// â”€â”€ Ring painter â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+// â"€â"€ Ring painter â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€
 class _RingPainter extends CustomPainter {
   final double progress;
   final Color color;

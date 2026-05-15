@@ -121,7 +121,7 @@ class _AiChatScreenState extends State<AiChatScreen>
     setState(() {
       _active.messages.add(ChatMessage(text: text, isUser: true, timestamp: DateTime.now()));
       if (_active.title == 'New chat') {
-        _active.title = text.length > 38 ? '${text.substring(0, 38)}…' : text;
+        _active.title = text.length > 38 ? '${text.substring(0, 38)}...' : text;
       }
       _loading = true;
     });
@@ -280,7 +280,7 @@ class _Header extends StatelessWidget {
         ),
       ),
       const SizedBox(width: 4),
-      // New Chat button — greyed out when current session is already empty (no messages)
+      // New Chat button -- greyed out when current session is already empty (no messages)
       Opacity(
         opacity: isEmpty ? 0.35 : 1.0,
         child: TapScale(
@@ -312,11 +312,13 @@ class _WelcomeView extends StatelessWidget {
     (icon: LucideIcons.piggyBank,    label: 'Budget\nmeals',           q: 'What are cheap high-protein meals a student can make?'),
     (icon: LucideIcons.calendarDays, label: 'Meal prep\nplan',         q: 'Plan a 5-day high-protein meal prep for a student'),
   ];
-  static const _colors = [
-    AppTheme.scanGreen,    Color(0xFF2E6B29),
-    AppTheme.typeBlue,     Color(0xFF2E3472),
-    AppTheme.browseYellow, Color(0xFF6B5A10),
-    AppTheme.askPurple,    Color(0xFF5A1F6B),
+  // bg light / fg light / bg dark / fg dark
+  // Dark mode: muted mid-tones so text is readable without neon glare
+  static const _chipData = [
+    (bgLight: AppTheme.scanGreen,    fgLight: Color(0xFF2E6B29), bgDark: Color(0xFF1A2E1A), fgDark: Color(0xFF4E9030)),
+    (bgLight: AppTheme.typeBlue,     fgLight: Color(0xFF2E3472), bgDark: Color(0xFF1A1C28), fgDark: Color(0xFF5E6AAA)),
+    (bgLight: AppTheme.browseYellow, fgLight: Color(0xFF6B5A10), bgDark: Color(0xFF242014), fgDark: Color(0xFF8A7020)),
+    (bgLight: AppTheme.askPurple,    fgLight: Color(0xFF5A1F6B), bgDark: Color(0xFF221428), fgDark: Color(0xFF704888)),
   ];
 
   @override
@@ -348,17 +350,26 @@ class _WelcomeView extends StatelessWidget {
           crossAxisCount: 2, crossAxisSpacing: 12, mainAxisSpacing: 12, childAspectRatio: 1.5),
         itemCount: _prompts.length,
         itemBuilder: (_, i) {
-          final p = _prompts[i]; final bg = _colors[i * 2]; final fg = _colors[i * 2 + 1];
+          final p = _prompts[i];
+          final chip = _chipData[i];
+          final isDark = AppTheme.isDark(context);
+          final bg  = isDark ? chip.bgDark  : chip.bgLight.withValues(alpha: 0.55);
+          final fg  = isDark ? chip.fgDark  : chip.fgLight;
+          final iconBg = isDark ? fg.withValues(alpha: 0.12) : chip.bgLight;
           return TapScale(
             onTap: () => onPrompt(p.q),
             child: Container(
               padding: const EdgeInsets.all(14),
               decoration: BoxDecoration(
-                color: bg.withValues(alpha: 0.35), borderRadius: BorderRadius.circular(18),
-                border: Border.all(color: bg.withValues(alpha: 0.6)),
+                color: bg,
+                borderRadius: BorderRadius.circular(18),
+                border: Border.all(
+                  color: isDark ? fg.withValues(alpha: 0.18) : chip.bgLight,
+                  width: isDark ? 1.0 : 1.2,
+                ),
               ),
               child: Column(crossAxisAlignment: CrossAxisAlignment.start, mainAxisAlignment: MainAxisAlignment.spaceBetween, children: [
-                Container(width: 32, height: 32, decoration: BoxDecoration(color: bg, borderRadius: BorderRadius.circular(10)),
+                Container(width: 32, height: 32, decoration: BoxDecoration(color: iconBg, borderRadius: BorderRadius.circular(10)),
                     child: Icon(p.icon, color: fg, size: 16)),
                 Text(p.label, style: TextStyle(color: fg, fontSize: 13, fontFamily: 'DM Sans', fontWeight: FontWeight.w700, height: 1.25)),
               ]),
@@ -383,20 +394,44 @@ class _MessageList extends StatelessWidget {
       required this.showTimes, required this.scrollCtrl, required this.onCopy, required this.onPrompt});
 
   @override
-  Widget build(BuildContext context) => ListView.builder(
-    controller: scrollCtrl,
-    padding: const EdgeInsets.fromLTRB(16, 16, 16, 8),
-    itemCount: messages.length + (loading ? 1 : 0),
-    itemBuilder: (_, i) {
-      if (i == messages.length) return _TypingIndicator().animate().fadeIn(duration: 200.ms).slideY(begin: 0.1);
-      final m = messages[i];
-      final showTs = showTimes ||
-          (i == messages.length - 1 && !m.isUser) ||
-          (i < messages.length - 1 && m.isUser && !messages[i + 1].isUser);
-      return _Bubble(key: ValueKey('${sessionId}_$i'), message: m, showTimestamp: showTs, onCopy: () => onCopy(m.text))
-          .animate().fadeIn(duration: 260.ms).slideY(begin: 0.04, duration: 280.ms, curve: Curves.easeOutCubic);
-    },
-  );
+  Widget build(BuildContext context) {
+    final trimmed = messages.length > 30;
+    return ListView.builder(
+      controller: scrollCtrl,
+      padding: const EdgeInsets.fromLTRB(16, 16, 16, 8),
+      itemCount: messages.length + (loading ? 1 : 0) + (trimmed ? 1 : 0),
+      itemBuilder: (_, i) {
+        if (trimmed && i == 0) {
+          return Container(
+            margin: const EdgeInsets.only(bottom: 12),
+            padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
+            decoration: BoxDecoration(
+              color: const Color(0xFFEABA1C).withValues(alpha: 0.12),
+              borderRadius: BorderRadius.circular(12),
+              border: Border.all(color: const Color(0xFFEABA1C).withValues(alpha: 0.3)),
+            ),
+            child: const Row(children: [
+              Icon(LucideIcons.circleAlert, size: 14, color: Color(0xFF8A6F00)),
+              SizedBox(width: 8),
+              Expanded(child: Text(
+                'Long conversation -- only the last 6 messages are sent to AI to save context.',
+                style: TextStyle(color: Color(0xFF8A6F00), fontSize: 11,
+                    fontFamily: 'DM Sans', fontWeight: FontWeight.w500),
+              )),
+            ]),
+          ).animate().fadeIn(duration: 200.ms);
+        }
+        final msgIdx = trimmed ? i - 1 : i;
+        if (msgIdx == messages.length) return _TypingIndicator().animate().fadeIn(duration: 200.ms).slideY(begin: 0.1);
+        final m = messages[msgIdx];
+        final showTs = showTimes ||
+            (msgIdx == messages.length - 1 && !m.isUser) ||
+            (msgIdx < messages.length - 1 && m.isUser && !messages[msgIdx + 1].isUser);
+        return _Bubble(key: ValueKey('${sessionId}_$msgIdx'), message: m, showTimestamp: showTs, onCopy: () => onCopy(m.text))
+            .animate().fadeIn(duration: 260.ms).slideY(begin: 0.04, duration: 280.ms, curve: Curves.easeOutCubic);
+      },
+    );
+  }
 }
 
 // ─── Message Bubble ───────────────────────────────────────────────────────────
@@ -439,7 +474,9 @@ class _Bubble extends StatelessWidget {
                     color: message.isUser ? null
                         : message.text.startsWith('ERROR:')
                             ? AppTheme.red.withValues(alpha: 0.12)
-                            : AppTheme.cardAltBg(context),
+                            : AppTheme.isDark(context)
+                                ? AppTheme.cardBg(context)
+                                : const Color(0xFFE8E6E0),  // warm gray on cream bg
                     gradient: message.isUser ? AppTheme.tealGradient : null,
                     borderRadius: BorderRadius.only(
                       topLeft: const Radius.circular(20), topRight: const Radius.circular(20),
@@ -587,7 +624,12 @@ class _InputBar extends StatelessWidget {
             hintText: 'Ask anything about cooking...',
             hintStyle: TextStyle(color: AppTheme.textMuted(context), fontSize: 14.5, fontFamily: 'DM Sans'),
             contentPadding: const EdgeInsets.symmetric(vertical: 13),
+            // Suppress all borders and fill -- the outer Container handles styling
             border: InputBorder.none,
+            enabledBorder: InputBorder.none,
+            focusedBorder: InputBorder.none,
+            filled: true,
+            fillColor: Colors.transparent,
           ),
         )),
         const SizedBox(width: 8),

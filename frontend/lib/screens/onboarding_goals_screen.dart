@@ -377,11 +377,14 @@ class _OnboardingGoalsScreenState extends State<OnboardingGoalsScreen> {
       Text('Sex', style: TextStyle(
           fontFamily: 'DM Sans', color: AppTheme.textMuted(context), fontSize: 13)),
       const SizedBox(height: 8),
-      Row(children: [
-        Expanded(child: _sexChip('male',   'Male')),
-        const SizedBox(width: 8),
-        Expanded(child: _sexChip('female', 'Female')),
-      ]),
+      SizedBox(
+        height: 44,
+        child: Row(children: [
+          Expanded(child: _sexChip('male',   'Male')),
+          const SizedBox(width: 8),
+          Expanded(child: _sexChip('female', 'Female')),
+        ]),
+      ),
     ]);
   }
 
@@ -416,20 +419,33 @@ class _OnboardingGoalsScreenState extends State<OnboardingGoalsScreen> {
       width: double.infinity,
       height: 48,
       decoration: BoxDecoration(
-        color: AppTheme.primaryDark.withValues(alpha: 0.08),
+        color: AppTheme.isDark(context)
+            ? AppTheme.green
+            : AppTheme.primaryDark.withValues(alpha: 0.08),
         borderRadius: BorderRadius.circular(14),
-        border: Border.all(color: AppTheme.primaryDark.withValues(alpha: 0.3)),
+        border: Border.all(
+          color: AppTheme.isDark(context)
+              ? AppTheme.green
+              : AppTheme.primaryDark.withValues(alpha: 0.3),
+        ),
+        boxShadow: AppTheme.isDark(context)
+            ? [BoxShadow(color: AppTheme.green.withValues(alpha: 0.35), blurRadius: 10, offset: const Offset(0, 4))]
+            : null,
       ),
       child: Center(
         child: _loading
-          ? const SizedBox(width: 20, height: 20,
-              child: CircularProgressIndicator(color: AppTheme.primaryDark, strokeWidth: 2))
-          : const Row(mainAxisSize: MainAxisSize.min, children: [
-              Icon(LucideIcons.calculator, color: AppTheme.primaryDark, size: 16),
-              SizedBox(width: 8),
+          ? SizedBox(width: 20, height: 20,
+              child: CircularProgressIndicator(
+                color: AppTheme.isDark(context) ? AppTheme.primaryDark : AppTheme.primaryDark,
+                strokeWidth: 2))
+          : Row(mainAxisSize: MainAxisSize.min, children: [
+              Icon(LucideIcons.calculator,
+                color: AppTheme.isDark(context) ? AppTheme.primaryDark : AppTheme.primaryDark,
+                size: 16),
+              const SizedBox(width: 8),
               Text('Calculate TDEE', style: TextStyle(
-                color: AppTheme.primaryDark, fontSize: 14,
-                fontFamily: 'DM Sans', fontWeight: FontWeight.w700,
+                color: AppTheme.isDark(context) ? AppTheme.primaryDark : AppTheme.primaryDark,
+                fontSize: 14, fontFamily: 'DM Sans', fontWeight: FontWeight.w800,
               )),
             ]),
       ),
