@@ -35,11 +35,30 @@ if USE_PG:
         return _pg_pool_instance
 
     def get_db():
-        """Return a pooled PG connection. Caller must call putconn() when done."""
-        return _get_pg_pool().getconn()
+        """Return a pooled PG connection. Auto-recreates pool if Neon killed idle connections."""
+        global _pg_pool_instance
+        pool = _get_pg_pool()
+        try:
+            conn = pool.getconn()
+            # Ping to verify the connection is alive — Neon drops idle connections after ~5 min
+            conn.cursor().execute("SELECT 1")
+            return conn
+        except Exception:
+            # Connection is dead — close the whole pool and recreate it fresh
+            logger.warning("PG connection dead, recreating pool...")
+            try:
+                pool.closeall()
+            except Exception:
+                pass
+            with _pool_lock:
+                _pg_pool_instance = None
+            return _get_pg_pool().getconn()
 
     def putconn(conn):
-        _get_pg_pool().putconn(conn)
+        try:
+            _get_pg_pool().putconn(conn)
+        except Exception:
+            pass
 
     PLACEHOLDER = "%s"
 
@@ -625,7 +644,7 @@ def _seed():
             "ingredients": [("noodles","250g"),("pork","150g"),("eggs","2"),("cabbage","1 cup"),("carrot","1"),("garlic","3 cloves"),("soy sauce","2 tbsp"),("cornstarch","2 tbsp")]
         },
         {
-            "name": "Bicol Express",
+            "name": "Bicol Express Classic",
             "cook_time": "35 min", "difficulty": "Medium", "tags": "Filipino,High-Protein",
             # Pork belly cooked in spicy coconut milk with chilis, rich and creamy
             "image_url": "https://images.unsplash.com/photo-1565557623262-b51c2513a641?w=600&q=80",
@@ -755,7 +774,7 @@ def _seed():
             "ingredients": [("noodles","150g"),("shrimp","150g"),("eggs","2"),("garlic","2 cloves"),("soy sauce","2 tbsp"),("fish sauce","1 tbsp"),("sugar","1 tsp"),("lime","0.5"),("peanuts","2 tbsp")]
         },
 
-        # ── 4 Italian ─────────────────────────────────────────────────────────
+        # ── 4 Italian ─────────────────────────────────────────────────────
         {
             "name": "Cacio e Pepe",
             "cook_time": "20 min", "difficulty": "Medium", "tags": "Italian,Vegetarian,High-Protein",
