@@ -263,19 +263,24 @@ class _HomeScreenState extends State<HomeScreen> {
   }
 
   Future<void> _loadSuggested() async {
-    if (mounted) setState(() { _loadingRecipes = true; _wakingUp = false; });
+    if (mounted) setState(() { _loadingRecipes = true; _wakingUp = false; _offline = false; });
     _wakeTimer?.cancel();
     _wakeTimer = Timer(const Duration(seconds: 3), () {
       if (mounted && _loadingRecipes) setState(() => _wakingUp = true);
     });
+
     final recipes = await ApiService.getRecipes([]);
     _wakeTimer?.cancel();
+
     if (mounted) {
       if (recipes.isEmpty) {
+        // Only show offline banner if the backend is actually unreachable.
+        // If it's reachable but returned empty (e.g. DB issue), just show cache silently.
+        final online = await ApiService.isOnline();
         final cached = await _loadCachedRecipes();
         setState(() {
           _suggested = cached.take(4).toList();
-          _offline = true;
+          _offline = !online; // true only when backend is genuinely unreachable
           _loadingRecipes = false;
           _wakingUp = false;
         });
