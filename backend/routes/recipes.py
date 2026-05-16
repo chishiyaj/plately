@@ -282,9 +282,9 @@ def _browse_query(prefs: dict, per_page: int, offset: int) -> list:
     # Sorting: High-Protein first if pref_hipro, then by id
     if pref_hipro:
         if USE_PG:
-            order_sql = " ORDER BY (r.tags ILIKE '%High-Protein%') DESC, n.protein DESC NULLS LAST, r.id"
+            order_sql = " ORDER BY CASE WHEN r.tags ILIKE '%High-Protein%' THEN 0 ELSE 1 END, n.protein DESC NULLS LAST, r.id"
         else:
-            order_sql = " ORDER BY (LOWER(r.tags) LIKE '%high-protein%') DESC, COALESCE(n.protein, 0) DESC, r.id"
+            order_sql = " ORDER BY CASE WHEN LOWER(r.tags) LIKE '%high-protein%' THEN 0 ELSE 1 END, COALESCE(n.protein, 0) DESC, r.id"
     else:
         order_sql = " ORDER BY r.id"
 
