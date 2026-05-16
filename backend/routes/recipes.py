@@ -328,8 +328,15 @@ def get_recipes():
 
         # -- Browse mode (no ingredients) -- applies pref filtering/sorting --
         if not ingredients:
-            rows  = _browse_query(prefs, per_page, offset)
-            total = query("SELECT COUNT(*) as c FROM recipes")[0]["c"]
+            try:
+                rows = _browse_query(prefs, per_page, offset)
+            except Exception as e:
+                logger.warning("Browse query failed (%s), retrying once...", e)
+                rows = _browse_query(prefs, per_page, offset)
+            try:
+                total = query("SELECT COUNT(*) as c FROM recipes")[0]["c"]
+            except Exception:
+                total = len(rows)
             result = []
             for r in rows:
                 nutrition = {
