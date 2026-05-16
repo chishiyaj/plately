@@ -331,11 +331,17 @@ def get_recipes():
             try:
                 rows = _browse_query(prefs, per_page, offset)
             except Exception as e:
-                logger.warning("Browse query failed (%s), retrying once...", e)
-                rows = _browse_query(prefs, per_page, offset)
+                logger.error("Browse query attempt 1 failed: %s", e, exc_info=True)
+                try:
+                    rows = _browse_query(prefs, per_page, offset)
+                except Exception as e2:
+                    logger.error("Browse query attempt 2 failed: %s", e2, exc_info=True)
+                    # Last resort — return all recipes with no sorting
+                    rows = query(f"SELECT r.*, n.calories, n.protein, n.carbs, n.fat, n.cost_php FROM recipes r LEFT JOIN nutrition n ON n.recipe_id = r.id ORDER BY r.id LIMIT {ph} OFFSET {ph}", (per_page, offset))
             try:
                 total = query("SELECT COUNT(*) as c FROM recipes")[0]["c"]
-            except Exception:
+            except Exception as e:
+                logger.error("COUNT query failed: %s", e)
                 total = len(rows)
             result = []
             for r in rows:
