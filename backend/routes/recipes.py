@@ -1,7 +1,7 @@
 """
 routes/recipes.py
-- No ingredients  → browse seeded DB (paginated)
-- With ingredients → AI generates 5 tailored recipes using ingredients + user prefs
+- No ingredients  -> browse seeded DB (paginated), prefs applied for filtering/sorting
+- With ingredients -> AI generates 5 tailored recipes using ingredients + user prefs
 - AI results cached in-memory by (ingredients + prefs) fingerprint for 1 hour
 - Tag values are normalised server-side so client filters always work
 - AI recipe instructions are stored with \n between steps so detail screen splits correctly
@@ -18,7 +18,7 @@ logger = logging.getLogger(__name__)
 OPENROUTER_URL = "https://openrouter.ai/api/v1/chat/completions"
 MODEL          = "google/gemma-4-31b-it:free"
 
-_VALID_TAGS = {"Asian", "Italian", "Vegetarian", "Low-Cal", "High-Protein", "Filipino"}
+_VALID_TAGS = {"Asian", "Italian", "Vegetarian", "Low-Cal", "High-Protein", "Filipino", "Budget", "Quick"}
 
 
 def _normalise_tags(raw: str) -> str:
@@ -27,6 +27,8 @@ def _normalise_tags(raw: str) -> str:
         "low cal": "Low-Cal", "low-cal": "Low-Cal", "lowcal": "Low-Cal", "low calorie": "Low-Cal",
         "vegetarian": "Vegetarian", "vegan": "Vegetarian",
         "asian": "Asian", "italian": "Italian", "filipino": "Filipino", "pinoy": "Filipino",
+        "budget": "Budget", "cheap": "Budget", "affordable": "Budget",
+        "quick": "Quick", "fast": "Quick",
     }
     parts = [t.strip() for t in raw.split(",")]
     normalised = []
@@ -68,7 +70,6 @@ def _cache_get(fp: str):
             )
         if rows:
             cached = json.loads(rows[0]["recipes_json"])
-            # Guard: never return empty cached results
             if isinstance(cached, list) and len(cached) > 0:
                 return cached
     except Exception as e:
@@ -77,9 +78,8 @@ def _cache_get(fp: str):
 
 
 def _cache_set(fp: str, data: list):
-    # Guard: only cache non-empty results
     if not data or len(data) == 0:
-        logger.info("Skipping cache write — empty result set")
+        logger.info("Skipping cache write -- empty result set")
         return
     try:
         recipes_json = json.dumps(data)
@@ -112,9 +112,9 @@ def _build_prompt(ingredients: list, prefs: dict) -> str:
     if no_dairy:   restrictions.append("strictly dairy-free (no milk, cheese, butter, cream)")
 
     goal_map = {
-        "lose":     f"cutting — target {cal_goal} kcal/day, high protein {pro_goal}g/day, low fat",
-        "gain":     f"bulking — target {cal_goal} kcal/day, high protein {pro_goal}g/day, calorie-dense",
-        "maintain": f"maintaining — target {cal_goal} kcal/day, protein {pro_goal}g/day, balanced macros",
+        "lose":     f"cutting -- target {cal_goal} kcal/day, high protein {pro_goal}g/day, low fat",
+        "gain":     f"bulking -- target {cal_goal} kcal/day, high protein {pro_goal}g/day, calorie-dense",
+        "maintain": f"maintaining -- target {cal_goal} kcal/day, protein {pro_goal}g/day, balanced macros",
     }
     goal_desc  = goal_map.get(goal, goal_map["maintain"])
     restr_line = f"Dietary restrictions (MUST follow): {', '.join(restrictions)}." if restrictions else "No dietary restrictions."
@@ -131,11 +131,14 @@ User fitness goal: {goal_desc}
 STRICT RULES:
 1. Use ONLY the provided ingredients plus max 3 common pantry items (salt, oil, water, soy sauce, pepper, vinegar, sugar).
 2. Every recipe must be cookable in a student dorm with basic equipment.
-3. Cost must be realistic: under ₱200 per serving in the Philippines.
-4. Adjust macros to the user's goal — do not ignore it.
-5. Respect ALL dietary restrictions — do not include forbidden ingredients.
-6. Tags MUST be chosen ONLY from this exact list: Asian, Italian, Vegetarian, Low-Cal, High-Protein
-   Use 1-2 tags per recipe. Match them accurately.
+3. Cost must be realistic: under 200 PHP per serving in the Philippines.
+4. Adjust macros to the user's goal -- do not ignore it.
+5. Respect ALL dietary restrictions -- do not include forbidden ingredients.
+6. Tags MUST be chosen ONLY from this exact list: Filipino, Asian, Italian, Vegetarian, Low-Cal, High-Protein, Budget, Quick
+   - Use "Filipino" for any traditional Filipino dish (adobo, sinigang, tinola, etc.)
+   - Use "Budget" for dishes that cost under 80 PHP per serving
+   - Use "Quick" for dishes ready in 15 minutes or less
+   - Use 1-3 tags per recipe. Match them accurately.
 7. Instructions MUST be exactly 5 numbered steps separated by newline characters.
    Format: "1. Step one.\\n2. Step two.\\n3. Step three.\\n4. Step four.\\n5. Step five."
 8. Difficulty must be exactly "Easy", "Medium", or "Hard".
@@ -147,7 +150,7 @@ Respond ONLY with a valid JSON array. No markdown fences, no explanation, no ext
     "name": "Recipe Name",
     "cook_time": "20 min",
     "difficulty": "Easy",
-    "tags": "Asian,High-Protein",
+    "tags": "Filipino,High-Protein",
     "instructions": "1. Step one.\\n2. Step two.\\n3. Step three.\\n4. Step four.\\n5. Step five.",
     "ingredients": [
       {{"name": "chicken", "amount": "200g"}},
@@ -165,7 +168,6 @@ Respond ONLY with a valid JSON array. No markdown fences, no explanation, no ext
 
 def _extract_json_array(raw: str) -> str:
     """Robustly extract a JSON array from AI response, even if wrapped in markdown."""
-    # Strip markdown fences
     if "```" in raw:
         parts = raw.split("```")
         for p in parts:
@@ -177,7 +179,6 @@ def _extract_json_array(raw: str) -> str:
                 break
 
     raw = raw.strip()
-    # Find the outermost JSON array
     start = raw.find("[")
     end   = raw.rfind("]")
     if start != -1 and end != -1 and end > start:
@@ -188,7 +189,7 @@ def _extract_json_array(raw: str) -> str:
 def _generate_ai_recipes(ingredients: list, prefs: dict) -> list:
     key = os.getenv("OPENROUTER_API_KEY", "").strip()
     if not key:
-        logger.warning("OPENROUTER_API_KEY not set — returning empty for DB fallback")
+        logger.warning("OPENROUTER_API_KEY not set -- returning empty for DB fallback")
         return []
 
     prompt = _build_prompt(ingredients, prefs)
@@ -208,25 +209,23 @@ def _generate_ai_recipes(ingredients: list, prefs: dict) -> list:
         timeout=35,
     )
 
-    # Log rate limit / status before raise_for_status
     if resp.status_code == 429:
-        logger.warning("OpenRouter 429 rate limit — AI recipe gen failed")
+        logger.warning("OpenRouter 429 rate limit -- AI recipe gen failed")
         raise requests.exceptions.HTTPError(response=resp)
     if resp.status_code == 503:
-        logger.warning("OpenRouter 503 unavailable — AI recipe gen failed")
+        logger.warning("OpenRouter 503 unavailable -- AI recipe gen failed")
         raise requests.exceptions.HTTPError(response=resp)
 
     resp.raise_for_status()
     raw = resp.json()["choices"][0]["message"]["content"].strip()
 
-    # Log raw response for Railway debugging
     logger.info("Raw OpenRouter recipe response (first 400 chars): %s", raw[:400])
 
     raw = _extract_json_array(raw)
     recipes = json.loads(raw)
 
     if not isinstance(recipes, list):
-        logger.warning("AI returned non-list JSON — got: %s", type(recipes))
+        logger.warning("AI returned non-list JSON -- got: %s", type(recipes))
         return []
 
     cleaned = []
@@ -248,6 +247,53 @@ def _generate_ai_recipes(ingredients: list, prefs: dict) -> list:
     return cleaned
 
 
+def _browse_query(prefs: dict, per_page: int, offset: int) -> list:
+    """
+    Browse mode query -- applies dietary pref filters to the DB result set.
+    - pref_veg=True  -> only show Vegetarian-tagged recipes
+    - pref_hipro=True -> sort High-Protein recipes to the top
+    Gluten/dairy have no reliable DB column so we skip filtering for them here
+    (they apply in AI mode via _build_prompt).
+    """
+    pref_veg   = prefs.get("pref_veg", False)
+    pref_hipro = prefs.get("pref_hipro", True)
+
+    base_sql = (
+        "SELECT r.*, n.calories, n.protein, n.carbs, n.fat, n.cost_php "
+        "FROM recipes r LEFT JOIN nutrition n ON n.recipe_id = r.id"
+    )
+
+    where_clauses = []
+    params: list = []
+
+    if pref_veg:
+        # Filter to only vegetarian-tagged recipes
+        if USE_PG:
+            where_clauses.append(f"r.tags ILIKE {ph}")
+            params.append("%Vegetarian%")
+        else:
+            where_clauses.append(f"LOWER(r.tags) LIKE {ph}")
+            params.append("%vegetarian%")
+
+    where_sql = ""
+    if where_clauses:
+        where_sql = " WHERE " + " AND ".join(where_clauses)
+
+    # Sorting: High-Protein first if pref_hipro, then by id
+    if pref_hipro:
+        if USE_PG:
+            order_sql = " ORDER BY (r.tags ILIKE '%High-Protein%') DESC, n.protein DESC NULLS LAST, r.id"
+        else:
+            order_sql = " ORDER BY (LOWER(r.tags) LIKE '%high-protein%') DESC, COALESCE(n.protein, 0) DESC, r.id"
+    else:
+        order_sql = " ORDER BY r.id"
+
+    limit_sql = f" LIMIT {ph} OFFSET {ph}"
+    params += [per_page, offset]
+
+    return query(base_sql + where_sql + order_sql + limit_sql, tuple(params))
+
+
 @bp.route("/api/recipes", methods=["POST"])
 @limiter.limit("30 per minute")
 def get_recipes():
@@ -267,7 +313,6 @@ def get_recipes():
         prefs       = data.get("prefs") or {}
         if not isinstance(prefs, dict):
             prefs = {}
-        # Field-level validation — clamp numeric goals, coerce booleans
         cal_goal     = prefs.get("cal_goal", 2200)
         protein_goal = prefs.get("protein_goal", 120)
         if not isinstance(cal_goal, (int, float)) or cal_goal < 500 or cal_goal > 10000:
@@ -277,18 +322,13 @@ def get_recipes():
         for k in ("pref_veg", "pref_gluten", "pref_dairy", "pref_hipro"):
             if k in prefs and not isinstance(prefs[k], bool):
                 prefs[k] = bool(prefs.get(k, False))
-        page        = max(1, int(data.get("page", 1)))
-        per_page    = min(50, max(1, int(data.get("per_page", 50))))
-        offset      = (page - 1) * per_page
+        page     = max(1, int(data.get("page", 1)))
+        per_page = min(50, max(1, int(data.get("per_page", 50))))
+        offset   = (page - 1) * per_page
 
-        # ── Browse mode (no ingredients) ──────────────────────────────────
+        # -- Browse mode (no ingredients) -- applies pref filtering/sorting --
         if not ingredients:
-            rows = query(
-                f"SELECT r.*, n.calories, n.protein, n.carbs, n.fat, n.cost_php "
-                f"FROM recipes r LEFT JOIN nutrition n ON n.recipe_id = r.id "
-                f"ORDER BY r.id LIMIT {ph} OFFSET {ph}",
-                (per_page, offset),
-            )
+            rows  = _browse_query(prefs, per_page, offset)
             total = query("SELECT COUNT(*) as c FROM recipes")[0]["c"]
             result = []
             for r in rows:
@@ -305,7 +345,7 @@ def get_recipes():
                 "meta": {"page": page, "per_page": per_page, "total": total},
             }), 200
 
-        # ── Ingredient mode — AI-generated tailored recipes ───────────────
+        # -- Ingredient mode -- AI-generated tailored recipes --
         fp_data = {
             "ings":  sorted(ingredients),
             "goal":  prefs.get("goal", "maintain"),
@@ -325,34 +365,46 @@ def get_recipes():
         try:
             ai_recipes = _generate_ai_recipes(ingredients, prefs)
         except requests.exceptions.Timeout:
-            logger.warning("AI recipe generation timed out — DB fallback")
+            logger.warning("AI recipe generation timed out -- DB fallback")
             ai_recipes = []
             ai_error_msg = "AI timed out"
         except requests.exceptions.HTTPError as e:
             status_code = e.response.status_code if e.response is not None else 0
             if status_code == 429:
-                ai_error_msg = "AI busy — showing saved recipes instead"
+                ai_error_msg = "AI busy -- showing saved recipes instead"
             else:
                 ai_error_msg = f"AI service error ({status_code})"
-            logger.warning("AI recipe HTTP error (%s) — DB fallback", e)
+            logger.warning("AI recipe HTTP error (%s) -- DB fallback", e)
             ai_recipes = []
         except (json.JSONDecodeError, KeyError, IndexError, ValueError) as e:
-            logger.warning("AI recipe parse error (%s) — DB fallback", e)
+            logger.warning("AI recipe parse error (%s) -- DB fallback", e)
             ai_recipes = []
             ai_error_msg = "AI response parse error"
 
         if ai_recipes:
+            # Sort AI recipes by how many scanned ingredients they use (most matches first)
+            ing_set = set(ingredients)
+            for r in ai_recipes:
+                recipe_ings = set(i["name"].lower().strip() for i in r.get("ingredients", []))
+                r["_match_count"] = len(ing_set & recipe_ings)
+            ai_recipes.sort(key=lambda r: r["_match_count"], reverse=True)
+            for r in ai_recipes:
+                r.pop("_match_count", None)
             _cache_set(fingerprint, ai_recipes)
             return jsonify({"status": "ok", "data": ai_recipes, "meta": {"source": "ai"}}), 200
 
-        # ── DB fallback when AI fails ─────────────────────────────────────
+        # -- DB fallback when AI fails --
+        # Rank by how many scanned ingredients each recipe matches (most matches first)
         placeholders = ",".join([ph] * len(ingredients))
         rows = query(
-            f"SELECT DISTINCT r.*, n.calories, n.protein, n.carbs, n.fat, n.cost_php "
+            f"SELECT r.*, n.calories, n.protein, n.carbs, n.fat, n.cost_php, "
+            f"COUNT(DISTINCT i.id) as match_count "
             f"FROM recipes r LEFT JOIN nutrition n ON n.recipe_id = r.id "
             f"JOIN recipe_ingredients ri ON ri.recipe_id = r.id "
             f"JOIN ingredients i ON i.id = ri.ingredient_id "
-            f"WHERE LOWER(i.name) IN ({placeholders}) ORDER BY r.id",
+            f"WHERE LOWER(i.name) IN ({placeholders}) "
+            f"GROUP BY r.id, n.calories, n.protein, n.carbs, n.fat, n.cost_php "
+            f"ORDER BY match_count DESC, n.protein DESC NULLS LAST, r.id",
             tuple(ingredients),
         )
         result = []
@@ -369,13 +421,11 @@ def get_recipes():
         logger.info("DB fallback returned %d recipes (ai_error: %s)", len(result), ai_error_msg)
 
         if result:
-            # DB has matches — return them with a note about AI failure
             meta = {"source": "db"}
             if ai_error_msg:
                 meta["ai_note"] = ai_error_msg
             return jsonify({"status": "ok", "data": result, "meta": meta}), 200
         else:
-            # Nothing from AI or DB
             msg = ai_error_msg or "No recipes found for those ingredients"
             return jsonify({"status": "error", "message": msg, "data": []}), 200
 
@@ -387,12 +437,13 @@ def get_recipes():
 
 
 @bp.route("/api/recipe/<int:recipe_id>", methods=["GET"])
+@limiter.limit("60 per minute")
 def get_recipe(recipe_id):
     try:
         if recipe_id < 0:
             return jsonify({
                 "status": "error",
-                "message": "AI-generated recipe — use full data from results list.",
+                "message": "AI-generated recipe -- use full data from results list.",
             }), 404
 
         rows = query(
