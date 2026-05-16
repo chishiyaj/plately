@@ -3,6 +3,7 @@ name: Build & Distribute APK
 on:
   push:
     branches: [ main ]
+    tags: [ 'v*' ]
   workflow_dispatch:
 
 jobs:
@@ -66,3 +67,11 @@ jobs:
             --app ${{ secrets.FIREBASE_APP_ID }} \
             --groups "testers" \
             --release-notes "Auto build from commit ${{ github.sha }} — ${{ github.event.head_commit.message }}"
+
+      - name: Upload APK to GitHub Release
+        uses: softprops/action-gh-release@v2
+        if: startsWith(github.ref, 'refs/tags/')
+        with:
+          files: frontend/build/app/outputs/flutter-apk/app-release.apk
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
